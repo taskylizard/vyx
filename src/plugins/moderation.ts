@@ -41,13 +41,18 @@ async function messageUpdate(
   message: Message<AnyTextableChannel | Uncached>,
   oldMessage: JSONMessage | null
 ) {
-  if (!message || !oldMessage || message.content === oldMessage.content) {
+  if (
+    !message ||
+    !oldMessage ||
+    message.content === oldMessage.content ||
+    !oldMessage.guildID
+  ) {
     return;
   }
 
   const config = await client.prisma.config.findUnique({
     where: {
-      guildId: BigInt(oldMessage!.guildID!)
+      guildId: BigInt(oldMessage.guildID)
     },
     select: {
       logsChannel: true
