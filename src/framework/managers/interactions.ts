@@ -203,7 +203,7 @@ export class InteractionsManager {
 
         // Production
         for (const [_, command] of this.handlers.commands) {
-          if (command.disabled) return;
+          if (command.disabled || command.moduleId) return;
           if (
             typeof command.guilds === 'undefined' ||
             command.guilds.length === 0
