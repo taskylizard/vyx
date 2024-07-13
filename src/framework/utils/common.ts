@@ -1,6 +1,5 @@
-import { readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'pathe';
+import { dirname } from 'pathe';
 
 /**
  * Imports a module and returns its default export.
@@ -14,36 +13,6 @@ export async function importDefault<T>(path: string): Promise<T> {
       default: T;
     }
   ).default;
-}
-
-/**
- * Runs a function and return the result and error in an array, similar to Golang error handling.
- *
- * @param cb Function to execute.
- * @returns Array with the result of the function and the error.
- */
-export async function goErr<T>(cb: () => T): Promise<[Awaited<T>, Error]> {
-  try {
-    const val = await cb();
-    return [val, undefined as unknown as Error];
-  } catch (error) {
-    return [undefined as unknown as Awaited<T>, error as Error];
-  }
-}
-
-/**
- * Runs a function and return the result and error in an array, similar to Golang error handling.
- *
- * @param cb Function to execute.
- * @returns Array with the result of the function and the error.
- */
-export function goErrSync<T>(cb: () => T): [T, Error] {
-  try {
-    const val = cb();
-    return [val, undefined as unknown as Error];
-  } catch (error) {
-    return [undefined as unknown as T, error as Error];
-  }
 }
 
 /**
@@ -71,34 +40,6 @@ export function formatDuration(duration: number | undefined): string {
     return `${minutes}:${seconds}`;
   }
   return `${hours}:${minutes}:${seconds}`;
-}
-
-/**
- * Reads a directory's file paths recursively, filtering for `.js` and `.ts` files by default.
- *
- * @param dir Directory to read.
- * @returns Array of file paths.
- */
-export function readPathsRecursively(
-  dir: string,
-  disableFilter = false
-): string[] {
-  return [
-    ...new Set(
-      readdirSync(dir)
-        .filter((path) => (disableFilter ? true : /^.+(\.[jt]s)?$/.test(path)))
-        .filter((file) => !file.includes('actions'))
-        .map((path) => resolve(dir, path))
-        .map((path) =>
-          goErrSync(() => statSync(path).isDirectory())[0]
-            ? readPathsRecursively(path)
-            : [path]
-        )
-        // make sure directories are before files
-        .sort((a, b) => (a.length > b.length ? -1 : 1))
-        .flat()
-    )
-  ];
 }
 
 /**

@@ -9,9 +9,14 @@ await client.connect();
 client.on('ready', async () => {
   await client.application
     .bulkEditGlobalCommands([])
-    .then(() => {
+    .then(async () => {
+      for await (const [_, guild] of client.guilds) {
+        await client.application.bulkEditGuildCommands(guild.id, []);
+      }
+    })
+    .catch((error) => console.error(error))
+    .finally(() => {
       client.disconnect();
       process.exit(0);
-    })
-    .catch((error) => console.error(error));
+    });
 });

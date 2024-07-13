@@ -1,8 +1,9 @@
 import { Logger } from '@control.systems/logger';
+import { fdir } from 'fdir';
 import { join } from 'pathe';
 import type { Client } from '../client';
 import type { Middleware, Plugin } from '../structures/plugin';
-import { importDefault, readPathsRecursively } from '../utils/common';
+import { importDefault } from '../utils/common';
 
 export class PluginsManager {
   public plugins: Map<string, Plugin>;
@@ -31,7 +32,10 @@ export class PluginsManager {
 
   public async load(): Promise<void> {
     this.logger.debug(`Started loading plugins from ${this.dir}...`);
-    const files = readPathsRecursively(join(this.dir, 'plugins'));
+    const load = (directory: string) =>
+      new fdir().withFullPaths().crawl(join(this.dir, directory));
+
+    const files = await load('plugins').withPromise();
 
     for (const file of files) await this.loadPlugin(file);
 

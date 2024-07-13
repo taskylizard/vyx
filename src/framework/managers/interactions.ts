@@ -1,4 +1,5 @@
 import { Color, ColorCode, Logger } from '@control.systems/logger';
+import { fdir } from 'fdir';
 import type {
   ApplicationCommandOptions,
   ApplicationCommandOptionsSubCommand,
@@ -16,8 +17,7 @@ import {
   type Interaction,
   type SlashCommand,
   type UserCommand,
-  importDefault,
-  readPathsRecursively
+  importDefault
 } from '..';
 
 export class InteractionsManager {
@@ -52,11 +52,14 @@ export class InteractionsManager {
   public async load(): Promise<void> {
     this.logger.debug(`Started loading interactions from ${this.dir}...`);
 
-    const commands = readPathsRecursively(join(this.dir, 'commands'));
+    const load = (directory: string) =>
+      new fdir().withFullPaths().crawl(join(this.dir, directory));
+
+    const commands = await load('commands').withPromise();
     for (const file of commands) await this.loadSlashCommand(file);
-    const userCommands = readPathsRecursively(join(this.dir, 'user'));
+    const userCommands = await load('user').withPromise();
     for (const file of userCommands) await this.loadUserCommand(file);
-    const components = readPathsRecursively(join(this.dir, 'interactions'));
+    const components = await load('interactions').withPromise();
     for (const file of components) await this.loadComponentInteraction(file);
 
     this.logger.info(
@@ -197,14 +200,19 @@ export class InteractionsManager {
           ])
           .catch(this.logger.error);
       } else {
+        // Production
+
         this.logger.info(
           `Running in ${Color.get(ColorCode.BRIGHT_GREEN)('production')} mode.`
         );
 
-        // Production
-        for (const [_, command] of this.handlers.commands) {
-          if (command.disabled || command.moduleId) return;
+        // Map over them for Global and Guild commands.
+        for (const command of this.handlers.commands
+          .filter((command) => !command.moduleId)
+          .filter((command) => !command.disabled)
+          .values()) {
           if (
+            !command.guilds ||
             typeof command.guilds === 'undefined' ||
             command.guilds.length === 0
           ) {
