@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Case {
+  caseId        Int    @map("case_id")
+  guildId       BigInt @map("guild_id")
+  caseCreator   BigInt @map("case_creator")
+  moderatedUser BigInt @map("moderated_user")
+  type          String
+  reason        String
+  createdAt     BigInt @map("created_at")
+
+  @@id([caseId, guildId])
+  @@index([moderatedUser])
+  @@map("cases")
+}
+
+model Config {
+  guildId        BigInt   @id @map("guild_id")
+  logsChannel    BigInt?  @map("logs_channel")
+  reportsChannel BigInt?  @map("reports_channel")
+  currency       String?
+  modules        Module[]
+
+  @@map("config")
+}
+
+enum Module {
+  MODERATION
+  MUSIC
+  ECONOMY
+}
+
+model Report {
+  reportId       String       @map("report_id")
+  guildId        BigInt       @map("guild_id")
+  createdMember  BigInt       @map("created_member")
+  reportedMember BigInt       @map("reported_member")
+  reason         String
+  status         ReportStatus @default(value: OPEN)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  resolvedAt     DateTime?    @map("resolved_at")
+
+  @@id([reportId, guildId])
+  @@map("reports")
+}
+
+enum ReportStatus {
+  OPEN
+  CLOSED
+}
+
+model Reminder {
+  id                Int      @id @default(autoincrement())
+  userId            String   @map("user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  time              DateTime
+  content           String
+  messageLink       String   @map("message_link")
+  reminderMessageId String?  @unique @map("reminder_message_id")
+}
+
+model EconomyProfile {
+  guildId   BigInt @map("guild_id")
+  userId    BigInt @map("user_id")
+  walletBal Int    @map("wallet_bal")
+  bankBal   Int    @map("bank_bal")
+
+  @@id([guildId, userId])
+  @@map("economy")
+}
+
+model ShopItem {
+  itemId      Int     @map("item_id")
+  guildId     BigInt  @map("guild_id")
+  name        String
+  description String
+  role        BigInt?
+  price       Float
+
+  @@id([itemId, guildId])
+  @@map("shop_items")
+}
