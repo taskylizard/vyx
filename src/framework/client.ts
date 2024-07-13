@@ -262,12 +262,28 @@ export class Client extends BaseClient {
     const subcommand = interaction.data.options.getSubCommand(false);
 
     if (subcommand) {
-      const result = cmd?.subcommands?.find(
+      let result = cmd?.subcommands?.find(
         (subcmd) => subcmd.name === subcommand[0]
       );
       if (!result) {
         this.logger.trace(`SubCommand ${subcommand[0]} not found`);
         return;
+      }
+
+      // HACK: fix this garbage and handle nested levels
+      if (
+        result &&
+        !result.run &&
+        result.subcommands &&
+        result.subcommands.length > 0
+      ) {
+        result = result?.subcommands?.find(
+          (subcmd) => subcmd.name === subcommand[1]
+        );
+        if (!result) {
+          this.logger.trace(`SubCommand ${subcommand[1]} not found`);
+          return;
+        }
       }
       cmd = result;
     }
