@@ -160,8 +160,7 @@ export class Client extends BaseClient {
       } catch (error) {
         this.logger.error('Failed to fetch bot owners:', error);
       }
-      await this.managers.interactions.updateCommands();
-      await this.managers.interactions.syncModules();
+      return await this.managers.interactions.updateCommands();
     });
 
     this.on('commandError', (ctx, error) =>

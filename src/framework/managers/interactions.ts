@@ -162,6 +162,8 @@ export class InteractionsManager {
         );
       }
     }
+
+    this.logger.info('Synced server modules configuration.');
   }
 
   /**
@@ -188,20 +190,22 @@ export class InteractionsManager {
           .filter((command) => !command.disabled)
           .map((command) => this.toSlashJson(command));
 
-        await this.client.application.bulkEditGuildCommands(this.testingGuild, [
-          ...commandData,
-          ...userCommandList
-        ]);
+        await this.client.application
+          .bulkEditGuildCommands(this.testingGuild, [
+            ...commandData,
+            ...userCommandList
+          ])
+          .catch(this.logger.error);
       } else {
         this.logger.info(
-          `Running in ${Color.get(ColorCode.BRIGHT_GREEN)('production')} mode...`
+          `Running in ${Color.get(ColorCode.BRIGHT_GREEN)('production')} mode.`
         );
 
         // Production
         for (const [_, command] of this.handlers.commands) {
-          if (!command.disabled) return;
+          if (command.disabled) return;
           if (
-            typeof command.guilds !== 'undefined' &&
+            typeof command.guilds === 'undefined' ||
             command.guilds.length === 0
           ) {
             // Global commands
@@ -216,15 +220,9 @@ export class InteractionsManager {
         }
 
         // Then bulk set every one.
-        if (this.client.application) {
-          await this.client.application
-            .bulkEditGlobalCommands([...slashCommands, ...userCommandList])
-            .catch(this.logger.error);
-        } else {
-          this.logger.warn(
-            'client.application is somehow undefined. Global slash commands will not be set.'
-          );
-        }
+        await this.client.application
+          .bulkEditGlobalCommands([...slashCommands, ...userCommandList])
+          .catch(this.logger.error);
 
         // Bulk setting Guild commands.
         for (const [id, guildCommandData] of guildSlashCommands.entries()) {
@@ -250,6 +248,8 @@ export class InteractionsManager {
     this.logger.info(
       `Updated all ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands.`
     );
+
+    await this.syncModules();
   }
 
   public toSlashJson(command: SlashCommand): CreateApplicationCommandOptions {
