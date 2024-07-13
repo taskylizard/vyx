@@ -56,6 +56,27 @@ export default defineSlashCommand({
           });
 
         if (config.modules.includes(mod)) {
+          // HACK: Sometimes Discord will just shit itself and will not sync modules commands
+          // HACK: This is a fix for this until I figure out
+
+          const commands = await ctx.client.application.getGuildCommands(
+            ctx.guild!.id
+          );
+          const resolvedCommand = commands.find(
+            (cmd) => cmd.name === command.name
+          );
+
+          if (!resolvedCommand) {
+            // That means they don't exist in the guild, so we add them back.
+            await ctx.client.application.createGuildCommand(
+              ctx.interaction.guildID!,
+              ctx.client.managers.interactions.toSlashJson(command)
+            );
+
+            return await ctx.reply(
+              'The module is enabled but its commands did not exist here, I have added them back.'
+            );
+          }
           return await ctx.reply('That seems to be already enabled.');
         }
 
