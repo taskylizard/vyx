@@ -116,7 +116,7 @@ type SlashCommandBase<O extends Option[]> = {
 } & Omit<CreateMessageApplicationCommandOptions, 'type'>;
 
 type SlashCommandWithRun<O extends Option[]> = SlashCommandBase<O> & {
-  subcommands?: never;
+  subcommands?: { error: `Not possible with description, options, run()` };
   /**
    * The description of the command.
    */
@@ -134,9 +134,9 @@ type SlashCommandWithRun<O extends Option[]> = SlashCommandBase<O> & {
 };
 
 type SlashCommandWithSubcommands<O extends Option[]> = SlashCommandBase<O> & {
-  description?: never;
-  options?: never;
-  run?: never;
+  description?: { error: `Not possible with subcommands` };
+  options?: { error: `Not possible with subcommands` };
+  run?: { error: `Not possible with subcommands` };
   /**
    * The subcommands for the command.
    */
