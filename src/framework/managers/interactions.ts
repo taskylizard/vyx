@@ -271,21 +271,21 @@ export class InteractionsManager {
           for (const subsubcommand of subcommand.subcommands) {
             suboptions.push({
               name: subsubcommand.name,
-              description: subsubcommand.description!,
+              description: subsubcommand.description,
               type: ApplicationCommandOptionTypes.SUB_COMMAND,
               options: subsubcommand.options
             });
           }
           options.push({
             name: subcommand.name,
-            description: subcommand.description!,
+            description: subcommand.description,
             type: ApplicationCommandOptionTypes.SUB_COMMAND_GROUP,
             options: suboptions
           });
         } else {
           options.push({
             name: subcommand.name,
-            description: subcommand.description!,
+            description: subcommand.description,
             type: ApplicationCommandOptionTypes.SUB_COMMAND,
             options: subcommand.options
           });
@@ -296,7 +296,7 @@ export class InteractionsManager {
     return {
       type: ApplicationCommandTypes.CHAT_INPUT,
       name: command.name,
-      description: command.description!,
+      description: command.description,
       options: options,
       integrationTypes: command.integrationTypes,
       nsfw: command.nsfw,

@@ -14,6 +14,7 @@ const modules: ApplicationCommandOptionsChoice<ApplicationCommandOptionTypes.STR
 
 export default defineSlashCommand({
   name: 'modules',
+  description: 'Toggle server modules.',
   guildOnly: true,
   requiredPermissions: ['MANAGE_GUILD'],
   subcommands: [

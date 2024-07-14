@@ -15,6 +15,7 @@ const DefaultPlaylist =
 export default defineSlashCommand({
   name: 'music',
   moduleId: 'MUSIC',
+  description: 'Relax with soothing sounds!',
   guildOnly: true,
   subcommands: [
     {

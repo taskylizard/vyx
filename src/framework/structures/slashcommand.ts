@@ -1,4 +1,4 @@
-import type { Module } from '@prisma/client';
+import type { $Enums } from '@prisma/client';
 import type {
   ApplicationCommandOptions,
   ApplicationCommandOptionsWithValue,
@@ -8,11 +8,14 @@ import type {
 } from 'oceanic.js';
 import type { Context } from './context';
 
-type SlashCommandBase = {
+/**
+ * Interface representing a command.
+ */
+export type SlashCommand = {
   /**
    * Module id for modular commands splitting.
    */
-  moduleId?: Module;
+  moduleId?: $Enums.Module;
   /**
    * If this command is disabled.
    */
@@ -21,6 +24,18 @@ type SlashCommandBase = {
    * The name of the command.
    */
   name: string;
+  /**
+   * The description of the command.
+   */
+  description: string;
+  /**
+   * The options for the command.
+   */
+  options?: ApplicationCommandOptions[];
+  /**
+   * The subcommands for the command.
+   */
+  subcommands?: SubCommand[];
   /**
    * Whether the command is owner-only.
    */
@@ -58,35 +73,13 @@ type SlashCommandBase = {
    * @returns {Promise<boolean>} Whether the pre-load check passes.
    */
   check?: (ctx: Context) => Promise<boolean>;
-} & Omit<CreateMessageApplicationCommandOptions, 'type'>;
-
-type CommandWithDescription = SlashCommandBase & {
-  /**
-   * The description of the command.
-   */
-  description: string;
-  /**
-   * The options for the command.
-   */
-  options?: ApplicationCommandOptions[];
-  subcommands?: never;
   /**
    * The main handler of your command.
    * @param {Context} ctx - The command context.
    * @returns {Promise<unknown>} A promise that resolves when the command is executed.
    */
   run?: ((ctx: Context) => Promise<unknown>) | string;
-};
-
-type CommandWithSubcommands = SlashCommandBase & {
-  description?: never;
-  options?: never;
-  run?: never;
-  /**
-   * The subcommands for the command.
-   */
-  subcommands: SubCommand[];
-};
+} & Omit<CreateMessageApplicationCommandOptions, 'type'>;
 
 type SubCommandEndpoint = Omit<SlashCommand, 'options' | 'subcommands'>;
 
@@ -100,8 +93,6 @@ export type SubCommand = SubCommandEndpoint & {
    */
   subcommands?: SubCommand[];
 };
-
-export type SlashCommand = CommandWithDescription | CommandWithSubcommands;
 
 /**
  * Defines a slash command with the given options.

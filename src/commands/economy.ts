@@ -8,6 +8,7 @@ import {
 export default defineSlashCommand({
   name: 'economy',
   moduleId: 'ECONOMY',
+  description: 'Server economy.',
   guildOnly: true,
   subcommands: [
     {

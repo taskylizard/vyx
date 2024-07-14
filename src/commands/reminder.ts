@@ -8,6 +8,7 @@ import { defineSlashCommand } from '#framework';
 
 export default defineSlashCommand({
   name: 'reminder',
+  description: 'Manage your reminders.',
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,

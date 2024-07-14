@@ -12,6 +12,7 @@ import { Embed, defineSlashCommand, splitArray } from '#framework';
 export default defineSlashCommand({
   name: 'moderation',
   moduleId: 'MODERATION',
+  description: 'Server moderation commands!',
   guildOnly: true,
   requiredPermissions: ['VIEW_AUDIT_LOG', 'MANAGE_GUILD'],
   subcommands: [
