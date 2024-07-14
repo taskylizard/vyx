@@ -1,5 +1,4 @@
 import {
-  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js';
@@ -31,10 +30,10 @@ export default defineSlashCommand({
       name: 'repo',
       description:
         'The repository as owner/repo or its link. It must be public.',
-      type: ApplicationCommandOptionTypes.STRING,
+      type: 'string',
       required: true
     }
-  ],
+  ] as const,
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,
@@ -45,9 +44,8 @@ export default defineSlashCommand({
     ApplicationIntegrationTypes.GUILD_INSTALL
   ],
   async run(ctx) {
-    const option = ctx.options.getString('repo', true);
     const regex = /http(s)?:\/\/github.com\//;
-    const input = option.replace(regex, '');
+    const input = ctx.options.repo.replace(regex, '');
 
     // urls
     const url = `https://api.github.com/repos/${input}`;

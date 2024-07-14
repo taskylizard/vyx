@@ -1,14 +1,63 @@
 import type { Module } from '@prisma/client';
 import type {
-  ApplicationCommandOptions,
-  ApplicationCommandOptionsWithValue,
   AutocompleteInteraction,
-  Constants,
-  CreateMessageApplicationCommandOptions
+  CreateMessageApplicationCommandOptions,
+  PermissionName
 } from 'oceanic.js';
 import type { Context } from './context';
 
-type SlashCommandBase = {
+export type OptionType =
+  | 'boolean'
+  | 'string'
+  | 'integer'
+  | 'number'
+  | 'user'
+  | 'role'
+  | 'channel'
+  | 'snowflake';
+
+export type Option = {
+  name: string;
+  description: string;
+  type: OptionType;
+  required?: boolean;
+};
+
+export type ExtractNames<O extends Option[]> = O[number]['name'];
+
+export type ExtractOptionByName<
+  O extends Option[],
+  K extends string
+> = O[number] extends infer P ? (P extends { name: K } ? P : never) : never;
+
+export type OptionValue<Opt extends Option> = Opt['required'] extends true
+  ? NullableValue<OptionTypeValue<Opt['type']>, Opt['required']>
+  : OptionTypeValue<Opt['type']> | null;
+
+type NullableValue<
+  O extends any,
+  Required extends boolean | undefined
+> = Required extends true ? O : O | null;
+
+export type OptionTypeValue<T extends OptionType> = T extends 'boolean'
+  ? boolean
+  : T extends 'string'
+    ? string
+    : T extends 'integer'
+      ? number
+      : T extends 'number'
+        ? number
+        : T extends 'user'
+          ? string
+          : T extends 'role'
+            ? string
+            : T extends 'channel'
+              ? string
+              : T extends 'snowflake'
+                ? string
+                : never;
+
+type SlashCommandBase<O extends Option[]> = {
   /**
    * Module id for modular commands splitting.
    */
@@ -40,7 +89,7 @@ type SlashCommandBase = {
   /**
    * The permissions required to execute the command.
    */
-  requiredPermissions?: Constants.PermissionName[];
+  requiredPermissions?: PermissionName[];
   /**
    * The autocomplete handler for the command.
    * @param {Object} options - The autocomplete options.
@@ -49,7 +98,7 @@ type SlashCommandBase = {
    * @returns {Promise<unknown>} A promise that resolves when autocomplete is handled.
    */
   autocomplete?: (options: {
-    ctx: Context;
+    ctx: Context<O>;
     autocomplete: AutocompleteInteraction;
   }) => Promise<unknown>;
   /**
@@ -57,10 +106,10 @@ type SlashCommandBase = {
    * @param {Context} ctx - The command context.
    * @returns {Promise<boolean>} Whether the pre-load check passes.
    */
-  check?: (ctx: Context) => Promise<boolean>;
+  check?: (ctx: Context<O>) => Promise<boolean>;
 } & Omit<CreateMessageApplicationCommandOptions, 'type'>;
 
-type CommandWithDescription = SlashCommandBase & {
+type SlashCommandWithDescription<O extends Option[]> = SlashCommandBase<O> & {
   /**
    * The description of the command.
    */
@@ -68,46 +117,53 @@ type CommandWithDescription = SlashCommandBase & {
   /**
    * The options for the command.
    */
-  options?: ApplicationCommandOptions[];
+  options?: O;
   subcommands?: never;
   /**
    * The main handler of your command.
    * @param {Context} ctx - The command context.
    * @returns {Promise<unknown>} A promise that resolves when the command is executed.
    */
-  run?: ((ctx: Context) => Promise<unknown>) | string;
+  run?: (ctx: Context<O>) => Promise<unknown> | string;
 };
 
-type CommandWithSubcommands = SlashCommandBase & {
+type SlashCommandWithSubcommands<O extends Option[]> = SlashCommandBase<O> & {
   description?: never;
   options?: never;
   run?: never;
   /**
    * The subcommands for the command.
    */
-  subcommands: SubCommand[];
+  subcommands: SubCommand<O>[];
 };
 
-type SubCommandEndpoint = Omit<SlashCommand, 'options' | 'subcommands'>;
+type SubCommandEndpoint<O extends Option[]> = Omit<
+  SlashCommand<O>,
+  'options' | 'subcommands'
+>;
 
-export type SubCommand = SubCommandEndpoint & {
+export type SubCommand<O extends Option[]> = SubCommandEndpoint<O> & {
   /**
    * The options for the subcommand.
    */
-  options?: ApplicationCommandOptionsWithValue[];
+  options?: O;
   /**
    * The subcommands for the subcommand.
    */
-  subcommands?: SubCommand[];
+  subcommands?: SubCommand<O>[];
 };
 
-export type SlashCommand = CommandWithDescription | CommandWithSubcommands;
+export type SlashCommand<F extends Option[]> =
+  | SlashCommandWithDescription<F>
+  | SlashCommandWithSubcommands<F>;
 
 /**
  * Defines a slash command with the given options.
  * @param {SlashCommand} options - The options for the command.
  * @returns {SlashCommand} The defined command.
  */
-export function defineSlashCommand(options: SlashCommand): SlashCommand {
+export function defineSlashCommand<F extends Option[]>(
+  options: SlashCommand<F>
+): SlashCommand<F> {
   return options;
 }

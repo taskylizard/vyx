@@ -1,18 +1,28 @@
-import type {
-  AnyInteractionChannel,
-  AnyInteractionGateway,
-  CommandInteraction,
-  ComponentInteraction,
-  EmbedOptions,
-  Guild,
-  InteractionContent,
-  InteractionOptionsWrapper,
-  Member,
-  Message,
-  User
+import {
+  type AnyInteractionChannel,
+  type AnyInteractionGateway,
+  ApplicationCommandOptionTypes,
+  type CommandInteraction,
+  type ComponentInteraction,
+  type EmbedOptions,
+  type Guild,
+  type InteractionContent,
+  type InteractionOptionsWrapper,
+  type Member,
+  type Message,
+  type User
 } from 'oceanic.js';
 import type { RainlinkWebsocket } from 'rainlink';
-import { type Client, Colors, type SlashCommand } from '..';
+import {
+  type Client,
+  Colors,
+  type ExtractNames,
+  type ExtractOptionByName,
+  type Option,
+  type OptionType,
+  type OptionValue,
+  type SlashCommand
+} from '..';
 
 type Filter = (interaction: ComponentInteraction) => boolean;
 interface CollectButtonOptions {
@@ -21,10 +31,13 @@ interface CollectButtonOptions {
   timeout?: number;
 }
 
-export class Context {
+export class Context<O extends Option[]> {
   private data: Map<string, unknown> = new Map<string, unknown>();
   public acknowledged: boolean;
   public colors: typeof Colors = Colors;
+  public options!: {
+    [K in ExtractNames<O>]: OptionValue<ExtractOptionByName<O, K>>;
+  };
 
   private deferTimeout: NodeJS.Timeout | null;
   private deferPromise: Promise<void> | null;
@@ -32,7 +45,7 @@ export class Context {
   public constructor(
     public readonly client: Client,
     public readonly interaction: CommandInteraction,
-    public readonly command: SlashCommand
+    public readonly command: SlashCommand<O>
   ) {
     this.acknowledged = false;
     this.deferPromise = null;
@@ -69,9 +82,9 @@ export class Context {
     return this.interaction.data.name;
   }
 
-  public get options(): InteractionOptionsWrapper {
-    return this.interaction.data.options;
-  }
+  // public get options(): InteractionOptionsWrapper {
+  // return this.interaction.data.options;
+  // }
 
   public wsl(guildID: string): RainlinkWebsocket | undefined {
     return this.client.rainlink.nodes.get(guildID)?.connect();

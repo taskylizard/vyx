@@ -15,6 +15,7 @@ import { join } from 'pathe';
 import {
   type Client,
   type Interaction,
+  type OptionType,
   type SlashCommand,
   type UserCommand,
   importDefault
@@ -318,5 +319,26 @@ export class InteractionsManager {
       contexts: command.contexts,
       nameLocalizations: command.nameLocalizations
     };
+  }
+
+  private mapOptionType(type: OptionType) {
+    switch (type) {
+      case 'boolean':
+        return ApplicationCommandOptionTypes.BOOLEAN;
+      case 'string':
+        return ApplicationCommandOptionTypes.STRING;
+      case 'integer':
+        return ApplicationCommandOptionTypes.INTEGER;
+      case 'number':
+        return ApplicationCommandOptionTypes.NUMBER;
+      case 'user':
+        return ApplicationCommandOptionTypes.USER;
+      case 'role':
+        return ApplicationCommandOptionTypes.ROLE;
+      case 'channel':
+        return ApplicationCommandOptionTypes.CHANNEL;
+      case 'snowflake':
+        return ApplicationCommandOptionTypes.INTEGER;
+    }
   }
 }
