@@ -105,6 +105,9 @@ importers:
       '@total-typescript/ts-reset':
         specifier: ^0.5.1
         version: 0.5.1
+      '@types/bun':
+        specifier: ^1.1.6
+        version: 1.1.6
       '@types/ms':
         specifier: ^0.7.34
         version: 0.7.34
@@ -711,11 +714,17 @@ packages:
   '@total-typescript/ts-reset@0.5.1':
     resolution: {integrity: sha512-AqlrT8YA1o7Ff5wPfMOL0pvL+1X+sw60NN6CcOCqs658emD6RfiXhF7Gu9QcfKBH7ELY2nInLhKSCWVoNL70MQ==}
 
+  '@types/bun@1.1.6':
+    resolution: {integrity: sha512-uJgKjTdX0GkWEHZzQzFsJkWp5+43ZS7HC8sZPFnOwnSo1AsNl2q9o2bFeS23disNDqbggEgyFkKCHl/w8iZsMA==}
+
   '@types/http-errors@1.8.2':
     resolution: {integrity: sha512-EqX+YQxINb+MeXaIqYDASb6U6FCHbWjkj4a1CKDBks3d/QiB2+PqBLyO72vLDgAO1wUI4O+9gweRcQK11bTL/w==}
 
   '@types/ms@0.7.34':
     resolution: {integrity: sha512-nG96G3Wp6acyAgJqGasjODb+acrI7KltPiRxzHPXnP3NgI28bpQDRv53olbqGXbfcgF5aiiHmO3xpwEpS5Ld9g==}
+
+  '@types/node@20.12.14':
+    resolution: {integrity: sha512-scnD59RpYD91xngrQQLGkE+6UrHUPzeKZWhhjBSa3HSkwjbQc38+q3RoIVEwxQGRw3M+j5hpNAM+lgV3cVormg==}
 
   '@types/node@20.14.10':
     resolution: {integrity: sha512-MdiXf+nDuMvY0gJKxyfZ7/6UFsETO7mGKF54MVD/ekJS6HdFtpZFBgrh6Pseu64XTb2MLyFPlbW6hj8HYRQNOQ==}
@@ -761,6 +770,9 @@ packages:
 
   bullmq@5.8.5:
     resolution: {integrity: sha512-5WwtP/uFE8x5waxuLNQCQph2IJSjj49Ba5NM1crEkKcbTx5ABgDaWDAaL0cId3iqyyKXf3esj9AFBcovCxlEJA==}
+
+  bun-types@1.1.17:
+    resolution: {integrity: sha512-Z4+OplcSd/YZq7ZsrfD00DKJeCwuNY96a1IDJyR73+cTBaFIS7SC6LhpY/W3AMEXO9iYq5NJ58WAwnwL1p5vKg==}
 
   bundle-require@5.0.0:
     resolution: {integrity: sha512-GuziW3fSSmopcx4KRymQEJVbZUfqlCqcq7dvs6TYwKRZiegK/2buMxQTPs6MGlNv50wms1699qYO54R8XfRX4w==}
@@ -1716,9 +1728,17 @@ snapshots:
 
   '@total-typescript/ts-reset@0.5.1': {}
 
+  '@types/bun@1.1.6':
+    dependencies:
+      bun-types: 1.1.17
+
   '@types/http-errors@1.8.2': {}
 
   '@types/ms@0.7.34': {}
+
+  '@types/node@20.12.14':
+    dependencies:
+      undici-types: 5.26.5
 
   '@types/node@20.14.10':
     dependencies:
@@ -1729,7 +1749,6 @@ snapshots:
   '@types/ws@8.5.10':
     dependencies:
       '@types/node': 20.14.10
-    optional: true
 
   '@vitalets/google-translate-api@9.2.0':
     dependencies:
@@ -1780,6 +1799,11 @@ snapshots:
       uuid: 9.0.1
     transitivePeerDependencies:
       - supports-color
+
+  bun-types@1.1.17:
+    dependencies:
+      '@types/node': 20.12.14
+      '@types/ws': 8.5.10
 
   bundle-require@5.0.0(esbuild@0.20.2):
     dependencies:
