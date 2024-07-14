@@ -1,5 +1,4 @@
 import {
-  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js';
@@ -23,21 +22,21 @@ export default defineSlashCommand({
       description: 'Create a reminder.',
       options: [
         {
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           name: 'time',
           description: 'The time to remind you in.',
           required: true
         },
         {
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           name: 'message',
           description: 'What to remind you of?',
           required: true
         }
-      ],
+      ] as const,
       async run(ctx) {
-        const reminder = ctx.options.getString('message', true);
-        const delay = parse(ctx.options.getString('time', true));
+        const reminder = ctx.options.message;
+        const delay = parse(ctx.options.time);
         if (typeof delay !== 'number') {
           return await ctx.reply(
             'The time you input is invalid! The format must be a human readable string, i.e: `1h30m25s`.'
@@ -110,11 +109,11 @@ export default defineSlashCommand({
           name: 'reminder',
           description: 'Reminder to delete.',
           required: true,
-          type: ApplicationCommandOptionTypes.INTEGER
+          type: 'integer'
         }
-      ],
+      ] as const,
       async run(ctx) {
-        const id = ctx.options.getInteger('reminder', true);
+        const id = ctx.options.reminder;
         const reminder = await ctx.client.prisma.reminder.delete({
           where: {
             id: Number(id)

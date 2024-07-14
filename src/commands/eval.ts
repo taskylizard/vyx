@@ -2,7 +2,6 @@ import assert from 'node:assert';
 import { inspect } from 'node:util';
 import { Logger } from '@control.systems/logger';
 import { codeblock, italic } from 'discord-md-tags';
-import { ApplicationCommandOptionTypes } from 'oceanic.js';
 import ms from 'pretty-ms';
 import { defineSlashCommand, env, splitMessage } from '#framework';
 
@@ -31,13 +30,13 @@ export default defineSlashCommand({
   options: [
     {
       name: 'code',
-      type: ApplicationCommandOptionTypes.STRING,
+      type: 'string',
       description: 'Code to evaluate.',
       required: true
     }
-  ],
+  ] as const,
   async run(ctx) {
-    const code = ctx.options.getString('code', true);
+    const code = ctx.options.code;
 
     const _ctx = ctx;
     // biome-ignore lint/correctness/noUnusedVariables: scoping

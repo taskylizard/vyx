@@ -24,7 +24,7 @@ export default defineSlashCommand({
         {
           name: 'query',
           description: 'The song link or track.',
-          type: ApplicationCommandOptionTypes.STRING
+          type: 'string'
         }
       ],
       async run(ctx) {
@@ -147,7 +147,7 @@ export default defineSlashCommand({
           name: 'time',
           description:
             'Set the position of the playing track. Example: 0:10 or 120:10.',
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           required: true
         }
       ],
@@ -295,7 +295,7 @@ export default defineSlashCommand({
         {
           name: 'search',
           description: 'The song to search for.',
-          type: ApplicationCommandOptionTypes.STRING
+          type: 'string'
         }
       ],
       async run(ctx) {

@@ -19,11 +19,11 @@ export default defineSlashCommand({
           name: 'currency',
           description: 'Your currency, can be a emoji or text.',
           required: true,
-          type: ApplicationCommandOptionTypes.STRING
+          type: 'string'
         }
-      ],
+      ] as const,
       async run(ctx) {
-        const value = ctx.options.getString('currency', true);
+        const value = ctx.options.currency;
 
         await ctx.client.prisma.config.update({
           where: {
@@ -68,11 +68,11 @@ export default defineSlashCommand({
           name: 'amount',
           description: 'The amount to deposit',
           required: true,
-          type: ApplicationCommandOptionTypes.INTEGER
+          type: 'integer'
         }
-      ],
+      ] as const,
       async run(ctx) {
-        const toDeposit = ctx.options.getInteger('amount', true);
+        const toDeposit = ctx.options.amount;
         const balance = await ctx.client.modules.economy.get(
           ctx.interaction.guildID!,
           ctx.interaction.user
@@ -151,11 +151,11 @@ export default defineSlashCommand({
           name: 'user',
           description: 'The person you wanna rob.',
           required: true,
-          type: ApplicationCommandOptionTypes.USER
+          type: 'user'
         }
       ],
       async run(ctx) {
-        const user = ctx.options.getUser('user', true);
+        const user = ctx.options.user;
 
         if (user.id === ctx.user.id) {
           return ctx.reply("You can't rob yourself.");
@@ -283,7 +283,7 @@ export default defineSlashCommand({
           name: 'amount',
           description: 'The amount to be withdrawn.',
           required: true,
-          type: ApplicationCommandOptionTypes.INTEGER,
+          type: 'integer',
           minValue: 1
         }
       ],
@@ -322,10 +322,10 @@ export default defineSlashCommand({
             {
               name: 'item',
               description: 'Name of the item.',
-              type: ApplicationCommandOptionTypes.STRING,
+              type: 'string',
               required: true
             }
-          ],
+          ] as const,
           async run(ctx) {
             const item = ctx.options.getString('item', true);
             const itemObj = await ctx.client.modules.shop.get(
@@ -412,7 +412,7 @@ export default defineSlashCommand({
               name: 'item',
               description: 'Name of the item.',
               required: true,
-              type: ApplicationCommandOptionTypes.STRING
+              type: 'string'
             }
           ],
           async run(ctx) {
@@ -451,7 +451,7 @@ export default defineSlashCommand({
               name: 'name',
               description: 'Name of the item.',
               required: true,
-              type: ApplicationCommandOptionTypes.STRING,
+              type: 'string',
               minLength: 5,
               maxLength: 20
             },
@@ -459,7 +459,7 @@ export default defineSlashCommand({
               name: 'description',
               description: 'Description of the item.',
               required: true,
-              type: ApplicationCommandOptionTypes.STRING,
+              type: 'string',
               maxLength: 50,
               minLength: 5
             },
@@ -467,7 +467,7 @@ export default defineSlashCommand({
               name: 'price',
               description: 'Price of the item.',
               required: true,
-              type: ApplicationCommandOptionTypes.INTEGER,
+              type: 'integer',
               minValue: 1
             },
             {

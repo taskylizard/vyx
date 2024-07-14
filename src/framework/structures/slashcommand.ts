@@ -1,10 +1,13 @@
 import type { Module } from '@prisma/client';
 import type {
+  Attachment,
   AutocompleteInteraction,
   CreateMessageApplicationCommandOptions,
   PermissionName
 } from 'oceanic.js';
 import type { Context } from './context';
+
+// Please save me.
 
 export type OptionType =
   | 'boolean'
@@ -14,7 +17,8 @@ export type OptionType =
   | 'user'
   | 'role'
   | 'channel'
-  | 'snowflake';
+  | 'snowflake'
+  | 'attachment';
 
 export type Option = {
   name: string;
@@ -55,7 +59,9 @@ export type OptionTypeValue<T extends OptionType> = T extends 'boolean'
               ? string
               : T extends 'snowflake'
                 ? string
-                : never;
+                : T extends 'attachment'
+                  ? Attachment
+                  : never;
 
 type SlashCommandBase<O extends Option[]> = {
   /**
@@ -109,7 +115,8 @@ type SlashCommandBase<O extends Option[]> = {
   check?: (ctx: Context<O>) => Promise<boolean>;
 } & Omit<CreateMessageApplicationCommandOptions, 'type'>;
 
-type SlashCommandWithDescription<O extends Option[]> = SlashCommandBase<O> & {
+type SlashCommandWithRun<O extends Option[]> = SlashCommandBase<O> & {
+  subcommands?: never;
   /**
    * The description of the command.
    */
@@ -118,7 +125,6 @@ type SlashCommandWithDescription<O extends Option[]> = SlashCommandBase<O> & {
    * The options for the command.
    */
   options?: O;
-  subcommands?: never;
   /**
    * The main handler of your command.
    * @param {Context} ctx - The command context.
@@ -153,17 +159,17 @@ export type SubCommand<O extends Option[]> = SubCommandEndpoint<O> & {
   subcommands?: SubCommand<O>[];
 };
 
-export type SlashCommand<F extends Option[]> =
-  | SlashCommandWithDescription<F>
-  | SlashCommandWithSubcommands<F>;
+export type SlashCommand<O extends Option[]> =
+  | SlashCommandWithRun<O>
+  | SlashCommandWithSubcommands<O>;
 
 /**
  * Defines a slash command with the given options.
  * @param {SlashCommand} options - The options for the command.
  * @returns {SlashCommand} The defined command.
  */
-export function defineSlashCommand<F extends Option[]>(
-  options: SlashCommand<F>
-): SlashCommand<F> {
+export function defineSlashCommand<O extends Option[]>(
+  options: SlashCommand<O>
+): SlashCommand<O> {
   return options;
 }

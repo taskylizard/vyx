@@ -3,6 +3,7 @@ import { fdir } from 'fdir';
 import type {
   ApplicationCommandOptions,
   ApplicationCommandOptionsSubCommand,
+  ApplicationCommandOptionsWithValue,
   CreateApplicationCommandOptions,
   CreateUserApplicationCommandOptions
 } from 'oceanic.js';
@@ -12,18 +13,19 @@ import {
   Collection
 } from 'oceanic.js';
 import { join } from 'pathe';
-import {
-  type Client,
-  type Interaction,
-  type OptionType,
-  type SlashCommand,
-  type UserCommand,
-  importDefault
+import type {
+  Client,
+  Interaction,
+  Option,
+  OptionType,
+  SlashCommand,
+  UserCommand
 } from '..';
+import { importDefault } from '..';
 
 export class InteractionsManager {
   public handlers: {
-    commands: Collection<string, SlashCommand>;
+    commands: Collection<string, SlashCommand<Option[]>>;
     userCommands: Collection<string, UserCommand>;
     components: Collection<
       string,
@@ -56,7 +58,7 @@ export class InteractionsManager {
     const load = (directory: string) =>
       new fdir().withFullPaths().crawl(join(this.dir, directory));
 
-    const commands = await load('commands').withPromise();
+    const commands = await load('k').withPromise();
     for (const file of commands) await this.loadSlashCommand(file);
     const userCommands = await load('user').withPromise();
     for (const file of userCommands) await this.loadUserCommand(file);
@@ -89,9 +91,9 @@ export class InteractionsManager {
   }
 
   private async loadSlashCommand(path: string) {
-    let cmd: SlashCommand;
+    let cmd: SlashCommand<Option[]>;
     try {
-      cmd = await importDefault<SlashCommand>(path);
+      cmd = await importDefault<SlashCommand<Option[]>>(path);
       if (this.handlers.commands.has(cmd.name)) {
         this.logger.warn(
           `Attempted to load already existing slash-command ${cmd.name}`
@@ -261,7 +263,9 @@ export class InteractionsManager {
     await this.syncModules();
   }
 
-  public toSlashJson(command: SlashCommand): CreateApplicationCommandOptions {
+  public toSlashJson(
+    command: SlashCommand<Option[]>
+  ): CreateApplicationCommandOptions {
     let options: ApplicationCommandOptions[] = [];
     if (command.subcommands) {
       for (const subcommand of command.subcommands) {
@@ -274,7 +278,7 @@ export class InteractionsManager {
               name: subsubcommand.name,
               description: subsubcommand.description!,
               type: ApplicationCommandOptionTypes.SUB_COMMAND,
-              options: subsubcommand.options
+              options: this.mapOptions(subsubcommand.options)
             });
           }
           options.push({
@@ -288,11 +292,11 @@ export class InteractionsManager {
             name: subcommand.name,
             description: subcommand.description!,
             type: ApplicationCommandOptionTypes.SUB_COMMAND,
-            options: subcommand.options
+            options: this.mapOptions(subcommand.options)
           });
         }
       }
-    } else if (command.options) options = command.options;
+    } else if (command.options) options = this.mapOptions(command.options);
 
     return {
       type: ApplicationCommandTypes.CHAT_INPUT,
@@ -321,7 +325,25 @@ export class InteractionsManager {
     };
   }
 
-  private mapOptionType(type: OptionType) {
+  private mapOptions(
+    options: Option[] | undefined
+  ): ApplicationCommandOptionsWithValue[] {
+    if (!options) return [];
+    const _options = [];
+    for (const option of options) {
+      _options.push({
+        name: option.name,
+        type: this.toOptionType(option.type),
+        description: option.description,
+        required: option.required ?? false
+      });
+    }
+
+    // @ts-expect-error
+    return _options;
+  }
+
+  private toOptionType(type: OptionType) {
     switch (type) {
       case 'boolean':
         return ApplicationCommandOptionTypes.BOOLEAN;
@@ -339,6 +361,8 @@ export class InteractionsManager {
         return ApplicationCommandOptionTypes.CHANNEL;
       case 'snowflake':
         return ApplicationCommandOptionTypes.INTEGER;
+      case 'attachment':
+        return ApplicationCommandOptionTypes.ATTACHMENT;
     }
   }
 }

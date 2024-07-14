@@ -94,20 +94,20 @@ export default defineSlashCommand({
         {
           name: 'user',
           description: 'The user.',
-          type: ApplicationCommandOptionTypes.USER,
+          type: 'user',
           required: true
         },
         {
           name: 'duration',
           description: 'The time to mute them for.',
           required: true,
-          type: ApplicationCommandOptionTypes.STRING
+          type: 'string'
         },
         {
           name: 'reason',
           description: 'The reasoning.',
           maxLength: 1024,
-          type: ApplicationCommandOptionTypes.STRING
+          type: 'string'
         }
       ],
       async run(ctx) {
@@ -196,13 +196,13 @@ export default defineSlashCommand({
       options: [
         {
           name: 'user',
-          type: ApplicationCommandOptionTypes.USER,
+          type: 'user',
           required: true,
           description: 'The user.'
         },
         {
           name: 'reason',
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           required: false,
           maxLength: 1024,
           description: 'The reason for this kick.'
@@ -273,13 +273,13 @@ export default defineSlashCommand({
       options: [
         {
           name: 'user',
-          type: ApplicationCommandOptionTypes.USER,
+          type: 'user',
           required: true,
           description: 'The user.'
         },
         {
           name: 'reason',
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           required: false,
           maxLength: 1024,
           description: 'The reason for this warn.'
@@ -322,13 +322,13 @@ export default defineSlashCommand({
       options: [
         {
           name: 'user',
-          type: ApplicationCommandOptionTypes.USER,
+          type: 'user',
           required: true,
           description: 'The user.'
         },
         {
           name: 'reason',
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           required: false,
           maxLength: 1024,
           description: 'The reason for this ban.'
@@ -400,7 +400,7 @@ export default defineSlashCommand({
             {
               name: 'user',
               description: 'The user.',
-              type: ApplicationCommandOptionTypes.USER,
+              type: 'user',
               required: true
             }
           ],
@@ -476,7 +476,7 @@ export default defineSlashCommand({
             {
               name: 'id',
               description: 'ID of the moderation case.',
-              type: ApplicationCommandOptionTypes.INTEGER,
+              type: 'integer',
               minValue: 1,
               required: true
             }

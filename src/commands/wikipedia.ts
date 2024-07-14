@@ -1,5 +1,4 @@
 import {
-  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js';
@@ -34,10 +33,10 @@ export default defineSlashCommand({
     {
       name: 'article',
       description: 'The article you want to search.',
-      type: ApplicationCommandOptionTypes.STRING,
+      type: 'string',
       required: true
     }
-  ],
+  ] as const,
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,
@@ -49,7 +48,7 @@ export default defineSlashCommand({
   ],
 
   async run(ctx) {
-    const article = ctx.options.getString('article', true);
+    const article = ctx.options.article;
     const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
       article
     )}?redirect=true`;

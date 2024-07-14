@@ -34,11 +34,7 @@ import {
 } from './modules';
 import { RevoltClient } from './revolt/client';
 import { Context } from './structures/context';
-import type {
-  Option,
-  SlashCommand,
-  SubCommand
-} from './structures/slashcommand';
+import type { Option, SlashCommand } from './structures/slashcommand';
 import { getDirname } from './utils/common';
 import { DiscordFormatter, DiscordTransport } from './webhook';
 
@@ -254,7 +250,8 @@ export class Client extends BaseClient {
       }`
     );
 
-    const options = new Set();
+    const options: Record<string, any> = {};
+
     let cmd = this.managers.interactions.handlers.commands.get(
       interaction.data.name
     );
@@ -266,9 +263,9 @@ export class Client extends BaseClient {
 
     const subcommand = interaction.data.options.getSubCommand(false);
 
-    if (subcommand) {
+    if (subcommand && cmd.subcommands) {
       let result = cmd.subcommands.find(
-        (subcmd: any) => subcmd.name === subcommand[0]
+        (subcmd) => subcmd.name === subcommand[0]
       );
       if (!result) {
         this.logger.trace(`SubCommand ${subcommand[0]} not found`);
@@ -283,37 +280,42 @@ export class Client extends BaseClient {
         result.subcommands.length > 0
       ) {
         result = result?.subcommands?.find(
-          (subcmd: unknown) => subcmd.name === subcommand[1]
+          (subcmd) => subcmd.name === subcommand[1]
         );
         if (!result) {
           this.logger.trace(`SubCommand ${subcommand[1]} not found`);
           return;
         }
       }
-      // FIXME: unhinged types
-      cmd = result as SlashCommand;
+
+      cmd = result as SlashCommand<Option[]>;
     }
 
-    this.logger.trace(`Found command ${cmd.name}`);
+    this.logger.trace(`Found slash-command /${cmd.name}`);
 
     if (cmd.options !== undefined) {
-      const optionLookup = new Map<string, Option>();
+      const optionLookup = new Map<string, [string, Option]>();
 
       for (const option of cmd.options) {
-        console.info(option);
-        optionLookup.set(option.name, option);
+        optionLookup.set(option.name, [option.name, option]);
       }
 
       for (const option of interaction.data.options.raw) {
         if (!('value' in option)) continue;
 
         if (!optionLookup.has(option.name)) continue;
+        const [key, _] = optionLookup.get(option.name)!;
 
-        options.add(option.value);
+        options[key] = option.value;
       }
     }
 
-    const ctx = new Context(this, interaction, cmd as SlashCommand);
+    const ctx = new Context(
+      this,
+      interaction,
+      cmd as SlashCommand<Option[]>,
+      options
+    );
     this.logger.trace(`Created Context for interaction /${cmd.name}`);
 
     await this.handleMiddlewares(ctx);
@@ -409,6 +411,7 @@ export class Client extends BaseClient {
       }
 
       if (typeof ctx.command.run === 'string') {
+        // @ts-expect-error  TODO: investigate why it narrows down to never
         await ctx.reply(ctx.command.run);
       } else {
         await (ctx.command.run
@@ -433,6 +436,8 @@ export class Client extends BaseClient {
       }
     } catch (error) {
       this.emit('commandError', ctx, error as Error);
+    } finally {
+      ctx.removeTimeout();
     }
   }
 

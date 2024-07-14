@@ -1,28 +1,25 @@
-import {
-  type AnyInteractionChannel,
-  type AnyInteractionGateway,
-  ApplicationCommandOptionTypes,
-  type CommandInteraction,
-  type ComponentInteraction,
-  type EmbedOptions,
-  type Guild,
-  type InteractionContent,
-  type InteractionOptionsWrapper,
-  type Member,
-  type Message,
-  type User
+import type {
+  AnyInteractionChannel,
+  AnyInteractionGateway,
+  CommandInteraction,
+  ComponentInteraction,
+  EmbedOptions,
+  Guild,
+  InteractionContent,
+  Member,
+  Message,
+  User
 } from 'oceanic.js';
 import type { RainlinkWebsocket } from 'rainlink';
-import {
-  type Client,
-  Colors,
-  type ExtractNames,
-  type ExtractOptionByName,
-  type Option,
-  type OptionType,
-  type OptionValue,
-  type SlashCommand
+import type {
+  Client,
+  ExtractNames,
+  ExtractOptionByName,
+  Option,
+  OptionValue,
+  SlashCommand
 } from '..';
+import { Colors } from '..';
 
 type Filter = (interaction: ComponentInteraction) => boolean;
 interface CollectButtonOptions {
@@ -35,7 +32,7 @@ export class Context<O extends Option[]> {
   private data: Map<string, unknown> = new Map<string, unknown>();
   public acknowledged: boolean;
   public colors: typeof Colors = Colors;
-  public options!: {
+  public options: {
     [K in ExtractNames<O>]: OptionValue<ExtractOptionByName<O, K>>;
   };
 
@@ -45,8 +42,12 @@ export class Context<O extends Option[]> {
   public constructor(
     public readonly client: Client,
     public readonly interaction: CommandInteraction,
-    public readonly command: SlashCommand<O>
+    public readonly command: SlashCommand<O>,
+    options: {
+      [K in ExtractNames<O>]: OptionValue<ExtractOptionByName<O, K>>;
+    }
   ) {
+    this.options = options;
     this.acknowledged = false;
     this.deferPromise = null;
     this.deferTimeout = setTimeout(
@@ -90,7 +91,7 @@ export class Context<O extends Option[]> {
     return this.client.rainlink.nodes.get(guildID)?.connect();
   }
 
-  private removeTimeout() {
+  public removeTimeout() {
     if (this.deferTimeout !== null) {
       clearTimeout(this.deferTimeout);
       this.deferTimeout = null;

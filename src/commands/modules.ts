@@ -1,16 +1,11 @@
 import type { Module } from '@prisma/client';
-import {
-  ApplicationCommandOptionTypes,
-  type ApplicationCommandOptionsChoice
-} from 'oceanic.js';
 import { defineSlashCommand } from '#framework';
 
-const modules: ApplicationCommandOptionsChoice<ApplicationCommandOptionTypes.STRING>[] =
-  [
-    { name: '🔧 Moderation', value: 'MODERATION' },
-    { name: '🍣 Economy', value: 'ECONOMY' },
-    { name: '🎶 Music', value: 'MUSIC' }
-  ];
+const modules = [
+  { name: '🔧 Moderation', value: 'MODERATION' },
+  { name: '🍣 Economy', value: 'ECONOMY' },
+  { name: '🎶 Music', value: 'MUSIC' }
+];
 
 export default defineSlashCommand({
   name: 'modules',
@@ -24,14 +19,13 @@ export default defineSlashCommand({
         {
           name: 'module',
           description: 'The module to enable.',
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           required: true,
           choices: modules
         }
-      ],
-
+      ] as const,
       async run(ctx) {
-        const mod = ctx.options.getString('module', true);
+        const mod = ctx.options.module;
 
         const command = [
           ...ctx.client.managers.interactions.handlers.commands.values()
@@ -89,7 +83,9 @@ export default defineSlashCommand({
           ctx.client.managers.interactions.toSlashJson(command)
         );
 
-        return await ctx.reply(`Enabled \`${mod}\`.`);
+        return await ctx.reply(
+          `Enabled \`${modules.find((_mod) => _mod.value === mod)}\`.`
+        );
       }
     },
     {
@@ -99,13 +95,13 @@ export default defineSlashCommand({
         {
           name: 'module',
           description: 'The module to disable.',
-          type: ApplicationCommandOptionTypes.STRING,
+          type: 'string',
           required: true,
           choices: modules
         }
-      ],
+      ] as const,
       async run(ctx) {
-        const mod = ctx.options.getString('module', true);
+        const mod = ctx.options.module;
 
         const command = [
           ...ctx.client.managers.interactions.handlers.commands.values()
@@ -151,7 +147,9 @@ export default defineSlashCommand({
           find.id
         );
 
-        return await ctx.reply(`Disabled \`${mod}\`.`);
+        return await ctx.reply(
+          `Disabled \`${modules.find((_mod) => _mod.value === mod)}\`.`
+        );
       }
     }
   ]

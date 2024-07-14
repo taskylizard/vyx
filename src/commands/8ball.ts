@@ -1,4 +1,3 @@
-import { ApplicationCommandOptionTypes } from "oceanic.js";
 import { Embed, defineSlashCommand } from "#framework";
 import { sample } from "@antfu/utils";
 
@@ -32,13 +31,13 @@ export default defineSlashCommand({
   options: [
     {
       name: "question",
-      type: ApplicationCommandOptionTypes.STRING,
+      type: "string",
       description: "Your question.",
       required: true,
     },
-  ],
+  ] as const,
   async run(ctx) {
-    const question = ctx.options.getString("question", true);
+    const { question } = ctx.options;
 
     const embed = new Embed()
       .setDescription(question)
