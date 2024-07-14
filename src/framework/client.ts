@@ -34,6 +34,7 @@ import {
 } from './modules';
 import { RevoltClient } from './revolt/client';
 import { Context } from './structures/context';
+import type { SlashCommand, SubCommand } from './structures/slashcommand';
 import { getDirname } from './utils/common';
 import { DiscordFormatter, DiscordTransport } from './webhook';
 
@@ -284,12 +285,13 @@ export class Client extends BaseClient {
           return;
         }
       }
-      cmd = result;
+      // FIXME: unhinged types
+      cmd = result as SlashCommand;
     }
 
     this.logger.trace(`Found command ${cmd.name}`);
 
-    const ctx = new Context(this, interaction, cmd);
+    const ctx = new Context(this, interaction, cmd as SlashCommand);
     this.logger.trace(`Created Context for interaction /${cmd.name}`);
 
     await this.handleMiddlewares(ctx);

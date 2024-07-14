@@ -12,7 +12,6 @@ import {
 
 export default defineSlashCommand({
   name: 'anilist',
-  description: 'AniList related commands.',
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,
