@@ -34,6 +34,11 @@ import {
 } from './modules';
 import { RevoltClient } from './revolt/client';
 import { Context } from './structures/context';
+import type {
+  Option,
+  SlashCommand,
+  SubCommand
+} from './structures/slashcommand';
 import { getDirname } from './utils/common';
 import { DiscordFormatter, DiscordTransport } from './webhook';
 
@@ -260,9 +265,10 @@ export class Client extends BaseClient {
 
     const subcommand = interaction.data.options.getSubCommand(false);
 
-    if (subcommand) {
-      let result = cmd?.subcommands?.find(
-        (subcmd) => subcmd.name === subcommand[0]
+    if (subcommand && cmd.subcommands) {
+      let result = cmd?.subcommands.find(
+        (subcmd: SubCommand<Record<string, Option>>) =>
+          subcmd.name === subcommand[0]
       );
       if (!result) {
         this.logger.trace(`SubCommand ${subcommand[0]} not found`);
@@ -277,25 +283,44 @@ export class Client extends BaseClient {
         result.subcommands.length > 0
       ) {
         result = result?.subcommands?.find(
-          (subcmd) => subcmd.name === subcommand[1]
+          (subcmd: SubCommand<Record<string, Option>>) =>
+            subcmd.name === subcommand[1]
         );
         if (!result) {
           this.logger.trace(`SubCommand ${subcommand[1]} not found`);
           return;
         }
       }
-      cmd = result;
+      cmd = result as SlashCommand<Record<string, Option>>;
     }
 
-    this.logger.trace(`Found command ${cmd.name}`);
+    const options: Record<string, any> = {};
 
-    const ctx = new Context(this, interaction, cmd);
+    if (cmd.options !== undefined) {
+      const lookup = new Map<string, Option>();
+
+      for (const [key, option] of Object.entries(cmd.options)) {
+        lookup.set(key, option);
+      }
+
+      for (const option of interaction.data.options.raw) {
+        if (!('value' in option)) continue;
+        if (!lookup.has(option.name)) continue;
+        options[option.name] = option.value;
+      }
+    }
+
+    this.logger.trace(`Found slash-command /${cmd.name}`);
+
+    const ctx = new Context(this, interaction, cmd, options);
     this.logger.trace(`Created Context for interaction /${cmd.name}`);
 
     await this.handleMiddlewares(ctx);
   }
 
-  private async handleMiddlewares(ctx: Context): Promise<void> {
+  private async handleMiddlewares<O extends Record<string, Option>>(
+    ctx: Context<O>
+  ): Promise<void> {
     let _prevIndex = -1;
     const stack = [
       ...this.managers.plugins.middlewares,
@@ -315,8 +340,8 @@ export class Client extends BaseClient {
     await runner(0);
   }
 
-  private async runSlashCommand(
-    ctx: Context,
+  private async runSlashCommand<O extends Record<string, Option>>(
+    ctx: Context<O>,
     _next: () => Promise<void> | void
   ): Promise<void> {
     if (ctx.command.ownerOnly && !this.isOwner(ctx.member || ctx.user)) {

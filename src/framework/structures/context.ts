@@ -12,7 +12,13 @@ import type {
   User
 } from 'oceanic.js';
 import type { RainlinkWebsocket } from 'rainlink';
-import { type Client, Colors, type SlashCommand } from '..';
+import {
+  type Client,
+  Colors,
+  type Option,
+  type OptionValue,
+  type SlashCommand
+} from '..';
 
 type Filter = (interaction: ComponentInteraction) => boolean;
 interface CollectButtonOptions {
@@ -21,10 +27,11 @@ interface CollectButtonOptions {
   timeout?: number;
 }
 
-export class Context {
+export class Context<O extends Record<string, Option>> {
   private data: Map<string, unknown> = new Map<string, unknown>();
   public acknowledged: boolean;
   public colors: typeof Colors = Colors;
+  public options: { [K in keyof O]: OptionValue<O[K]> };
 
   private deferTimeout: NodeJS.Timeout | null;
   private deferPromise: Promise<void> | null;
@@ -32,8 +39,10 @@ export class Context {
   public constructor(
     public readonly client: Client,
     public readonly interaction: CommandInteraction,
-    public readonly command: SlashCommand
+    public readonly command: SlashCommand,
+    options: { [K in keyof O]: OptionValue<O[K]> }
   ) {
+    this.options = options;
     this.acknowledged = false;
     this.deferPromise = null;
     this.deferTimeout = setTimeout(
@@ -69,9 +78,9 @@ export class Context {
     return this.interaction.data.name;
   }
 
-  public get options(): InteractionOptionsWrapper {
-    return this.interaction.data.options;
-  }
+  // public get options(): InteractionOptionsWrapper {
+  //   return this.interaction.data.options;
+  // }
 
   public wsl(guildID: string): RainlinkWebsocket | undefined {
     return this.client.rainlink.nodes.get(guildID)?.connect();

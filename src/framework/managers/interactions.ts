@@ -5,6 +5,7 @@ import { fdir } from 'fdir';
 import type {
   ApplicationCommandOptions,
   ApplicationCommandOptionsSubCommand,
+  ApplicationCommandOptionsWithValue,
   CreateApplicationCommandOptions,
   CreateUserApplicationCommandOptions
 } from 'oceanic.js';
@@ -17,6 +18,8 @@ import { join, resolve } from 'pathe';
 import {
   type Client,
   type Interaction,
+  type Option,
+  type OptionType,
   type SlashCommand,
   type UserCommand,
   getDirname,
@@ -295,7 +298,7 @@ export class InteractionsManager {
               name: subsubcommand.name,
               description: subsubcommand.description,
               type: ApplicationCommandOptionTypes.SUB_COMMAND,
-              options: subsubcommand.options
+              options: this.mapOptions(subsubcommand.options)
             });
           }
           options.push({
@@ -309,11 +312,11 @@ export class InteractionsManager {
             name: subcommand.name,
             description: subcommand.description,
             type: ApplicationCommandOptionTypes.SUB_COMMAND,
-            options: subcommand.options
+            options: this.mapOptions(subcommand.options)
           });
         }
       }
-    } else if (command.options) options = command.options;
+    } else if (command.options) options = this.mapOptions(command.options);
 
     return {
       type: ApplicationCommandTypes.CHAT_INPUT,
@@ -340,5 +343,44 @@ export class InteractionsManager {
       contexts: command.contexts,
       nameLocalizations: command.nameLocalizations
     };
+  }
+
+  private mapOptions(
+    options: Record<string, Option> | undefined
+  ): ApplicationCommandOptionsWithValue[] {
+    if (!options) return [];
+    const _options: ApplicationCommandOptionsWithValue[] = [];
+    for (const [name, option] of Object.entries(options)) {
+      _options.push({
+        name,
+        description: option.description,
+        type: this.toOptionType(option.type),
+        required: option.required
+      });
+    }
+    return _options;
+  }
+
+  private toOptionType(type: OptionType) {
+    switch (type) {
+      case 'boolean':
+        return ApplicationCommandOptionTypes.BOOLEAN;
+      case 'string':
+        return ApplicationCommandOptionTypes.STRING;
+      case 'integer':
+        return ApplicationCommandOptionTypes.INTEGER;
+      case 'number':
+        return ApplicationCommandOptionTypes.NUMBER;
+      case 'user':
+        return ApplicationCommandOptionTypes.USER;
+      case 'role':
+        return ApplicationCommandOptionTypes.ROLE;
+      case 'channel':
+        return ApplicationCommandOptionTypes.CHANNEL;
+      case 'snowflake':
+        return ApplicationCommandOptionTypes.INTEGER;
+      case 'attachment':
+        return ApplicationCommandOptionTypes.ATTACHMENT;
+    }
   }
 }
