@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { Color, ColorCode, Logger } from '@control.systems/logger';
 import { fdir } from 'fdir';
 import type {
@@ -11,12 +13,13 @@ import {
   ApplicationCommandTypes,
   Collection
 } from 'oceanic.js';
-import { join } from 'pathe';
+import { join, resolve } from 'pathe';
 import {
   type Client,
   type Interaction,
   type SlashCommand,
   type UserCommand,
+  getDirname,
   importDefault
 } from '..';
 
@@ -227,6 +230,22 @@ export class InteractionsManager {
           }
         }
 
+        // Stringify commands array and calculate sha-256 hash, then store them as cache.
+        const commandsHash = createHash('sha256')
+          .update(JSON.stringify([...slashCommands, ...userCommandList]))
+          .digest('hex');
+
+        const changesFile = resolve(getDirname(import.meta.url), '.cache');
+
+        // Check if commands have changed before re-registering them again.
+        if ((await stat(changesFile)).isFile()) {
+          const oldHash = await readFile(changesFile, 'utf-8');
+          if (oldHash === commandsHash) {
+            this.logger.info('No changes detected, will not try to register.');
+            await this.syncModules();
+            return;
+          }
+        }
         // Then bulk set every one.
         await this.client.application
           .bulkEditGlobalCommands([...slashCommands, ...userCommandList])
@@ -248,6 +267,9 @@ export class InteractionsManager {
             );
           }
         }
+
+        // Write commands hash cache.
+        await writeFile(changesFile, commandsHash);
       }
     } catch (error) {
       this.logger.error('Failed to update application commands.', error);
@@ -257,7 +279,7 @@ export class InteractionsManager {
       `Updated all ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands.`
     );
 
-    await this.syncModules();
+    return await this.syncModules();
   }
 
   public toSlashJson(command: SlashCommand): CreateApplicationCommandOptions {

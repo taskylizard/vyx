@@ -178,6 +178,6 @@ dist
 .DS_Store
 trash
 
-
 docker/lavalink/plugins
 revcord.sqlite
+.cache
