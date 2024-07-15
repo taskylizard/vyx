@@ -21,11 +21,16 @@ export type OptionType =
   | 'snowflake'
   | 'attachment';
 
-export type Option = {
-  description: string;
-  type: OptionType;
-  required?: boolean;
+type StringOptionProps = {
+  maxLength?: number;
+  minLength?: number;
 };
+
+export type Option<T extends OptionType> = {
+  description: string;
+  type: T;
+  required?: boolean;
+} & (T extends 'string' ? StringOptionProps : {});
 
 export type OptionTypeValue<T extends OptionType> = T extends 'boolean'
   ? boolean
@@ -47,9 +52,10 @@ export type OptionTypeValue<T extends OptionType> = T extends 'boolean'
                   ? Attachment
                   : never;
 
-export type OptionValue<O extends Option> = O['required'] extends true
-  ? NullableValue<OptionTypeValue<O['type']>, O['required']>
-  : OptionTypeValue<O['type']> | null;
+export type OptionValue<O extends Option<OptionType>> =
+  O['required'] extends true
+    ? NullableValue<OptionTypeValue<O['type']>, O['required']>
+    : OptionTypeValue<O['type']> | null;
 
 type NullableValue<
   O extends any,
@@ -57,7 +63,10 @@ type NullableValue<
 > = Required extends true ? O : O | null;
 
 export type SlashCommand<
-  O extends Record<string, Option> = Record<string, Option>
+  O extends Record<string, Option<OptionType>> = Record<
+    string,
+    Option<OptionType>
+  >
 > = {
   /**
    * Module id for modular commands splitting.
@@ -130,7 +139,7 @@ export type SlashCommand<
 
 type SubCommandEndpoint = Omit<SlashCommand, 'options' | 'subcommands'>;
 
-export type SubCommand<O extends Record<string, Option>> =
+export type SubCommand<O extends Record<string, Option<OptionType>>> =
   SubCommandEndpoint & {
     /**
      * The options for the subcommand.
@@ -147,8 +156,8 @@ export type SubCommand<O extends Record<string, Option>> =
  * @param {SlashCommand} options - The options for the command.
  * @returns {SlashCommand} The defined command.
  */
-export function defineSlashCommand<F extends Record<string, Option>>(
-  options: SlashCommand<F>
-): SlashCommand<F> {
+export function defineSlashCommand<
+  F extends Record<string, Option<OptionType>>
+>(options: SlashCommand<F>): SlashCommand<F> {
   return options;
 }

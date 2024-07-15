@@ -29,16 +29,15 @@ const responses = [
 export default defineSlashCommand({
   name: "8ball",
   description: "Ask the magic 8ball.",
-  options: [
-    {
-      name: "question",
-      type: ApplicationCommandOptionTypes.STRING,
+  options: {
+    question: {
+      type: "string",
       description: "Your question.",
       required: true,
     },
-  ],
+  },
   async run(ctx) {
-    const question = ctx.options.getString("question", true);
+    const question = ctx.options.question;
 
     const embed = new Embed()
       .setDescription(question)

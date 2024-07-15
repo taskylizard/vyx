@@ -26,17 +26,17 @@ export default defineSlashCommand({
     {
       name: 'anime',
       description: 'Searches by provided query on AniList.',
-      options: [
-        {
-          type: 3,
-          name: 'search',
+      options: {
+        search: {
+          type: 'string',
           description: 'Anime to search for.',
           required: true
         }
-      ],
+      },
       async run(ctx) {
-        const query = ctx.options.getString('search', true);
+        const query = ctx.options.search;
 
+        // FIXME: fails here
         try {
           const anime = await searchAnilist(query, 'ANIME');
 
