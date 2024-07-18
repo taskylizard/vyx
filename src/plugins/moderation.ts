@@ -72,8 +72,11 @@ async function messageUpdate(
   const embed = new Embed()
     .setTitle('Message Edited')
     .setThumbnail(member!.avatarURL())
+    .setTimestamp(new Date().toISOString())
     .addFields([
-      { name: 'Author', value: member!.user.mention },
+      { name: 'Author', value: member!.user.mention, inline: true },
+      { name: 'Channel', value: message.channel!.mention, inline: true },
+      { name: 'Message link', value: message.jumpLink, inline: true },
       {
         name: 'Previous',
         value: oldMessage.content
@@ -116,8 +119,10 @@ async function messageDelete(client: Client, message: PossiblyUncachedMessage) {
     .setThumbnail(message.author.avatarURL())
     .addFields([
       { name: 'Author', value: message.author.mention },
+      { name: 'Channel', value: message.channel!.mention, inline: true },
       { name: 'Content', value: message.content }
-    ]);
+    ])
+    .setTimestamp(new Date().toISOString());
 
   return await channel.createMessage({ embeds: [embed] });
 }
