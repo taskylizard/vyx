@@ -32,6 +32,9 @@ importers:
       anilist:
         specifier: ^0.12.3
         version: 0.12.3
+      arktype:
+        specifier: 2.0.0-beta.0
+        version: 2.0.0-beta.0
       bullmq:
         specifier: ^5.8.5
         version: 5.8.5
@@ -50,9 +53,6 @@ importers:
       fdir:
         specifier: ^6.1.1
         version: 6.1.1
-      ioredis:
-        specifier: ^5.4.1
-        version: 5.4.1
       ms:
         specifier: ^2.1.3
         version: 2.1.3
@@ -74,18 +74,12 @@ importers:
       pretty-ms:
         specifier: ^9.0.0
         version: 9.0.0
-      proper-tags:
-        specifier: ^2.0.2
-        version: 2.0.2
       rainlink:
         specifier: ^1.0.6
         version: 1.0.6
       revolt.js:
         specifier: 7.0.3
         version: 7.0.3
-      shoukaku:
-        specifier: ^4.0.1
-        version: 4.0.1
       ts-pattern:
         specifier: ^5.2.0
         version: 5.2.0
@@ -127,7 +121,7 @@ importers:
         specifier: ^0.14.2
         version: 0.14.2
       tsx:
-        specifier: ^4.7.0
+        specifier: 4.7.0
         version: 4.7.0
 
 packages:
@@ -138,6 +132,12 @@ packages:
 
   '@antfu/utils@0.7.10':
     resolution: {integrity: sha512-+562v9k4aI80m1+VuMHehNJWLOFjBnXn3tdOitzD0il5b7smkSBal4+a3oKiQTbrwMmN/TBUMDvbdoWDehgOww==}
+
+  '@ark/schema@0.2.0':
+    resolution: {integrity: sha512-IkNWCSHdjaoemMXpps4uFHEAQzwJPbTAS8K2vcQpk90sa+eNBuPSVyB/81/Qyl1VYW0iX3ceGC5NL/OznQv1jg==}
+
+  '@ark/util@0.1.0':
+    resolution: {integrity: sha512-qCLYICQoCy3kEKDVwirQp8qvxhY7NJd8BhhoHaj1l3wCFAk9NUbcDsxAkPStZEMdPI/d7NcbGJe8SWZuRG2twQ==}
 
   '@biomejs/biome@1.8.3':
     resolution: {integrity: sha512-/uUV3MV+vyAczO+vKrPdOW0Iaet7UnJMU4bNMinggGJTAnBPjCoLEYcyYtYHNnUNYlv4xZMH6hVIQCAozq8d5w==}
@@ -756,6 +756,9 @@ packages:
     resolution: {integrity: sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==}
     engines: {node: '>=8'}
 
+  arktype@2.0.0-beta.0:
+    resolution: {integrity: sha512-fE3ssMiXjr/bLqFPzlDhRlXngdyHQreu7p7i8+dtcY1CA+f8WrVUcue6JxywhnqEJXPG4HOcIwQcC+q4VfeUMQ==}
+
   asynckit@0.4.0:
     resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
 
@@ -1173,10 +1176,6 @@ packages:
     engines: {node: '>=16.13'}
     hasBin: true
 
-  proper-tags@2.0.2:
-    resolution: {integrity: sha512-rpgQb3JC9uWAogm9J3G6heeg7n/Gq82GZKaFt080JPVbydKvGW6ECj9Ui1a6taTFv9Oa+dq9GMhHeOJyxxaURA==}
-    engines: {node: '>=12.0.0'}
-
   proxy-from-env@1.1.0:
     resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
 
@@ -1232,10 +1231,6 @@ packages:
   shebang-regex@3.0.0:
     resolution: {integrity: sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A==}
     engines: {node: '>=8'}
-
-  shoukaku@4.0.1:
-    resolution: {integrity: sha512-+Y94AnUFabCkE8O2Y3MSfnVmiiQ1MMVK/DO962Q23KPTWJkuqs+S/CPRQSOPWqo+ISq7teVxGJsSapwnJOrFgQ==}
-    engines: {node: '>=18.0.0', npm: '>=7.0.0'}
 
   solid-js@1.8.18:
     resolution: {integrity: sha512-cpkxDPvO/AuKBugVv6xKFd1C9VC0XZMu4VtF56IlHoux8HgyW44uqNSWbozMnVcpIzHIhS3vVXPAVZYM26jpWw==}
@@ -1374,6 +1369,12 @@ snapshots:
   '@antfu/ni@0.21.12': {}
 
   '@antfu/utils@0.7.10': {}
+
+  '@ark/schema@0.2.0':
+    dependencies:
+      '@ark/util': 0.1.0
+
+  '@ark/util@0.1.0': {}
 
   '@biomejs/biome@1.8.3':
     optionalDependencies:
@@ -1769,6 +1770,11 @@ snapshots:
   ansi-styles@4.3.0:
     dependencies:
       color-convert: 2.0.1
+
+  arktype@2.0.0-beta.0:
+    dependencies:
+      '@ark/schema': 0.2.0
+      '@ark/util': 0.1.0
 
   asynckit@0.4.0: {}
 
@@ -2238,8 +2244,6 @@ snapshots:
     dependencies:
       '@prisma/engines': 5.16.2
 
-  proper-tags@2.0.2: {}
-
   proxy-from-env@1.1.0: {}
 
   rainlink@1.0.6: {}
@@ -2294,13 +2298,6 @@ snapshots:
       shebang-regex: 3.0.0
 
   shebang-regex@3.0.0: {}
-
-  shoukaku@4.0.1:
-    dependencies:
-      ws: 8.17.1
-    transitivePeerDependencies:
-      - bufferutil
-      - utf-8-validate
 
   solid-js@1.8.18:
     dependencies:
