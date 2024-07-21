@@ -1,3 +1,4 @@
+import { isNull, isUndefined } from '@antfu/utils';
 import {
   type AnyTextableChannel,
   ChannelTypes,
@@ -41,13 +42,15 @@ async function messageUpdate(
   oldMessage: JSONMessage | null
 ) {
   if (
-    !message ||
-    !oldMessage ||
+    isUndefined(message) ||
+    isUndefined(oldMessage) ||
     !(message instanceof Message) ||
-    !message.content ||
+    isUndefined(message.content) ||
+    isNull(oldMessage) ||
     message.content === oldMessage.content ||
-    !oldMessage.guildID ||
-    !message.author ||
+    isUndefined(oldMessage.guildID) ||
+    isUndefined(message.author) ||
+    isUndefined(message.channel) ||
     message.author.bot
   ) {
     return;
@@ -62,20 +65,20 @@ async function messageUpdate(
     }
   });
 
-  if (!config?.logsChannel) return;
+  if (isNull(config) || !config.logsChannel) return;
 
   const channel = client.getChannel(config.logsChannel.toString());
-  if (channel?.type !== ChannelTypes.GUILD_TEXT) return;
+  if (!channel || channel.type !== ChannelTypes.GUILD_TEXT) return;
 
-  const { member } = message;
+  const { author } = message;
 
   const embed = new Embed()
     .setTitle('Message Edited')
-    .setThumbnail(member!.avatarURL())
+    .setThumbnail(author.avatarURL())
     .setTimestamp(new Date().toISOString())
     .addFields([
-      { name: 'Author', value: member!.user.mention, inline: true },
-      { name: 'Channel', value: message.channel!.mention, inline: true },
+      { name: 'Author', value: author.mention, inline: true },
+      { name: 'Channel', value: message.channel.mention, inline: true },
       { name: 'Message link', value: message.jumpLink, inline: true },
       {
         name: 'Previous',
@@ -92,10 +95,12 @@ async function messageUpdate(
 
 async function messageDelete(client: Client, message: PossiblyUncachedMessage) {
   if (
-    !message.guildID ||
+    isUndefined(message.channel) ||
+    isUndefined(message.guildID) ||
+    isNull(message.guildID) ||
     !(message instanceof Message) ||
-    !message.author ||
-    !message.content ||
+    isUndefined(message.author) ||
+    isUndefined(message.content) ||
     message.author.bot
   )
     return;
@@ -112,14 +117,14 @@ async function messageDelete(client: Client, message: PossiblyUncachedMessage) {
   if (!config || !config.logsChannel) return;
 
   const channel = client.getChannel(config.logsChannel.toString());
-  if (!channel || channel.type !== ChannelTypes.GUILD_TEXT) return;
+  if (isUndefined(channel) || channel.type !== ChannelTypes.GUILD_TEXT) return;
 
   const embed = new Embed()
     .setTitle('Message Delete')
     .setThumbnail(message.author.avatarURL())
     .addFields([
       { name: 'Author', value: message.author.mention },
-      { name: 'Channel', value: message.channel!.mention, inline: true },
+      { name: 'Channel', value: message.channel.mention, inline: true },
       { name: 'Content', value: message.content }
     ])
     .setTimestamp(new Date().toISOString());
