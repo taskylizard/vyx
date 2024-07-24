@@ -1,5 +1,5 @@
-FROM docker.io/library/node:20-alpine
-RUN apk add --update --no-cache python3 make g++
+FROM docker.io/library/node:20
+RUN apt-get install -y --no-install-recommends python3 make g++
 RUN corepack enable
 
 WORKDIR /app

@@ -101,9 +101,11 @@ export class InteractionsManager {
         throw new Error(`Slash command ${cmd.name} already exists.`);
       }
 
-      this.handlers.commands.set(cmd.name, cmd);
-      this.logger.debug(`Loaded slash-command ${cmd.name}.`);
-      return cmd;
+      if (!cmd.disabled) {
+        this.handlers.commands.set(cmd.name, cmd);
+        this.logger.debug(`Loaded slash-command ${cmd.name}.`);
+        return cmd;
+      }
     } catch (error) {
       this.logger.error(`Failed to load slash-command ${path}.`, error);
       throw error;
