@@ -1,3 +1,4 @@
+import { code } from 'discord-md-tags';
 import {
   ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
@@ -68,6 +69,7 @@ export default defineSlashCommand({
 
     const embed = new Embed()
       .setTitle(`${repo.full_name} on GitHub`)
+      .setURL(repo.html_url)
       .setDescription(
         repo.description !== null
           ? `${repo.description}`
@@ -82,7 +84,7 @@ export default defineSlashCommand({
       .addField(
         'Latest Commit',
         commits[0]
-          ? `\`${commits[0].sha.slice(0, 7)}\`([link](${commits[0].html_url}))`
+          ? `[\`${commits[0].sha.slice(0, 7)}\`](${commits[0].html_url})`
           : 'This repository has no commits.'
       )
       .addField(

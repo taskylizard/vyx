@@ -103,7 +103,21 @@ function formatResult(
   const inspected = inspect(result, { depth: 0 })
     .replace(NL_PATTERN, '\n')
     .replace(
-      new RegExp([env.DISCORD_TOKEN, env.DATABASE_URL].join('|'), 'gi'),
+      new RegExp(
+        [
+          env.DISCORD_TOKEN,
+          env.DATABASE_URL,
+          env.REDIS_HOST,
+          env.DIVOLT_TOKEN,
+          env.INFLUXDB_URL,
+          env.INFLUXDB_ADMIN_TOKEN,
+          env.LAVALINK_HOST,
+          env.ERRORS_WEBHOOK_ID,
+          env.ERRORS_WEBHOOK_TOKEN,
+          env.REVOLT_TOKEN
+        ].join('|'),
+        'gi'
+      ),
       '[redacted]'
     );
 
