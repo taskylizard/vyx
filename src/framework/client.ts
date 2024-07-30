@@ -210,12 +210,12 @@ export class Client extends BaseClient {
   private async onInteraction(
     interaction: AnyInteractionGateway
   ): Promise<void> {
-    if (interaction.isModalSubmitInteraction()) {
+    if (interaction.isModalSubmitInteraction())
       return this.runModalSubmitInteraction(interaction);
-    }
-    if (interaction.isComponentInteraction()) {
+
+    if (interaction.isComponentInteraction())
       return this.runComponentInteraction(interaction);
-    }
+
     if (!interaction.isCommandInteraction()) return;
 
     if (interaction.isUserCommand()) {
@@ -394,7 +394,7 @@ export class Client extends BaseClient {
       }
 
       this.emit('commandSuccess', ctx);
-      this.modules.analytics.writeInteraction(ctx.interaction);
+      await this.modules.analytics.writeInteraction(ctx.interaction);
       if (ctx.command.cooldown) {
         const cmdCooldowns = this.managers.interactions.cooldowns.get(
           ctx.command.name

@@ -57,7 +57,7 @@ export class Analytics {
     }
   }
 
-  public writeInteraction(
+  public async writeInteraction(
     interaction: CommandInteraction<
       AnyInteractionChannel | Uncached,
       ApplicationCommandTypes
@@ -65,9 +65,17 @@ export class Analytics {
   ) {
     if (!interaction.isChatInputCommand()) return;
 
+    const guildName = interaction.guild
+      ? interaction.guild.name
+      : interaction.guildID
+        ? (await this.client.rest.guilds.get(interaction.guildID)).name
+        : 'none';
+
+    const guildId = interaction.guildID ?? 'none';
+
     const point = new Point('Commands')
-      .stringField('guild', interaction.guild?.name)
-      .stringField('guild_id', interaction.guildID)
+      .stringField('guild', guildName)
+      .stringField('guild_id', guildId)
       .stringField('user', interaction.user.username)
       .stringField('user_id', interaction.user.id)
       .stringField('channel_id', interaction.channelID)
