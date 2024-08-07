@@ -26,7 +26,6 @@ import { Library, Rainlink } from 'rainlink';
 import { InteractionsManager, type Managers, PluginsManager } from './managers';
 import {
   Analytics,
-  CasesModule,
   EconomyModule,
   type Modules,
   SchedulerModule,
@@ -132,7 +131,6 @@ export class Client extends BaseClient {
     this.modules = {
       economy: new EconomyModule(this.prisma),
       shop: new ShopModule(this.prisma),
-      cases: new CasesModule(this),
       scheduler: new SchedulerModule(
         { port: 6379, host: env.REDIS_HOST },
         this

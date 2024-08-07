@@ -7,7 +7,7 @@ import { defineSlashCommand } from '#framework';
 
 const modules: ApplicationCommandOptionsChoice<ApplicationCommandOptionTypes.STRING>[] =
   [
-    { name: '🔧 Moderation', value: 'MODERATION' },
+    { name: '📮 Report', value: 'REPORT' },
     { name: '🍣 Economy', value: 'ECONOMY' },
     { name: '🎶 Music', value: 'MUSIC' }
   ];
@@ -50,7 +50,6 @@ export default defineSlashCommand({
             data: {
               guildId: BigInt(ctx.interaction.guildID!),
               currency: '🍣',
-              logsChannel: null,
               reportsChannel: null
             }
           });
@@ -90,7 +89,9 @@ export default defineSlashCommand({
           ctx.client.managers.interactions.toSlashJson(command)
         );
 
-        return await ctx.reply(`Enabled \`${mod}\`.`);
+        return await ctx.reply(
+          `Enabled ${modules.find((_mod) => _mod.value === mod)?.name}.`
+        );
       }
     },
     {
@@ -152,7 +153,9 @@ export default defineSlashCommand({
           find.id
         );
 
-        return await ctx.reply(`Disabled \`${mod}\`.`);
+        return await ctx.reply(
+          `Disabled ${modules.find((_mod) => _mod.value === mod)?.name}.`
+        );
       }
     }
   ]

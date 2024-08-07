@@ -8,7 +8,6 @@ export * from './managers/interactions';
 export * from './managers/plugins';
 export * from './revolt/client';
 export * from './modules/analytics';
-export * from './modules/cases';
 export * from './modules/economy';
 export * from './modules/scheduler';
 export * from './modules/shop';

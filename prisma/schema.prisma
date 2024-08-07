@@ -7,23 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Case {
-  caseId        Int    @map("case_id")
-  guildId       BigInt @map("guild_id")
-  caseCreator   BigInt @map("case_creator")
-  moderatedUser BigInt @map("moderated_user")
-  type          String
-  reason        String
-  createdAt     BigInt @map("created_at")
-
-  @@id([caseId, guildId])
-  @@index([moderatedUser])
-  @@map("cases")
-}
-
 model Config {
   guildId        BigInt   @id @map("guild_id")
-  logsChannel    BigInt?  @map("logs_channel")
   reportsChannel BigInt?  @map("reports_channel")
   currency       String?
   modules        Module[]
@@ -32,7 +17,7 @@ model Config {
 }
 
 enum Module {
-  MODERATION
+  REPORT
   MUSIC
   ECONOMY
 }

@@ -30,7 +30,6 @@ async function guildCreate(client: Client, guild: Guild) {
       guildId: BigInt(guild.id),
       modules: [],
       currency: '🍣',
-      logsChannel: null,
       reportsChannel: null
     }
   });
