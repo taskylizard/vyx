@@ -84,7 +84,7 @@ export class Client extends BaseClient {
           'MESSAGE_CONTENT',
           'ALL'
         ],
-        compress: true
+        compress: 'zlib-stream'
       },
       allowedMentions: { everyone: false, repliedUser: true, roles: false },
       auth: `Bot ${env.DISCORD_TOKEN}`
