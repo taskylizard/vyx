@@ -21,6 +21,8 @@ services:
         max-size: "1g"
         max-file: "3"
     container_name: vyx
+    volumes:
+      - "./state/downloads/:/app/state/downloads/"
     depends_on:
       postgres:
         condition: service_healthy

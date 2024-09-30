@@ -181,3 +181,4 @@ trash
 docker/lavalink/plugins
 revcord.sqlite
 .cache
+state/downloads

@@ -21,12 +21,14 @@ import {
   Role,
   type User
 } from 'oceanic.js';
+import { type $Fetch, createFetch } from 'ofetch';
 import { join } from 'pathe';
 import { Library, Rainlink } from 'rainlink';
 import { InteractionsManager, type Managers, PluginsManager } from './managers';
 import {
   Analytics,
   EconomyModule,
+  LucidaModule,
   type Modules,
   SchedulerModule,
   ShopModule
@@ -72,6 +74,8 @@ export class Client extends BaseClient {
 
   public revolt: RevoltClient;
   public divolt: RevoltClient;
+
+  public fetcher: $Fetch;
 
   public constructor(
     options: ClientOptions = {
@@ -135,7 +139,8 @@ export class Client extends BaseClient {
         { port: 6379, host: env.REDIS_HOST },
         this
       ),
-      analytics: new Analytics(this)
+      analytics: new Analytics(this),
+      lucida: new LucidaModule()
     };
 
     this.managers = {
@@ -149,6 +154,7 @@ export class Client extends BaseClient {
       'Divolt'
     );
 
+    this.fetcher = createFetch();
     this.owners = [];
 
     this.once('ready', async () => {
