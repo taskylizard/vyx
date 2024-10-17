@@ -1,37 +1,37 @@
-import type { Prisma, PrismaClient } from '@prisma/client';
-import type { DefaultArgs } from '@prisma/client/runtime/library';
+import type { Prisma, PrismaClient } from '@prisma/client'
+import type { DefaultArgs } from '@prisma/client/runtime/library'
 
 export interface ShopItemConstructor {
-  guildId: bigint;
-  name: string;
-  description: string;
-  price: number;
-  role?: bigint;
+  guildId: bigint
+  name: string
+  description: string
+  price: number
+  role?: bigint
 }
 
 export class ShopModule {
-  table: Prisma.ShopItemDelegate<DefaultArgs>;
+  table: Prisma.ShopItemDelegate<DefaultArgs>
 
   constructor(private client: PrismaClient) {
-    this.client = client;
-    this.table = this.client.shopItem;
+    this.client = client
+    this.table = this.client.shopItem
   }
 
   async list(guild: string) {
     const query = await this.table.findMany({
       where: { guildId: BigInt(guild) },
       orderBy: { itemId: 'asc' }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async get(guild: string, name: string) {
     const item = await this.table.findFirst({
       where: { guildId: BigInt(guild), name }
-    });
+    })
 
-    return item;
+    return item
   }
 
   async add(item: ShopItemConstructor) {
@@ -39,18 +39,18 @@ export class ShopModule {
       where: { guildId: BigInt(item.guildId) },
       orderBy: { itemId: 'desc' },
       take: 1
-    });
+    })
 
-    const previousId = fetchedId?.itemId ?? 0;
+    const previousId = fetchedId?.itemId ?? 0
 
     const query = await this.table.create({
       data: {
         ...item,
         itemId: previousId + 1
       }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async delete(guild: string, name: string) {
@@ -59,6 +59,6 @@ export class ShopModule {
         guildId: BigInt(guild),
         name
       }
-    });
+    })
   }
 }

@@ -1,14 +1,14 @@
 import type {
   CommandInteraction,
   CreateUserApplicationCommandOptions
-} from 'oceanic.js';
+} from 'oceanic.js'
 
 /**
  * Represents a user command with a run method to handle interactions.
  */
 export type UserCommand = {
-  run: (interaction: CommandInteraction) => Promise<unknown>;
-} & Omit<CreateUserApplicationCommandOptions, 'type'>;
+  run: (interaction: CommandInteraction) => Promise<unknown>
+} & Omit<CreateUserApplicationCommandOptions, 'type'>
 
 /**
  * Defines a user command.
@@ -16,5 +16,5 @@ export type UserCommand = {
  * @returns {UserCommand} The defined user command.
  */
 export function defineUserCommand(command: UserCommand): UserCommand {
-  return command;
+  return command
 }

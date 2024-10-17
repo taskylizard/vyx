@@ -191,3 +191,41 @@ services:
       - vyx
     environment:
       ENABLE_METRICS: "true"
+
+  searxng:
+    container_name: searxng-vyx
+    image: docker.io/searxng/searxng:latest
+    restart: unless-stopped
+    networks:
+      - vyx
+    ports:
+      - "127.0.0.1:8765:8080"
+    volumes:
+      - ./docker/searxng:/etc/searxng:rw
+    environment:
+      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
+      - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
+      - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "1"
+
+  chroma:
+    container_name: chroma-vyx
+    image: ghcr.io/chroma-core/chroma:latest
+    environment:
+      - IS_PERSISTENT=TRUE
+    volumes:
+      - ./docker/chroma:/chroma/chroma/
+    ports:
+      - 8087:8000
+    networks:
+      - vyx

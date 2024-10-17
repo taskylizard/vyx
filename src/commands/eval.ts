@@ -1,26 +1,26 @@
-import assert from 'node:assert';
-import { inspect } from 'node:util';
-import { Logger } from '@control.systems/logger';
-import { codeblock, italic } from 'discord-md-tags';
-import { ApplicationCommandOptionTypes } from 'oceanic.js';
-import ms from 'pretty-ms';
-import { defineSlashCommand, env, splitMessage } from '#framework';
+import assert from 'node:assert'
+import { inspect } from 'node:util'
+import { Logger } from '@control.systems/logger'
+import { codeblock, italic } from 'discord-md-tags'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
+import ms from 'pretty-ms'
+import { defineSlashCommand, env, splitMessage } from '#framework'
 
-const NL = '!!NL!!';
-const NL_PATTERN = new RegExp(NL, 'g');
+const NL = '!!NL!!'
+const NL_PATTERN = new RegExp(NL, 'g')
 /** Number of nanoseconds in a millisecond. */
-const nsInMs = 1_000_000;
+const nsInMs = 1_000_000
 
-let lastResult = null;
+let lastResult = null
 const times: {
   /** Timestamp of when the script began in nanoseconds. */
-  start?: bigint;
+  start?: bigint
   /** Timestamp of when the script ended in nanoseconds. */
-  end?: bigint;
+  end?: bigint
   /** Duration of script execution time in nanoseconds. */
-  diff?: bigint;
-} = {};
-const logger = new Logger('Eval');
+  diff?: bigint
+} = {}
+const logger = new Logger('Eval')
 
 export default defineSlashCommand({
   name: 'eval',
@@ -37,11 +37,11 @@ export default defineSlashCommand({
     }
   ],
   async run(ctx) {
-    const code = ctx.options.getString('code', true);
+    const code = ctx.options.getString('code', true)
 
-    const _ctx = ctx;
+    const _ctx = ctx
     // biome-ignore lint/correctness/noUnusedVariables: scoping
-    const { prisma, prisma: db, prisma: database } = ctx.client;
+    const { prisma, prisma: db, prisma: database } = ctx.client
     // biome-ignore lint/correctness/noUnusedVariables: scoping
     const doReply = (value: Error | string): void => {
       if (value instanceof Error) {
@@ -51,49 +51,49 @@ export default defineSlashCommand({
             logger.error(
               'Error while trying to send message about callback error',
               error
-            );
-          });
+            )
+          })
       } else {
         if (!times.diff) {
-          assert(times.end);
-          assert(times.start);
-          times.diff = times.end - times.start;
+          assert(times.end)
+          assert(times.start)
+          times.diff = times.end - times.start
         }
 
-        const results = formatResult(value, times.diff);
+        const results = formatResult(value, times.diff)
         for (const result of results) {
           _ctx.reply(result).catch((error) => {
-            logger.error('Error while sending result message', error);
-          });
+            logger.error('Error while sending result message', error)
+          })
         }
       }
-    };
-    times.start = process.hrtime.bigint();
+    }
+    times.start = process.hrtime.bigint()
     try {
       // biome-ignore lint/security/noGlobalEval:dont care
-      lastResult = eval(code);
+      lastResult = eval(code)
     } catch (error: unknown) {
       return await ctx.reply(
         [
           'Error while evaluating:',
           codeblock('javascript')`${String(error)}`
         ].join('\n')
-      );
+      )
     }
 
-    times.end = process.hrtime.bigint();
-    times.diff = times.end - times.start;
+    times.end = process.hrtime.bigint()
+    times.diff = times.end - times.start
 
-    times.start = process.hrtime.bigint();
-    const results = formatResult(lastResult ?? '[no result]', times.diff, code);
+    times.start = process.hrtime.bigint()
+    const results = formatResult(lastResult ?? '[no result]', times.diff, code)
 
     if (Array.isArray(results)) {
-      return results.map(async (result) => await ctx.reply(result));
+      return results.map(async (result) => await ctx.reply(result))
     }
 
-    return await ctx.reply(results);
+    return await ctx.reply(results)
   }
-});
+})
 
 function formatResult(
   result: string,
@@ -119,24 +119,25 @@ function formatResult(
         'gi'
       ),
       '[redacted]'
-    );
+    )
 
-  const lines = inspected.split('\n');
-  const lastIndex = inspected.length - 1;
-  const prependPart =
-    !inspected.startsWith('{') &&
-    !inspected.startsWith('[') &&
-    !inspected.startsWith("'")
-      ? lines[0]
-      : inspected[0];
+  const lines = inspected.split('\n')
+  const lastIndex = inspected.length - 1
+  const prependPart = !(
+    inspected.startsWith('{') ||
+    inspected.startsWith('[') ||
+    inspected.startsWith("'")
+  )
+    ? lines[0]
+    : inspected[0]
   const appendPart =
     inspected[lastIndex] !== '}' &&
     inspected[lastIndex] !== ']' &&
     inspected[lastIndex] !== "'"
       ? lines[lines.length - 1]
-      : inspected[lastIndex];
-  const prepend = `\`\`\`javascript\n${prependPart}\n`;
-  const append = `\n${appendPart}\n\`\`\``;
+      : inspected[lastIndex]
+  const prepend = `\`\`\`javascript\n${prependPart}\n`
+  const append = `\n${appendPart}\n\`\`\``
   if (input) {
     return splitMessage(
       [
@@ -148,7 +149,7 @@ function formatResult(
         prepend,
         append
       }
-    );
+    )
   }
 
   return splitMessage(
@@ -161,5 +162,5 @@ function formatResult(
       prepend,
       append
     }
-  );
+  )
 }

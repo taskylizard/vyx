@@ -1,6 +1,6 @@
-import { definePlugin } from '#framework';
+import { definePlugin } from '#framework'
 
-const SUBMIT_CHANNEL_ID = '1276863566397571223';
+const SUBMIT_CHANNEL_ID = '1276863566397571223'
 
 export default definePlugin({
   name: 'privateersclub',
@@ -9,8 +9,8 @@ export default definePlugin({
       if (message.channelID === SUBMIT_CHANNEL_ID) {
         await message.startThread({
           name: 'Discussion 🧵'
-        });
+        })
       }
-    });
+    })
   }
-});
+})

@@ -1,26 +1,26 @@
-import { code } from 'discord-md-tags';
+import { code } from 'discord-md-tags'
 import {
   ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
-} from 'oceanic.js';
-import { Embed, defineSlashCommand } from '#framework';
+} from 'oceanic.js'
+import { Embed, defineSlashCommand } from '#framework'
 
 interface Response {
-  name: string;
-  full_name: string;
-  description: string | null;
-  topics: string[];
-  stargazers_count: number;
-  watchers_count: number;
-  forks_count: number;
-  html_url: string;
-  homepage: string;
+  name: string
+  full_name: string
+  description: string | null
+  topics: string[]
+  stargazers_count: number
+  watchers_count: number
+  forks_count: number
+  html_url: string
+  homepage: string
 }
 
 interface Commit {
-  sha: string;
-  html_url: string;
+  sha: string
+  html_url: string
 }
 
 export default defineSlashCommand({
@@ -46,26 +46,26 @@ export default defineSlashCommand({
     ApplicationIntegrationTypes.GUILD_INSTALL
   ],
   async run(ctx) {
-    const option = ctx.options.getString('repo', true);
-    const regex = /http(s)?:\/\/github.com\//;
-    const input = option.replace(regex, '');
+    const option = ctx.options.getString('repo', true)
+    const regex = /http(s)?:\/\/github.com\//
+    const input = option.replace(regex, '')
 
     // urls
-    const url = `https://api.github.com/repos/${input}`;
-    const commitsUrl = `https://api.github.com/repos/${input}/commits`;
+    const url = `https://api.github.com/repos/${input}`
+    const commitsUrl = `https://api.github.com/repos/${input}/commits`
 
     // fetch repo
-    const rawData = await fetch(url);
-    const repo: Response = (await rawData.json()) as unknown as Response;
+    const rawData = await fetch(url)
+    const repo: Response = (await rawData.json()) as unknown as Response
     if (repo) {
       if (!repo.name)
         return ctx.reply(
           'That repository could be found - did you spell its name correctly, and is it private?'
-        );
+        )
     }
-    const rawCommitData = await fetch(commitsUrl);
+    const rawCommitData = await fetch(commitsUrl)
     const commits: Commit[] =
-      (await rawCommitData.json()) as unknown as Commit[];
+      (await rawCommitData.json()) as unknown as Commit[]
 
     const embed = new Embed()
       .setTitle(`${repo.full_name} on GitHub`)
@@ -110,8 +110,8 @@ export default defineSlashCommand({
         }/issues) • [Pull requests](${repo.html_url}/pulls) ${
           repo.homepage ? ` • [Homepage](${repo.homepage})` : ''
         }`
-      );
+      )
 
-    return ctx.reply([embed]);
+    return ctx.reply([embed])
   }
-});
+})

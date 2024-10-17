@@ -4,9 +4,10 @@ import {
   Logger,
   type LoggerOptions,
   PrettyFormatter
-} from '@control.systems/logger';
-import { PrismaClient } from '@prisma/client';
-import { createEnv } from 'neon-env';
+} from '@control.systems/logger'
+import { PrismaClient } from '@prisma/client'
+import { Redis } from 'ioredis'
+import { createEnv } from 'neon-env'
 import {
   type AnyInteractionGateway,
   Client as BaseClient,
@@ -20,23 +21,24 @@ import {
   type RESTApplication,
   Role,
   type User
-} from 'oceanic.js';
-import { type $Fetch, createFetch } from 'ofetch';
-import { join } from 'pathe';
-import { Library, Rainlink } from 'rainlink';
-import { InteractionsManager, type Managers, PluginsManager } from './managers';
+} from 'oceanic.js'
+import { type $Fetch, createFetch } from 'ofetch'
+import { join } from 'pathe'
+import { Library, Rainlink } from 'rainlink'
+import { InteractionsManager, type Managers, PluginsManager } from './managers'
 import {
+  AIModule,
   Analytics,
   EconomyModule,
   LucidaModule,
   type Modules,
   SchedulerModule,
   ShopModule
-} from './modules';
-import { RevoltClient } from './revolt/client';
-import { Context } from './structures/context';
-import { getDirname } from './utils/common';
-import { DiscordFormatter, DiscordTransport } from './webhook';
+} from './modules'
+import { RevoltClient } from './revolt/client'
+import { Context } from './structures/context'
+import { getDirname } from './utils/common'
+import { DiscordFormatter, DiscordTransport } from './webhook'
 
 export const env = createEnv({
   DISCORD_TOKEN: { type: 'string' },
@@ -53,29 +55,33 @@ export const env = createEnv({
   INFLUXDB_URL: { type: 'string' },
   ERRORS_WEBHOOK_ID: { type: 'string' },
   ERRORS_WEBHOOK_TOKEN: { type: 'string' },
-  INFLUXDB_ADMIN_TOKEN: { type: 'string' }
-});
+  INFLUXDB_ADMIN_TOKEN: { type: 'string' },
+  OLLAMA_API_HOST: { type: 'string' },
+  SEARXNG_API_HOST: { type: 'string' },
+  CHROMA_API_HOST: { type: 'string' }
+})
 
-type CompareResult = 'higher' | 'lower' | 'same' | 'invalid' | 'unknown';
-const __dirname = getDirname(import.meta.url);
+type CompareResult = 'higher' | 'lower' | 'same' | 'invalid' | 'unknown'
+const __dirname = getDirname(import.meta.url)
 
 export class Client extends BaseClient {
-  public managers: Managers;
-  public owners: string[];
-  public logger: Logger;
-  public env: typeof env;
-  private oceanicLogger: Logger;
-  private rainlinkLogger: Logger;
-  private loggerConfig: LoggerOptions;
+  public managers: Managers
+  public owners: string[]
+  public logger: Logger
+  public env: typeof env
+  private oceanicLogger: Logger
+  private rainlinkLogger: Logger
+  private loggerConfig: LoggerOptions
 
-  public prisma: PrismaClient;
-  public modules: Modules;
-  public rainlink: Rainlink;
+  public prisma: PrismaClient
+  public redis: Redis
+  public modules: Modules
+  public rainlink: Rainlink
 
-  public revolt: RevoltClient;
-  public divolt: RevoltClient;
+  // public revolt: RevoltClient;
+  // public divolt: RevoltClient;
 
-  public fetcher: $Fetch;
+  public fetch: $Fetch
 
   public constructor(
     options: ClientOptions = {
@@ -94,9 +100,9 @@ export class Client extends BaseClient {
       auth: `Bot ${env.DISCORD_TOKEN}`
     }
   ) {
-    super(options);
+    super(options)
 
-    this.env = env;
+    this.env = env
     this.loggerConfig = {
       levels:
         env.NODE_ENV === 'production'
@@ -112,14 +118,15 @@ export class Client extends BaseClient {
           client: this
         })
       ]
-    };
+    }
 
-    this.logger = new Logger(this.constructor.name, this.loggerConfig);
-    this.oceanicLogger = new Logger('Oceanic', this.loggerConfig);
-    this.rainlinkLogger = new Logger('rainlink', this.loggerConfig);
-    this.logger.debug('Initialized loggers.');
+    this.logger = new Logger(this.constructor.name, this.loggerConfig)
+    this.oceanicLogger = new Logger('Oceanic', this.loggerConfig)
+    this.rainlinkLogger = new Logger('rainlink', this.loggerConfig)
+    this.logger.debug('Initialized loggers.')
 
-    this.prisma = new PrismaClient();
+    this.prisma = new PrismaClient()
+    this.redis = new Redis(env.REDIS_HOST)
     this.rainlink = new Rainlink({
       library: new Library.OceanicJS(this),
       nodes: [
@@ -131,7 +138,7 @@ export class Client extends BaseClient {
           secure: false
         }
       ]
-    });
+    })
     this.modules = {
       economy: new EconomyModule(this.prisma),
       shop: new ShopModule(this.prisma),
@@ -140,32 +147,40 @@ export class Client extends BaseClient {
         this
       ),
       analytics: new Analytics(this),
-      lucida: new LucidaModule()
-    };
+      lucida: new LucidaModule(),
+      ai: new AIModule(this)
+    }
 
     this.managers = {
       interactions: new InteractionsManager(this, join(__dirname, '..')),
       plugins: new PluginsManager(this, join(__dirname, '..'))
-    };
+    }
 
-    this.revolt = new RevoltClient({}, 'Revolt');
-    this.divolt = new RevoltClient(
-      { baseURL: 'https://divolt.xyz/api' },
-      'Divolt'
-    );
+    // this.revolt = new RevoltClient({}, 'Revolt');
+    // this.divolt = new RevoltClient(
+    //   { baseURL: 'https://divolt.xyz/api' },
+    //   'Divolt'
+    // );
 
-    this.fetcher = createFetch();
-    this.owners = [];
+    this.fetch = createFetch({
+      defaults: {
+        headers: {
+          'api-user-agent': 'vyx (https://github.com/taskylizard/vyx)',
+          'User-Agent': 'vyx (https://github.com/taskylizard/vyx)'
+        }
+      }
+    })
+    this.owners = []
 
     this.once('ready', async () => {
-      this.logger.info(`Logged in as ${this.user?.username}.`);
+      this.logger.info(`Logged in as ${this.user?.username}.`)
       try {
-        if (!this.owners.length) this.owners = await this.fetchBotOwners();
+        if (!this.owners.length) this.owners = await this.fetchBotOwners()
       } catch (error) {
-        this.logger.error('Failed to fetch bot owners:', error);
+        this.logger.error('Failed to fetch bot owners:', error)
       }
-      return await this.managers.interactions.updateCommands();
-    });
+      return await this.managers.interactions.updateCommands()
+    })
 
     this.on('commandError', (ctx, error) =>
       this.logger.error(
@@ -177,7 +192,7 @@ export class Client extends BaseClient {
       .on('error', (err, id) =>
         this.oceanicLogger.error(`Error on shard ${id}:`, err)
       )
-      .on('interactionCreate', this.onInteraction);
+      .on('interactionCreate', this.onInteraction)
 
     this.rainlink
       .on('nodeConnect', (node) =>
@@ -200,45 +215,45 @@ export class Client extends BaseClient {
       .on('trackStart', async (player, track) => {
         const channel =
           this.getChannel(player.textId) ??
-          (await this.rest.channels.get(player.textId));
+          (await this.rest.channels.get(player.textId))
 
-        if (channel.type !== ChannelTypes.GUILD_TEXT) return;
+        if (channel.type !== ChannelTypes.GUILD_TEXT) return
         await channel.createMessage({
           content: `Now playing **${track.title}** by **${track.author}**`
-        });
-      });
+        })
+      })
 
-    this.logger.info('Initialized Client.');
+    this.logger.info('Initialized Client.')
   }
 
   private async onInteraction(
     interaction: AnyInteractionGateway
   ): Promise<void> {
     if (interaction.isModalSubmitInteraction())
-      return this.runModalSubmitInteraction(interaction);
+      return this.runModalSubmitInteraction(interaction)
 
     if (interaction.isComponentInteraction())
-      return this.runComponentInteraction(interaction);
+      return this.runComponentInteraction(interaction)
 
-    if (!interaction.isCommandInteraction()) return;
+    if (!interaction.isCommandInteraction()) return
 
     if (interaction.isUserCommand()) {
       this.logger.debug(
         `Received user-command interaction /${interaction.data.name} from ${interaction.user.tag} (${interaction.user.id})`
-      );
+      )
 
       const cmd = this.managers.interactions.handlers.userCommands.get(
         interaction.data.name
-      );
+      )
 
       if (!cmd) {
-        this.logger.trace(`User-command ${interaction.data.name} not found`);
-        return;
+        this.logger.trace(`User-command ${interaction.data.name} not found`)
+        return
       }
-      this.logger.trace(`Found user-command ${cmd.name}`);
+      this.logger.trace(`Found user-command ${cmd.name}`)
 
-      await cmd.run(interaction);
-      return;
+      await cmd.run(interaction)
+      return
     }
 
     this.logger.debug(
@@ -251,26 +266,26 @@ export class Client extends BaseClient {
             : 'bot DM'
           : undefined
       }`
-    );
+    )
 
     let cmd = this.managers.interactions.handlers.commands.get(
       interaction.data.name
-    );
+    )
 
     if (!cmd) {
-      this.logger.trace(`Command ${interaction.data.name} not found`);
-      return;
+      this.logger.trace(`Command ${interaction.data.name} not found`)
+      return
     }
 
-    const subcommand = interaction.data.options.getSubCommand(false);
+    const subcommand = interaction.data.options.getSubCommand(false)
 
     if (subcommand) {
       let result = cmd?.subcommands?.find(
         (subcmd) => subcmd.name === subcommand[0]
-      );
+      )
       if (!result) {
-        this.logger.trace(`SubCommand ${subcommand[0]} not found`);
-        return;
+        this.logger.trace(`SubCommand ${subcommand[0]} not found`)
+        return
       }
 
       // HACK: fix this garbage and handle nested levels
@@ -282,41 +297,41 @@ export class Client extends BaseClient {
       ) {
         result = result?.subcommands?.find(
           (subcmd) => subcmd.name === subcommand[1]
-        );
+        )
         if (!result) {
-          this.logger.trace(`SubCommand ${subcommand[1]} not found`);
-          return;
+          this.logger.trace(`SubCommand ${subcommand[1]} not found`)
+          return
         }
       }
-      cmd = result;
+      cmd = result
     }
 
-    this.logger.trace(`Found command ${cmd.name}`);
+    this.logger.trace(`Found command ${cmd.name}`)
 
-    const ctx = new Context(this, interaction, cmd);
-    this.logger.trace(`Created Context for interaction /${cmd.name}`);
+    const ctx = new Context(this, interaction, cmd)
+    this.logger.trace(`Created Context for interaction /${cmd.name}`)
 
-    await this.handleMiddlewares(ctx);
+    await this.handleMiddlewares(ctx)
   }
 
   private async handleMiddlewares(ctx: Context): Promise<void> {
-    let _prevIndex = -1;
+    let _prevIndex = -1
     const stack = [
       ...this.managers.plugins.middlewares,
       this.runSlashCommand.bind(this)
-    ];
+    ]
 
     async function runner(index: number) {
-      _prevIndex = index;
+      _prevIndex = index
 
-      const middleware = stack[index];
+      const middleware = stack[index]
 
       if (middleware) {
-        await middleware(ctx, () => runner(index + 1));
+        await middleware(ctx, () => runner(index + 1))
       }
     }
 
-    await runner(0);
+    await runner(0)
   }
 
   private async runSlashCommand(
@@ -326,17 +341,17 @@ export class Client extends BaseClient {
     if (ctx.command.ownerOnly && !this.isOwner(ctx.member || ctx.user)) {
       this.logger.debug(
         `Command ${ctx.command.name} didn't run because ${ctx.user.tag} isn't a bot owner.`
-      );
-      this.emit('ownerOnlyCommand', ctx);
-      return;
+      )
+      this.emit('ownerOnlyCommand', ctx)
+      return
     }
 
     if (ctx.command.guildOnly && !ctx.guild) {
       this.logger.debug(
         `Command ${ctx.command.name} didn't run due to being ran in DMs.`
-      );
-      this.emit('guildOnlyCommand', ctx);
-      return;
+      )
+      this.emit('guildOnlyCommand', ctx)
+      return
     }
 
     if (ctx.command.cooldown) {
@@ -344,24 +359,24 @@ export class Client extends BaseClient {
         this.managers.interactions.cooldowns.set(
           ctx.command.name,
           new Map<string, number>()
-        );
+        )
       }
 
       const cmdCooldowns = this.managers.interactions.cooldowns.get(
         ctx.command.name
-      );
-      const now = Date.now();
+      )
+      const now = Date.now()
       if (cmdCooldowns?.has((ctx.member || ctx.user).id)) {
         const expiration =
           (cmdCooldowns.get((ctx.member || ctx.user).id) as number) +
-          ctx.command.cooldown * 1000;
+          ctx.command.cooldown * 1000
         if (now < expiration) {
-          const secsLeft = Math.floor((expiration - now) / 1000);
+          const secsLeft = Math.floor((expiration - now) / 1000)
           this.logger.debug(
             `Command ${ctx.command.name} didn't run due to being on cooldown. Seconds left: ${secsLeft}`
-          );
-          this.emit('commandCooldown', ctx, secsLeft);
-          return;
+          )
+          this.emit('commandCooldown', ctx, secsLeft)
+          return
         }
       }
     }
@@ -376,75 +391,75 @@ export class Client extends BaseClient {
           `Command ${ctx.command.name} didn't run because ${
             ctx.user.tag
           } doesn't have ${ctx.command.requiredPermissions.join()} permissions.`
-        );
-        this.emit('noPermissions', ctx, ctx.command.requiredPermissions);
-        return;
+        )
+        this.emit('noPermissions', ctx, ctx.command.requiredPermissions)
+        return
       }
 
       if (ctx.command.check && !ctx.command.check(ctx)) {
-        this.emit('commandCheckFail', ctx);
-        return;
+        this.emit('commandCheckFail', ctx)
+        return
       }
 
       if (typeof ctx.command.run === 'string') {
-        await ctx.reply(ctx.command.run);
+        await ctx.reply(ctx.command.run)
       } else {
         await (ctx.command.run
           ? ctx.command.run(ctx)
           : ctx.reply(
               "I could not process that command as it didn't have any handlers.",
               true
-            ));
+            ))
       }
 
-      this.emit('commandSuccess', ctx);
-      await this.modules.analytics.writeInteraction(ctx.interaction);
+      this.emit('commandSuccess', ctx)
+      await this.modules.analytics.writeInteraction(ctx.interaction)
       if (ctx.command.cooldown) {
         const cmdCooldowns = this.managers.interactions.cooldowns.get(
           ctx.command.name
-        );
-        cmdCooldowns?.set(ctx.user.id, Date.now());
+        )
+        cmdCooldowns?.set(ctx.user.id, Date.now())
         setTimeout(
           () => cmdCooldowns?.delete(ctx.user.id),
           ctx.command.cooldown * 1000
-        );
+        )
       }
     } catch (error) {
-      this.emit('commandError', ctx, error as Error);
+      this.emit('commandError', ctx, error as Error)
     }
   }
 
   private async runComponentInteraction(interaction: ComponentInteraction) {
-    if (!interaction.isComponentInteraction()) return;
+    if (!interaction.isComponentInteraction()) return
 
     // action will be included in the custom id
-    const action = interaction.data.customID.split('-')[0];
+    const action = interaction.data.customID.split('-')[0]
 
-    let handler = this.managers.interactions.handlers.components.get(action);
+    let handler = this.managers.interactions.handlers.components.get(action)
 
     // give higher priority to option value in select menus
     if (interaction.data.componentType === ComponentTypes.STRING_SELECT) {
-      const value = interaction.data.values.getStrings()[0].split('-')[0];
+      const value = interaction.data.values.getStrings()[0].split('-')[0]
 
       if (value && this.managers.interactions.handlers.components.has(value)) {
-        handler = this.managers.interactions.handlers.components.get(value);
+        handler = this.managers.interactions.handlers.components.get(value)
       }
     }
 
-    if (!handler) return;
+    if (!handler) return
 
     // @ts-expect-error
-    await handler.run(interaction!, this);
+    await handler.run(interaction!, this)
   }
 
   private async runModalSubmitInteraction(interaction: ModalSubmitInteraction) {
-    const action = interaction.data.customID.split('-')[0];
-    const handler = this.managers.interactions.handlers.components.get(action);
+    const action = interaction.data.customID.split('-')[0]
+    const handler = this.managers.interactions.handlers.components.get(action)
 
-    if (!handler) return;
+    if (!handler) return
 
     // @ts-expect-error
-    await handler.run(interaction!, this);
+    await handler.run(interaction!, this)
   }
 
   /**
@@ -456,17 +471,17 @@ export class Client extends BaseClient {
       method: 'GET',
       auth: true,
       path: '/oauth2/applications/@me'
-    });
+    })
 
-    let owners: string[];
+    let owners: string[]
     if (app.team) {
-      owners = app.team.members.map((member) => member.user.id);
+      owners = app.team.members.map((member) => member.user.id)
     } else {
       // @ts-expect-error
-      owners = [app.owner?.id];
+      owners = [app.owner?.id]
     }
-    this.logger.debug(`Successfully fetched bot owners: ${owners.join(', ')}`);
-    return owners;
+    this.logger.debug(`Successfully fetched bot owners: ${owners.join(', ')}`)
+    return owners
   }
 
   /**
@@ -477,10 +492,10 @@ export class Client extends BaseClient {
    */
   public validatePermissions(member: Member, perms: PermissionName[]): boolean {
     for (const perm of perms) {
-      if (!member.permissions.has(perm)) return false;
+      if (!member.permissions.has(perm)) return false
     }
 
-    return true;
+    return true
   }
 
   public getTopRole(member: Member) {
@@ -488,7 +503,7 @@ export class Client extends BaseClient {
       member.roles
         .map((role) => member.guild.roles.get(role)!)
         .sort((a, b) => b.position - a.position)[0] ?? null
-    );
+    )
   }
 
   /** higher = from is higher than to */
@@ -498,127 +513,125 @@ export class Client extends BaseClient {
   ): CompareResult {
     if (!(to instanceof Member)) {
       // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.members.get(to)!;
+      to = from.guild.members.get(to)!
     }
     if (!to) {
-      return 'invalid';
+      return 'invalid'
     }
     if (from.guild.ownerID === from.id) {
-      return 'higher';
+      return 'higher'
     }
     if (to.guild.ownerID === to.id) {
-      return 'lower';
+      return 'lower'
     }
-    const a = this.getTopRole(from)?.position ?? -1;
-    const b = this.getTopRole(to)?.position ?? -1;
+    const a = this.getTopRole(from)?.position ?? -1
+    const b = this.getTopRole(to)?.position ?? -1
     if (a > b) {
-      return 'higher';
+      return 'higher'
     }
     if (a < b) {
-      return 'lower';
+      return 'lower'
     }
     if (a === b) {
-      return 'same';
+      return 'same'
     }
-    return 'unknown';
+    return 'unknown'
   }
 
   /** higher = current member's top role is higher than compared role */
   public compareMemberToRole(from: Member, to: Role | string): CompareResult {
     if (!(to instanceof Role)) {
       // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.roles.get(to)!;
+      to = from.guild.roles.get(to)!
     }
     if (!to) {
-      return 'invalid';
+      return 'invalid'
     }
     if (from.guild.ownerID === to.id) {
-      return 'lower';
+      return 'lower'
     }
-    const a = this.getTopRole(from).position ?? -1;
+    const a = this.getTopRole(from).position ?? -1
     if (a > to.position) {
-      return 'higher';
+      return 'higher'
     }
     if (a < to.position) {
-      return 'lower';
+      return 'lower'
     }
     if (a === to.position) {
-      return 'same';
+      return 'same'
     }
-    return 'unknown';
+    return 'unknown'
   }
 
   /** higher = current role is higher than compared member's top role */
   public compareRoleToMember(from: Role, to: Member | string): CompareResult {
     if (!(to instanceof Member)) {
       // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.members.get(to)!;
+      to = from.guild.members.get(to)!
     }
     if (!to) {
-      return 'invalid';
+      return 'invalid'
     }
     if (from.guild.ownerID === to.id) {
-      return 'lower';
+      return 'lower'
     }
-    const pos = this.getTopRole(to)?.position ?? -1;
+    const pos = this.getTopRole(to)?.position ?? -1
     if (from.position > pos) {
-      return 'higher';
+      return 'higher'
     }
     if (from.position < pos) {
-      return 'lower';
+      return 'lower'
     }
     if (from.position === pos) {
-      return 'same';
+      return 'same'
     }
-    return 'unknown';
+    return 'unknown'
   }
 
   /** higher = current role is higher than compared role */
   public compareRoleToRole(from: Role, to: Role | string): CompareResult {
     if (!(to instanceof Role)) {
       // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.roles.get(to)!;
+      to = from.guild.roles.get(to)!
     }
     if (!to) {
-      return 'invalid';
+      return 'invalid'
     }
     if (from.position > to.position) {
-      return 'higher';
+      return 'higher'
     }
     if (from.position < to.position) {
-      return 'lower';
+      return 'lower'
     }
     if (from.position === to.position) {
-      return 'same';
+      return 'same'
     }
-    return 'unknown';
+    return 'unknown'
   }
 
   /**
    * Connect to Discord.
    */
   public async start(): Promise<void> {
-    await this.managers.plugins.load();
-    await this.managers.interactions.load();
+    await this.managers.plugins.load()
+    await this.managers.interactions.load()
 
-    await this.prisma.$connect();
-    this.logger.info('Connected to prisma.');
+    await this.prisma.$connect()
+    this.logger.info('Connected to prisma.')
 
-    this.logger.info('Logging in...');
-    await super.connect();
-    await this.revolt.loginBot(env.REVOLT_TOKEN);
-    await this.divolt.loginBot(env.DIVOLT_TOKEN);
+    this.logger.info('Logging in...')
+    await super.connect()
+    // await this.revolt.loginBot(env.REVOLT_TOKEN);
+    // await this.divolt.loginBot(env.DIVOLT_TOKEN);
 
-    process.on('unhandledRejection', (error: Error) =>
-      this.logger.error(error)
-    );
+    process.on('unhandledRejection', (error: Error) => this.logger.error(error))
 
-    process.on('error', (error) => this.logger.error(error));
+    process.on('error', (error) => this.logger.error(error))
     process.on('exit', async () => {
-      await this.prisma.$disconnect();
-      await this.modules.analytics.writeApi.close();
-      this.disconnect();
-    });
+      await this.prisma.$disconnect()
+      await this.modules.analytics.writeApi.close()
+      this.disconnect()
+    })
   }
 
   /**
@@ -627,15 +640,15 @@ export class Client extends BaseClient {
    * @returns boolean
    */
   public isOwner(user: Member | User): boolean {
-    return this.owners.includes(user.id);
+    return this.owners.includes(user.id)
   }
 
   public async getUsersCount() {
-    let count = 0;
+    let count = 0
     for (const guild of this.guilds.values()) {
-      const members = (await guild.fetchMembers()).length;
-      count += members;
+      const members = (await guild.fetchMembers()).length
+      count += members
     }
-    return count;
+    return count
   }
 }

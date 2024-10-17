@@ -1,16 +1,16 @@
-import type { EconomyProfile, Prisma, PrismaClient } from '@prisma/client';
-import type { DefaultArgs } from '@prisma/client/runtime/library';
-import type { User } from 'oceanic.js';
+import type { EconomyProfile, Prisma, PrismaClient } from '@prisma/client'
+import type { DefaultArgs } from '@prisma/client/runtime/library'
+import type { User } from 'oceanic.js'
 
 export class EconomyModule {
-  client: PrismaClient;
-  config: Prisma.ConfigDelegate<DefaultArgs>;
-  table: Prisma.EconomyProfileDelegate<DefaultArgs>;
+  client: PrismaClient
+  config: Prisma.ConfigDelegate<DefaultArgs>
+  table: Prisma.EconomyProfileDelegate<DefaultArgs>
 
   constructor(client: PrismaClient) {
-    this.client = client;
-    this.config = this.client.config;
-    this.table = this.client.economyProfile;
+    this.client = client
+    this.config = this.client.config
+    this.table = this.client.economyProfile
   }
 
   async get(guild: string, user: User): Promise<EconomyProfile | undefined> {
@@ -28,9 +28,9 @@ export class EconomyModule {
         walletBal: 0,
         bankBal: 0
       }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async add(guild: string, user: User, amount: number) {
@@ -50,9 +50,9 @@ export class EconomyModule {
         walletBal: amount,
         bankBal: 0
       }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async subtract(guild: string, user: User, amount: number) {
@@ -72,9 +72,9 @@ export class EconomyModule {
         walletBal: 0 - amount,
         bankBal: 0
       }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async deposit(guild: string, user: User, amount: number) {
@@ -95,9 +95,9 @@ export class EconomyModule {
         walletBal: 0 - amount,
         bankBal: 0 + amount
       }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async withdraw(guild: string, user: User, amount: number) {
@@ -118,23 +118,23 @@ export class EconomyModule {
         walletBal: 0 + amount,
         bankBal: 0 - amount
       }
-    });
+    })
 
-    return query;
+    return query
   }
 
   async getCurrency(guild: string) {
     const config = await this.config.findUnique({
       where: { guildId: BigInt(guild) },
       select: { currency: true }
-    });
+    })
 
-    return config?.currency || '🍣';
+    return config?.currency || '🍣'
   }
 
   async getAll(guild: string) {
     return await this.table.findMany({
       where: { guildId: BigInt(guild) }
-    });
+    })
   }
 }

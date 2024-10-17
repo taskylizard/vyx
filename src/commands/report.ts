@@ -1,5 +1,5 @@
-import { ApplicationCommandOptionTypes } from 'oceanic.js';
-import { defineSlashCommand } from '#framework';
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
+import { defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   moduleId: 'REPORT',
@@ -18,7 +18,7 @@ export default defineSlashCommand({
   async run(ctx) {
     const reportsChannel = ctx.options.getChannel('channel')
       ? BigInt(ctx.options.getChannel('channel', true).id)
-      : null;
+      : null
 
     await ctx.client.prisma.config.upsert({
       where: {
@@ -31,9 +31,9 @@ export default defineSlashCommand({
         reportsChannel,
         guildId: BigInt(ctx.interaction.guildID!)
       }
-    });
+    })
 
-    const action = typeof reportsChannel === 'bigint' ? 'Set' : 'Disabled';
-    return await ctx.reply(`${action} reports channel.`);
+    const action = typeof reportsChannel === 'bigint' ? 'Set' : 'Disabled'
+    return await ctx.reply(`${action} reports channel.`)
   }
-});
+})

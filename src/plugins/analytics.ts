@@ -1,11 +1,11 @@
-import { definePlugin } from '#framework';
+import { definePlugin } from '#framework'
 
 export default definePlugin({
   name: 'Analytics',
   onLoad(client) {
-    if (client.env.NODE_ENV !== 'production') return;
+    if (client.env.NODE_ENV !== 'production') return
     setInterval(async () => {
-      await client.modules.analytics.writeStats();
-    }, 20_000);
+      await client.modules.analytics.writeStats()
+    }, 20_000)
   }
-});
+})

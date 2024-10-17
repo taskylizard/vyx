@@ -1,5 +1,5 @@
-import { ComponentTypes, Constants, TextInputStyles } from 'oceanic.js';
-import { defineUserCommand } from '#framework';
+import { ComponentTypes, Constants, TextInputStyles } from 'oceanic.js'
+import { defineUserCommand } from '#framework'
 
 export default defineUserCommand({
   name: 'Report this member',
@@ -9,15 +9,15 @@ export default defineUserCommand({
       return await interaction.reply({
         content: 'This command can only be used inside servers.',
         flags: 64
-      });
+      })
     }
 
-    const member = interaction.data.resolved.members.first();
+    const member = interaction.data.resolved.members.first()
     if (!member) {
       return await interaction.reply({
         content: 'Please mention a user to report.',
         flags: 64
-      });
+      })
     }
 
     await interaction.createModal({
@@ -38,6 +38,6 @@ export default defineUserCommand({
           ]
         }
       ]
-    });
+    })
   }
-});
+})

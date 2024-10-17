@@ -182,3 +182,5 @@ docker/lavalink/plugins
 revcord.sqlite
 .cache
 state/downloads
+docker/searxng/settings.yml
+docker/chroma/

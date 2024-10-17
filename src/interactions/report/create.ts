@@ -1,5 +1,5 @@
-import { ButtonStyles, ComponentTypes, type TextChannel } from 'oceanic.js';
-import { Embed, defineInteraction } from '#framework';
+import { ButtonStyles, ComponentTypes, type TextChannel } from 'oceanic.js'
+import { Embed, defineInteraction } from '#framework'
 
 export default defineInteraction({
   id: 'action.report.create',
@@ -10,8 +10,8 @@ export default defineInteraction({
       !interaction.guildID ||
       !interaction.isModalSubmitInteraction()
     )
-      return;
-    await interaction.defer(64);
+      return
+    await interaction.defer(64)
 
     const existingReport = await client.prisma.report.findFirst({
       where: {
@@ -19,55 +19,55 @@ export default defineInteraction({
         createdMember: BigInt(interaction.member.id),
         status: 'OPEN'
       }
-    });
+    })
 
     if (existingReport) {
       return await interaction.editOriginal({
         content:
           'You already have an open report. Please wait for it to be resolved.'
-      });
+      })
     }
 
     const config = await client.prisma.config.findUnique({
       where: {
         guildId: BigInt(interaction.guildID)
       }
-    });
+    })
 
     if (!config?.reportsChannel) {
       return await interaction.editOriginal({
         content: 'This server does not have a report panel set up.'
-      });
+      })
     }
 
     const reportChannel = interaction.guild?.channels.get(
       config.reportsChannel.toString()
-    ) as TextChannel | undefined;
+    ) as TextChannel | undefined
 
     if (!reportChannel) {
       return await interaction.editOriginal({
         content: 'This server does not have a report panel set up.'
-      });
+      })
     }
 
-    const reason = interaction.data.components.getTextInput('reason', true);
-    const reportMemberId = interaction.data.customID.split('-')[1].trim();
+    const reason = interaction.data.components.getTextInput('reason', true)
+    const reportMemberId = interaction.data.customID.split('-')[1].trim()
     const reportedMember =
       interaction.guild!.members.get(reportMemberId) ??
-      (await client.rest.guilds.getMember(interaction.guildID, reportMemberId));
+      (await client.rest.guilds.getMember(interaction.guildID, reportMemberId))
 
     if (!reportedMember) {
       return await interaction.editOriginal({
         content: 'The user you mentioned is not in this server.'
-      });
+      })
     }
     const [fetchedId] = await client.prisma.report.findMany({
       where: { guildId: BigInt(interaction.guildID) },
       orderBy: { reportId: 'desc' },
       take: 1
-    });
+    })
 
-    const id = fetchedId?.reportId ?? 0;
+    const id = fetchedId?.reportId ?? 0
 
     const report = await client.prisma.report.create({
       data: {
@@ -77,7 +77,7 @@ export default defineInteraction({
         reportedMember: BigInt(reportedMember?.id),
         reason: reason
       }
-    });
+    })
 
     const embed = new Embed()
       .setTitle(`Report from ${interaction.member.username}`)
@@ -95,7 +95,7 @@ export default defineInteraction({
       .setTimestamp(new Date().toISOString())
       .setFooter({
         text: `Report ID: ${report.reportId}`
-      });
+      })
 
     await reportChannel.createMessage({
       embeds: [embed],
@@ -112,8 +112,8 @@ export default defineInteraction({
           ]
         }
       ]
-    });
+    })
 
-    return await interaction.reply({ content: 'Reported that user.' });
+    return await interaction.reply({ content: 'Reported that user.' })
   }
-});
+})

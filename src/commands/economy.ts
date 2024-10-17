@@ -1,9 +1,5 @@
-import { ApplicationCommandOptionTypes } from 'oceanic.js';
-import {
-  Embed,
-  type ShopItemConstructor,
-  defineSlashCommand
-} from '#framework';
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
+import { Embed, type ShopItemConstructor, defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'economy',
@@ -24,7 +20,7 @@ export default defineSlashCommand({
         }
       ],
       async run(ctx) {
-        const value = ctx.options.getString('currency', true);
+        const value = ctx.options.getString('currency', true)
 
         await ctx.client.prisma.config.update({
           where: {
@@ -33,9 +29,9 @@ export default defineSlashCommand({
           data: {
             currency: value
           }
-        });
+        })
 
-        return await ctx.reply(`Successfully set currency to ${value}.`);
+        return await ctx.reply(`Successfully set currency to ${value}.`)
       }
     },
     {
@@ -45,10 +41,10 @@ export default defineSlashCommand({
         const balance = await ctx.client.modules.economy.get(
           ctx.interaction.guildID!,
           ctx.interaction.user
-        );
+        )
         const currency = await ctx.client.modules.economy.getCurrency(
           ctx.interaction.guildID!
-        );
+        )
 
         const embed = new Embed().setTitle('Balance').addFields([
           {
@@ -56,9 +52,9 @@ export default defineSlashCommand({
             value: `${balance?.walletBal} ${currency}`
           },
           { name: 'Bank', value: `${balance?.bankBal} ${currency}` }
-        ]);
+        ])
 
-        return ctx.reply([embed]);
+        return ctx.reply([embed])
       }
     },
     {
@@ -73,27 +69,27 @@ export default defineSlashCommand({
         }
       ],
       async run(ctx) {
-        const toDeposit = ctx.options.getInteger('amount', true);
+        const toDeposit = ctx.options.getInteger('amount', true)
         const balance = await ctx.client.modules.economy.get(
           ctx.interaction.guildID!,
           ctx.interaction.user
-        );
+        )
 
         if (balance!.walletBal < toDeposit) {
-          return await ctx.reply("You don't have that much money!");
+          return await ctx.reply("You don't have that much money!")
         }
 
         await ctx.reply(
           `Successfully deposited ${toDeposit} ${await ctx.client.modules.economy.getCurrency(
             ctx.interaction.guildID!
           )} to your bank!`
-        );
+        )
 
         await ctx.client.modules.economy.deposit(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           toDeposit
-        );
+        )
       }
     },
     {
@@ -103,45 +99,45 @@ export default defineSlashCommand({
       async run(ctx) {
         const currency = await ctx.client.modules.economy.getCurrency(
           ctx.interaction.guildID!
-        );
-        const random = Math.floor(Math.random() * 10);
+        )
+        const random = Math.floor(Math.random() * 10)
 
         if (random > 7) {
-          const money = Math.floor(Math.random() * 200) + 50;
+          const money = Math.floor(Math.random() * 200) + 50
 
           await ctx.reply(
             `The police caught you! You got fined ${money} ${currency}`
-          );
+          )
 
           return await ctx.client.modules.economy.subtract(
             ctx.interaction.guildID!,
             ctx.interaction.user,
             money
-          );
+          )
         }
 
-        const money = Math.floor(Math.random() * 200) + 100;
+        const money = Math.floor(Math.random() * 200) + 100
 
         const messages = [
           'You robbed a bank! You got ',
           "You stole someone's wallet! You found ",
           'You broke into a house and stole '
-        ];
+        ]
 
         const description = `${
           messages[Math.floor(Math.random() * 3)]
-        }${money} ${currency}`;
+        }${money} ${currency}`
 
         const embed = new Embed()
           .setTitle('You committed a crime!')
-          .setDescription(description);
+          .setDescription(description)
 
-        await ctx.reply([embed]);
+        await ctx.reply([embed])
         return await ctx.client.modules.economy.add(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           money
-        );
+        )
       }
     },
     {
@@ -156,80 +152,80 @@ export default defineSlashCommand({
         }
       ],
       async run(ctx) {
-        const user = ctx.options.getUser('user', true);
+        const user = ctx.options.getUser('user', true)
 
         if (user.id === ctx.user.id) {
-          return ctx.reply("You can't rob yourself.");
+          return ctx.reply("You can't rob yourself.")
         }
 
         if (!ctx.guild?.members.get(user.id)) {
-          return ctx.reply('That user could not be found.');
+          return ctx.reply('That user could not be found.')
         }
 
         const userBalance = await ctx.client.modules.economy.get(
           ctx.interaction.guildID!,
           user
-        );
+        )
         const robberBalance = await ctx.client.modules.economy.get(
           ctx.interaction.guildID!,
           ctx.interaction.user
-        );
+        )
 
-        const earnedPercent = Math.round(Math.random() * 20) + 20;
+        const earnedPercent = Math.round(Math.random() * 20) + 20
         const earned = Math.round(
           userBalance!.walletBal * (earnedPercent / 100)
-        );
-        const chance = Math.random() * 100;
+        )
+        const chance = Math.random() * 100
         const currency = await ctx.client.modules.economy.getCurrency(
           ctx.interaction.guildID!
-        );
+        )
 
         if (userBalance!.walletBal < 0) {
           return ctx.reply(
             "You tried to rob them, but they didn't have any money in their wallet!"
-          );
+          )
         }
 
         if (chance > 40) {
           const lost = Math.round(
             (robberBalance!.bankBal + robberBalance!.walletBal) * (earned / 100)
-          );
+          )
           await ctx.client.modules.economy.subtract(
             ctx.interaction.guildID!,
             ctx.interaction.user,
             lost
-          );
+          )
 
           return ctx.reply(
             `You tried to rob them, but they caught you! You got fined ${lost} ${currency}`
-          );
+          )
         }
 
         const embed = new Embed()
           .setTitle(`You robbed ${user.username}`)
           .setDescription(
             `You took their wallet! You got ${earned} ${currency}`
-          );
+          )
 
         await ctx.client.modules.economy.add(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           earned
-        );
+        )
         await ctx.client.modules.economy.subtract(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           earned
-        );
+        )
 
-        return ctx.reply([embed]);
+        return ctx.reply([embed])
       }
     },
     {
       name: 'slut',
       description: 'Get money by being a slut!',
       async run(ctx) {
-        const money = Math.floor(Math.random() * 200 + 50);
+        const money = Math.floor(Math.random() * 200 + 50)
 
         const embed = new Embed()
           .setTitle('You worked as a slut!')
@@ -237,43 +233,43 @@ export default defineSlashCommand({
             `You worked as a slut for 2 hours! You earned ${money} ${await ctx.client.modules.economy.getCurrency(
               ctx.interaction.guildID!
             )}`
-          );
+          )
         await ctx.client.modules.economy.add(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           money
-        );
+        )
 
-        return ctx.reply([embed]);
+        return ctx.reply([embed])
       }
     },
     {
       name: 'work',
       description: 'Get money from working!',
       async run(ctx) {
-        const random = Math.floor(Math.random() * 3);
-        const money = Math.floor(Math.random() * 150 + 50);
+        const random = Math.floor(Math.random() * 3)
+        const money = Math.floor(Math.random() * 150 + 50)
 
         const messages = [
           'You coded a discord bot from a commission! You were paid ',
           "You worked at McDonald's and earned ",
           'You coded a website for a small company! They paid you '
-        ];
+        ]
 
         const description = `${
           messages[random]
-        }${money} ${await ctx.client.modules.economy.getCurrency(ctx.interaction.guildID!)}`;
+        }${money} ${await ctx.client.modules.economy.getCurrency(ctx.interaction.guildID!)}`
 
         const embed = new Embed()
           .setTitle('You worked!')
-          .setDescription(description);
+          .setDescription(description)
 
         await ctx.client.modules.economy.add(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           money
-        );
-        return ctx.reply([embed]);
+        )
+        return ctx.reply([embed])
       }
     },
     {
@@ -289,27 +285,27 @@ export default defineSlashCommand({
         }
       ],
       async run(ctx) {
-        const toWithdraw = ctx.options.getInteger('amount', true);
+        const toWithdraw = ctx.options.getInteger('amount', true)
         const balance = await ctx.client.modules.economy.get(
           ctx.interaction.guildID!,
           ctx.interaction.user
-        );
+        )
 
         if (balance!.bankBal < toWithdraw) {
-          return ctx.reply("You don't have enough balance in your bank!");
+          return ctx.reply("You don't have enough balance in your bank!")
         }
 
         await ctx.reply(
           `Successfully withdrew ${toWithdraw} ${await ctx.client.modules.economy.getCurrency(
             ctx.interaction.guildID!
           )} from your bank!`
-        );
+        )
 
         await ctx.client.modules.economy.withdraw(
           ctx.interaction.guildID!,
           ctx.interaction.user,
           toWithdraw
-        );
+        )
       }
     },
     {
@@ -328,36 +324,36 @@ export default defineSlashCommand({
             }
           ],
           async run(ctx) {
-            const item = ctx.options.getString('item', true);
+            const item = ctx.options.getString('item', true)
             const itemObj = await ctx.client.modules.shop.get(
               ctx.interaction.guildID!,
               item
-            );
+            )
             const user = await ctx.client.modules.economy.get(
               ctx.interaction.guildID!,
               ctx.interaction.user
-            );
+            )
 
             if (!itemObj) {
               return await ctx.reply(
                 'Shop item could not be found. Check items using `/shop list` .'
-              );
+              )
             }
 
             if (itemObj.price > user!.walletBal) {
-              return await ctx.reply("You don't have that much money!");
+              return await ctx.reply("You don't have that much money!")
             }
 
             await ctx.reply(
               `Successfully bought ${itemObj.name} for ${
                 itemObj.price
               } ${await ctx.client.modules.economy.getCurrency(ctx.interaction.guildID!)}`
-            );
+            )
 
             if (itemObj.role) {
               const role = ctx.interaction.guild!.roles.get(
                 itemObj.role.toString()
-              );
+              )
 
               if (role) {
                 await ctx.client.rest.guilds.addMemberRole(
@@ -365,7 +361,7 @@ export default defineSlashCommand({
                   ctx.interaction.user.id,
                   role.id,
                   `Purchased the ${itemObj.name} shop item.`
-                );
+                )
               }
             }
 
@@ -373,7 +369,7 @@ export default defineSlashCommand({
               ctx.interaction.guildID!,
               ctx.interaction.user,
               itemObj.price
-            );
+            )
           }
         },
         {
@@ -382,12 +378,12 @@ export default defineSlashCommand({
           async run(ctx) {
             const list = await ctx.client.modules.shop.list(
               ctx.interaction.guildID!
-            );
-            const embed = new Embed().setTitle('Shop');
+            )
+            const embed = new Embed().setTitle('Shop')
 
             const currency = await ctx.client.modules.economy.getCurrency(
               ctx.interaction.guildID!
-            );
+            )
 
             if (list.length) {
               list.forEach((item) => {
@@ -396,13 +392,13 @@ export default defineSlashCommand({
                     name: `${item.name} - ${item.price} ${currency}`,
                     value: item.description
                   }
-                ]);
-              });
+                ])
+              })
             } else {
-              embed.setDescription('No items have been added.');
+              embed.setDescription('No items have been added.')
             }
 
-            return ctx.reply([embed]);
+            return ctx.reply([embed])
           }
         },
         {
@@ -417,31 +413,31 @@ export default defineSlashCommand({
             }
           ],
           async run(ctx) {
-            const name = ctx.options.getString('item', true);
+            const name = ctx.options.getString('item', true)
             const itemObj = await ctx.client.modules.shop.get(
               ctx.interaction.guildID!,
               name
-            );
+            )
 
             if (!itemObj) {
-              await ctx.client.application.getGlobalCommands();
+              await ctx.client.application.getGlobalCommands()
               return await ctx.reply(
                 'Shop item could not be found. Check items using `/shop list` .'
-              );
+              )
             }
 
             if (!ctx.interaction.memberPermissions?.has('MANAGE_GUILD')) {
               return await ctx.reply(
                 "You don't have the permissions needed to create a item! Needed permissions: Manage guild"
-              );
+              )
             }
 
-            await ctx.reply('Successfully deleted the item.');
+            await ctx.reply('Successfully deleted the item.')
 
             return await ctx.client.modules.shop.delete(
               ctx.interaction.guildID!,
               name
-            );
+            )
           }
         },
         {
@@ -478,35 +474,35 @@ export default defineSlashCommand({
             }
           ],
           async run(ctx) {
-            const name = ctx.options.getString('name', true);
-            const description = ctx.options.getString('description', true);
-            const price = ctx.options.getInteger('price', true);
-            const role = ctx.options.getRole('role');
+            const name = ctx.options.getString('name', true)
+            const description = ctx.options.getString('description', true)
+            const price = ctx.options.getInteger('price', true)
+            const role = ctx.options.getRole('role')
 
             const obj: ShopItemConstructor = {
               name,
               description,
               price,
               guildId: BigInt(ctx.interaction.guildID!)
-            };
+            }
 
             if (role) {
-              obj.role = BigInt(role.id);
+              obj.role = BigInt(role.id)
             }
 
             if (!ctx.interaction.memberPermissions!.has('MANAGE_GUILD')) {
               return await ctx.reply(
                 "You don't have the permissions needed to create a item! Needed permissions: Manage guild"
-              );
+              )
             }
 
             const existingItem = await ctx.client.modules.shop.get(
               ctx.interaction.guildID!,
               name
-            );
+            )
 
             if (existingItem) {
-              return await ctx.reply('That item already exists.');
+              return await ctx.reply('That item already exists.')
             }
 
             const embed = new Embed()
@@ -520,13 +516,13 @@ export default defineSlashCommand({
                     ctx.interaction.guildID!
                   )}`
                 }
-              ]);
+              ])
 
-            await ctx.reply([embed]);
-            return await ctx.client.modules.shop.add(obj);
+            await ctx.reply([embed])
+            return await ctx.client.modules.shop.add(obj)
           }
         }
       ]
     }
   ]
-});
+})

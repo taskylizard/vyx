@@ -1,5 +1,5 @@
-import { ComponentTypes, TextInputStyles } from 'oceanic.js';
-import { defineInteraction } from '#framework';
+import { ComponentTypes, TextInputStyles } from 'oceanic.js'
+import { defineInteraction } from '#framework'
 
 export default defineInteraction({
   id: 'action.snooze.submit',
@@ -9,9 +9,9 @@ export default defineInteraction({
       where: {
         reminderMessageId: interaction.message.id
       }
-    });
+    })
 
-    if (!reminder) return;
+    if (!reminder) return
 
     await interaction.createModal({
       customID: `action.snooze.resolve-${reminder.id}`,
@@ -32,6 +32,6 @@ export default defineInteraction({
           ]
         }
       ]
-    });
+    })
   }
-});
+})

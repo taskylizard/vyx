@@ -1,4 +1,4 @@
-const originalEmitWarning = process.emitWarning;
+const originalEmitWarning = process.emitWarning
 
 // @ts-expect-error
 process.emitWarning = (warning, type, code: string, ...args) => {
@@ -6,11 +6,11 @@ process.emitWarning = (warning, type, code: string, ...args) => {
   const suppressedWarnings = [
     'DEP0040' /* punycode warning */,
     'ExperimentalWarning'
-  ];
+  ]
 
-  if (suppressedWarnings.includes(code)) return;
+  if (suppressedWarnings.includes(code)) return
 
   // Call the original emitWarning function for other warnings
   // @ts-expect-error
-  originalEmitWarning.call(process, warning, type, code, ...args);
-};
+  originalEmitWarning.call(process, warning, type, code, ...args)
+}

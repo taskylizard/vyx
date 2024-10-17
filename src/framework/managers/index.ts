@@ -1,10 +1,10 @@
-import type { InteractionsManager } from './interactions';
-import type { PluginsManager } from './plugins';
+import type { InteractionsManager } from './interactions'
+import type { PluginsManager } from './plugins'
 
-export * from './plugins';
-export * from './interactions';
+export * from './plugins'
+export * from './interactions'
 
 export interface Managers {
-  interactions: InteractionsManager;
-  plugins: PluginsManager;
+  interactions: InteractionsManager
+  plugins: PluginsManager
 }

@@ -1,8 +1,8 @@
 import {
   ApplicationIntegrationTypes,
   InteractionContextTypes
-} from 'oceanic.js';
-import { Embed, defineSlashCommand } from '#framework';
+} from 'oceanic.js'
+import { Embed, defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'npm',
@@ -25,14 +25,14 @@ export default defineSlashCommand({
     ApplicationIntegrationTypes.GUILD_INSTALL
   ],
   async run(ctx) {
-    const query = ctx.options.getString('package', true);
+    const query = ctx.options.getString('package', true)
 
-    let response: any;
+    let response: any
     try {
       response = await (
         await fetch(`https://registry.npmjs.org/${encodeURIComponent(query)}`)
-      ).json();
-      const pkg = response.versions[response['dist-tags'].latest];
+      ).json()
+      const pkg = response.versions[response['dist-tags'].latest]
 
       const embed = new Embed()
         .setTitle(pkg.name)
@@ -41,24 +41,24 @@ export default defineSlashCommand({
         .setColor(ctx.colors.DARK_RED)
         .addField('Version', pkg.version)
         .setFooter({ text: 'Last updated at' })
-        .setTimestamp(new Date(response.time.modified).toISOString());
+        .setTimestamp(new Date(response.time.modified).toISOString())
 
       if (pkg.license) {
-        embed.addField('License', pkg.license);
+        embed.addField('License', pkg.license)
       }
 
       if (pkg.keywords?.length) {
         embed.addField(
           'Keywords',
           pkg.keywords.map((keyword: string) => `\`${keyword}\``).join(', ')
-        );
+        )
       }
 
-      return await ctx.reply({ embeds: [embed] });
+      return await ctx.reply({ embeds: [embed] })
     } catch {
       return await ctx.reply(
         "There were no results for your query - did you type the package's name correctly?"
-      );
+      )
     }
   }
-});
+})

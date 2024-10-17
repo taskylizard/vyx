@@ -1,10 +1,10 @@
-import { translate } from '@vitalets/google-translate-api';
+import { translate } from '@vitalets/google-translate-api'
 import {
   ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
-} from 'oceanic.js';
-import { Embed, defineSlashCommand } from '#framework';
+} from 'oceanic.js'
+import { Embed, defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'translate',
@@ -34,17 +34,17 @@ export default defineSlashCommand({
     ApplicationIntegrationTypes.GUILD_INSTALL
   ],
   async run(ctx) {
-    const language = ctx.options.getString('language', true);
-    const _text = ctx.options.getString('text', true);
-    const { text } = await translate(_text, { to: language });
+    const language = ctx.options.getString('language', true)
+    const _text = ctx.options.getString('text', true)
+    const { text } = await translate(_text, { to: language })
     const embed = new Embed()
       .setTitle('Google Translate')
       .setColor(ctx.colors.BLUE)
       .addFields([
         { name: 'Original Text', value: _text },
         { name: 'Translated', value: text }
-      ]);
+      ])
 
-    return await ctx.reply([embed]);
+    return await ctx.reply([embed])
   }
-});
+})
