@@ -1,3 +1,4 @@
+import type { Awaitable } from '@antfu/utils'
 import type { $Enums } from '@prisma/client'
 import type {
   ApplicationCommandOptions,
@@ -70,9 +71,9 @@ export type SlashCommand = {
   /**
    * The pre-load check. You can use this to run something before execution.
    * @param {Context} ctx - The command context.
-   * @returns {Promise<boolean>} Whether the pre-load check passes.
+   * @returns {boolean} Whether the pre-load check passes.
    */
-  check?: (ctx: Context) => Promise<boolean>
+  check?: (ctx: Context) => Awaitable<boolean>
   /**
    * The main handler of your command.
    * @param {Context} ctx - The command context.

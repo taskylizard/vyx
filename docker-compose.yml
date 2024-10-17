@@ -223,6 +223,7 @@ services:
     image: ghcr.io/chroma-core/chroma:latest
     environment:
       - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=False
     volumes:
       - ./docker/chroma:/chroma/chroma/
     ports:

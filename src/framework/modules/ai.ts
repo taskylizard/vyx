@@ -289,7 +289,7 @@ IMPORTANT: When specifying categories or engines, always use a valid JSON array 
         )
 
       // Start typing indicator
-      let typingInterval: NodeJS.Timer | null = null
+      let typingInterval: NodeJS.Timeout | null = null
       const startTyping = () => {
         thread.sendTyping().catch((error) => {
           this.logger.error('Error sending typing indicator:', error)

@@ -30,7 +30,6 @@ import {
   AIModule,
   Analytics,
   EconomyModule,
-  LucidaModule,
   type Modules,
   SchedulerModule,
   ShopModule
@@ -147,7 +146,6 @@ export class Client extends BaseClient {
         this
       ),
       analytics: new Analytics(this),
-      lucida: new LucidaModule(),
       ai: new AIModule(this)
     }
 

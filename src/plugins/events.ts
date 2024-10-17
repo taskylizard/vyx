@@ -67,5 +67,5 @@ async function commandError(ctx: Context, error: Error) {
 }
 
 async function commandCheckFail(ctx: Context) {
-  await ctx.reply('The command check failed.')
+  await ctx.reply('You cannot run this command.', true)
 }
