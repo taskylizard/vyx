@@ -1,3 +1,4 @@
 [tools]
 node = 'latest'
 typos = "latest"
+"ubi:trufflesecurity/trufflehog" = "latest"
