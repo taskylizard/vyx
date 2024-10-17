@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises'
 import { sample } from '@antfu/utils'
-import { ApplicationCommandOptionTypes, ChannelTypes } from 'oceanic.js'
+import {
+  ApplicationCommandOptionTypes,
+  ApplicationIntegrationTypes,
+  ChannelTypes,
+  InteractionContextTypes
+} from 'oceanic.js'
 import { Embed, defineSlashCommand, emojis } from '#framework'
 
 export default defineSlashCommand({
@@ -26,6 +31,15 @@ export default defineSlashCommand({
           type: ApplicationCommandOptionTypes.BOOLEAN,
           required: false
         }
+      ],
+      contexts: [
+        InteractionContextTypes.BOT_DM,
+        InteractionContextTypes.GUILD,
+        InteractionContextTypes.PRIVATE_CHANNEL
+      ],
+      integrationTypes: [
+        ApplicationIntegrationTypes.USER_INSTALL,
+        ApplicationIntegrationTypes.GUILD_INSTALL
       ],
       async run(ctx) {
         const prompt = ctx.options.getString('prompt', true)

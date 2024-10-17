@@ -30,10 +30,12 @@ export class Analytics {
   public queryApi!: QueryApi
 
   public async writeStats() {
-    const users = new Point('Users')
-      .floatField('discord', await this.client.getUsersCount())
-      .floatField('revolt', await this.client.revolt.getUsersCount())
-      .floatField('divolt', await this.client.divolt.getUsersCount())
+    const users = new Point('Users').floatField(
+      'discord',
+      await this.client.getUsersCount()
+    )
+    // .floatField('revolt', await this.client.revolt.getUsersCount())
+    // .floatField('divolt', await this.client.divolt.getUsersCount())
 
     let discordPing = this.client.shards.map((shard) => shard.latency)[0]
 
@@ -45,10 +47,9 @@ export class Analytics {
     )
       discordPing = 0
 
-    const ping = new Point('Ping')
-      .floatField('discord', discordPing)
-      .floatField('revolt', this.client.revolt.events.ping())
-      .floatField('divolt', this.client.divolt.events.ping())
+    const ping = new Point('Ping').floatField('discord', discordPing)
+    // .floatField('revolt', this.client.revolt.events.ping())
+    // .floatField('divolt', this.client.divolt.events.ping())
 
     try {
       this.writeApi.writePoints([users, ping])
