@@ -19,6 +19,7 @@ import {
   type Interaction,
   type SlashCommand,
   type UserCommand,
+  createGuard,
   getDirname,
   importDefault
 } from '..'
@@ -91,20 +92,41 @@ export class InteractionsManager {
   }
 
   private async loadSlashCommand(path: string) {
-    let cmd: SlashCommand
+    let cmd: SlashCommand | SlashCommand[]
+    // Typeguard for single slash command
+    const isSingleCommand = createGuard((cmd: SlashCommand | SlashCommand[]) =>
+      Array.isArray(cmd) ? undefined : cmd
+    )
     try {
-      cmd = await importDefault<SlashCommand>(path)
-      if (this.handlers.commands.has(cmd.name)) {
-        this.logger.warn(
-          `Attempted to load already existing slash-command ${cmd.name}`
-        )
-        throw new Error(`Slash command ${cmd.name} already exists.`)
-      }
+      cmd = await importDefault<SlashCommand | SlashCommand[]>(path)
+      if (isSingleCommand(cmd)) {
+        if (this.handlers.commands.has(cmd.name)) {
+          this.logger.warn(
+            `Attempted to load already existing slash-command ${cmd.name}`
+          )
+          throw new Error(`Slash command ${cmd.name} already exists.`)
+        }
 
-      if (!cmd.disabled) {
-        this.handlers.commands.set(cmd.name, cmd)
-        this.logger.debug(`Loaded slash-command ${cmd.name}.`)
-        return cmd
+        if (!cmd.disabled) {
+          this.handlers.commands.set(cmd.name, cmd)
+          this.logger.debug(`Loaded slash-command ${cmd.name}.`)
+          return cmd
+        }
+      } else {
+        for (const command of cmd) {
+          if (this.handlers.commands.has(command.name)) {
+            this.logger.warn(
+              `Attempted to load already existing slash-command ${command.name}`
+            )
+            throw new Error(`Slash command ${command.name} already exists.`)
+          }
+
+          if (!command.disabled) {
+            this.handlers.commands.set(command.name, command)
+            this.logger.debug(`Loaded slash-command ${command.name}.`)
+            return command
+          }
+        }
       }
     } catch (error) {
       this.logger.error(`Failed to load slash-command ${path}.`, error)

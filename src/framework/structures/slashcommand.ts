@@ -10,7 +10,7 @@ import type {
 import type { Context } from './context'
 
 /**
- * Interface representing a command.
+ * Interface representing a slash command.
  */
 export type SlashCommand = {
   /**
@@ -46,7 +46,7 @@ export type SlashCommand = {
    */
   guildOnly?: boolean
   /**
-   * The ID of the guild.
+   * The IDs of the guilds where this command is available.
    */
   guilds?: string[]
   /**
@@ -71,7 +71,7 @@ export type SlashCommand = {
   /**
    * The pre-load check. You can use this to run something before execution.
    * @param {Context} ctx - The command context.
-   * @returns {boolean} Whether the pre-load check passes.
+   * @returns {Awaitable<boolean>} Whether the pre-load check passes.
    */
   check?: (ctx: Context) => Awaitable<boolean>
   /**
@@ -82,24 +82,49 @@ export type SlashCommand = {
   run?: ((ctx: Context) => Promise<unknown>) | string
 } & Omit<CreateMessageApplicationCommandOptions, 'type'>
 
+/**
+ * Represents a subcommand without options or nested subcommands.
+ */
 type SubCommandEndpoint = Omit<SlashCommand, 'options' | 'subcommands'>
 
+/**
+ * Represents a subcommand, which can have options and nested subcommands.
+ */
 export type SubCommand = SubCommandEndpoint & {
   /**
    * The options for the subcommand.
    */
   options?: ApplicationCommandOptionsWithValue[]
   /**
-   * The subcommands for the subcommand.
+   * The nested subcommands for this subcommand.
    */
   subcommands?: SubCommand[]
 }
 
 /**
- * Defines a slash command with the given options.
- * @param {SlashCommand} options - The options for the command.
- * @returns {SlashCommand} The defined command.
+ * Defines a single slash command.
+ * @param {SlashCommand} command - The slash command to define.
+ * @returns {SlashCommand} The defined slash command.
  */
-export function defineSlashCommand(options: SlashCommand): SlashCommand {
+export function defineSlashCommand(command: SlashCommand): SlashCommand
+
+/**
+ * Defines multiple slash commands.
+ * @param {SlashCommand[]} commands - An array of slash commands to define.
+ * @returns {SlashCommand[]} The array of defined slash commands.
+ */
+export function defineSlashCommand(commands: SlashCommand[]): SlashCommand[]
+
+/**
+ * Defines one or more slash commands.
+ * @param {SlashCommand | SlashCommand[]} options - A single slash command or an array of slash commands.
+ * @returns {SlashCommand | SlashCommand[]} The defined slash command(s).
+ */
+export function defineSlashCommand(
+  options: SlashCommand | SlashCommand[]
+): SlashCommand | SlashCommand[] {
+  if (Array.isArray(options)) {
+    return options
+  }
   return options
 }

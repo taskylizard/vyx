@@ -98,6 +98,12 @@ export type Result<T, E extends string | Error = Error> =
   | { ok: true; result: T }
   | { ok: false; error: E }
 
+export function createGuard<T, U extends T>(
+  check: (maybe: T) => U | undefined
+): (maybe: T) => maybe is U {
+  return (maybe: T): maybe is U => check(maybe) !== undefined
+}
+
 export const emojis = [
   '🎊',
   '🎉',
