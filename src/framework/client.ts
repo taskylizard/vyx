@@ -57,7 +57,8 @@ export const env = createEnv({
   INFLUXDB_ADMIN_TOKEN: { type: 'string' },
   OLLAMA_API_HOST: { type: 'string' },
   SEARXNG_API_HOST: { type: 'string' },
-  CHROMA_API_HOST: { type: 'string' }
+  CHROMA_API_HOST: { type: 'string' },
+  AOC_SESSION: { type: 'string' }
 })
 
 type CompareResult = 'higher' | 'lower' | 'same' | 'invalid' | 'unknown'

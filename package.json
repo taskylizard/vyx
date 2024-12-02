@@ -39,6 +39,7 @@
     "@vitalets/google-translate-api": "^9.2.0",
     "ai": "^3.4.33",
     "anilist": "^0.12.4",
+    "aocjs": "^1.0.2",
     "bullmq": "^5.25.1",
     "chromadb": "^1.9.2",
     "denque": "^2.1.0",

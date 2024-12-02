@@ -38,6 +38,9 @@ importers:
       anilist:
         specifier: ^0.12.4
         version: 0.12.4
+      aocjs:
+        specifier: ^1.0.2
+        version: 1.0.2
       bullmq:
         specifier: ^5.25.1
         version: 5.25.1
@@ -794,6 +797,9 @@ packages:
   ansi-styles@4.3.0:
     resolution: {integrity: sha512-zbB9rCJAT1rbjiVDb2hqKFHNYLxgtk8NURxZ3IZwD3F6NtxbXZQCnnSi1Lkx+IDohdPlFp222wVALIheZJQSEg==}
     engines: {node: '>=8'}
+
+  aocjs@1.0.2:
+    resolution: {integrity: sha512-C0TAALaZqaXw+uFOS9s4dXcbOEpsIC7uhONMJqKbCcZHs67dn8XGuvD0VkUJoONruaKzEyJxVmu4nuWKxGthfw==}
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
@@ -2183,6 +2189,8 @@ snapshots:
   ansi-styles@4.3.0:
     dependencies:
       color-convert: 2.0.1
+
+  aocjs@1.0.2: {}
 
   argparse@2.0.1: {}
 
