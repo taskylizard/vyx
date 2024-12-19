@@ -31,7 +31,6 @@
   "dependencies": {
     "@agentic/core": "^7.1.0",
     "@antfu/utils": "^0.7.10",
-    "@control.systems/logger": "^1.0.5",
     "@execaman/lyricist": "^2.0.2",
     "@influxdata/influxdb-client": "^1.35.0",
     "@oceanicjs/builders": "^1.1.11",
@@ -60,6 +59,7 @@
     "pretty-ms": "^9.1.0",
     "rainlink": "^1.2.5",
     "revolt.js": "7.0.3",
+    "tracix": "^1.0.0",
     "ts-pattern": "^5.5.0",
     "zlib-sync": "^0.1.9",
     "zod": "^3.23.8"

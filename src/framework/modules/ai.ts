@@ -1,5 +1,4 @@
 import { omit, pick, pruneUndefined } from '@agentic/core'
-import { Logger } from '@control.systems/logger'
 import {
   type Experimental_LanguageModelV1Middleware as LanguageModelV1Middleware,
   embed,
@@ -11,6 +10,7 @@ import { ChromaClient } from 'chromadb'
 import { evaluate as math } from 'mathjs'
 import type { ThreadChannel } from 'oceanic.js'
 import { type OllamaProvider, createOllama } from 'ollama-ai-provider'
+import { Logger } from 'tracix'
 import { z } from 'zod'
 import type { Client, Result } from '#framework'
 import {

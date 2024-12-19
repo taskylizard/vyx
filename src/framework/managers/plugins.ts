@@ -1,6 +1,6 @@
-import { Logger } from '@control.systems/logger'
 import { fdir } from 'fdir'
 import { join } from 'pathe'
+import { Logger } from 'tracix'
 import type { Client } from '../client'
 import type { Middleware, Plugin } from '../structures/plugin'
 import { importDefault } from '../utils/common'

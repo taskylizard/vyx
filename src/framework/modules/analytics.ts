@@ -1,5 +1,4 @@
 import { isNumber } from '@antfu/utils'
-import { Logger } from '@control.systems/logger'
 import {
   InfluxDB,
   Point,
@@ -12,6 +11,7 @@ import type {
   CommandInteraction,
   Uncached
 } from 'oceanic.js'
+import { Logger } from 'tracix'
 import { type Client, env } from '../client'
 
 export class Analytics {

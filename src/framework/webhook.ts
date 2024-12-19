@@ -1,3 +1,6 @@
+import { EmbedBuilder } from '@oceanicjs/builders'
+import { codeblock } from 'discord-md-tags'
+import type { ExecuteWebhookOptions } from 'oceanic.js'
 import {
   type Formatter,
   type LogData,
@@ -5,10 +8,7 @@ import {
   type Logger,
   Transport,
   type TransportOptions
-} from '@control.systems/logger'
-import { EmbedBuilder } from '@oceanicjs/builders'
-import { codeblock } from 'discord-md-tags'
-import type { ExecuteWebhookOptions } from 'oceanic.js'
+} from 'tracix'
 import type { Client } from './client'
 
 export class DiscordFormatter implements Formatter {

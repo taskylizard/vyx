@@ -1,5 +1,5 @@
-import { Logger } from '@control.systems/logger'
 import { Client, type ClientOptions } from 'revolt.js'
+import { Logger } from 'tracix'
 
 export class RevoltClient extends Client {
   /** If the bot is connected to the websocket */

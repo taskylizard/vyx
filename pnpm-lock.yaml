@@ -14,9 +14,6 @@ importers:
       '@antfu/utils':
         specifier: ^0.7.10
         version: 0.7.10
-      '@control.systems/logger':
-        specifier: ^1.0.5
-        version: 1.0.5
       '@execaman/lyricist':
         specifier: ^2.0.2
         version: 2.0.2
@@ -101,6 +98,9 @@ importers:
       revolt.js:
         specifier: 7.0.3
         version: 7.0.3
+      tracix:
+        specifier: ^1.0.0
+        version: 1.0.0
       ts-pattern:
         specifier: ^5.5.0
         version: 5.5.0
@@ -297,10 +297,6 @@ packages:
     engines: {node: '>=14.21.3'}
     cpu: [x64]
     os: [win32]
-
-  '@control.systems/logger@1.0.5':
-    resolution: {integrity: sha512-pJjlqQRZYeo4ofoAS7uHtbsmALlvOkZ9p91XVWx1RrP6+7lXWVTtvVODHiYYK68+g6PghDE/9tGvC9hnlhar7g==}
-    engines: {node: '>=18.16.1'}
 
   '@discordjs/voice@0.17.0':
     resolution: {integrity: sha512-hArn9FF5ZYi1IkxdJEVnJi+OxlwLV0NJYWpKXsmNOojtGtAZHxmsELA+MZlu2KW1F/K1/nt7lFOfcMXNYweq9w==}
@@ -1029,9 +1025,6 @@ packages:
       picomatch:
         optional: true
 
-  fecha@4.2.3:
-    resolution: {integrity: sha512-OP2IUU6HeYKJi3i0z4A19kHMQoLVs4Hc+DPqqxI2h/DPZHTm/vjsfC6P0b4jCMy14XizLBqvndQ+UilD7707Jw==}
-
   follow-redirects@1.15.9:
     resolution: {integrity: sha512-gew4GsXizNgdoRyqmyfMHyAmXsZDk6mHkSxZFCzW9gwlbtOW44CDtYavM+y+72qD/Vq2l550kMF52DT8fOLJqQ==}
     engines: {node: '>=4.0'}
@@ -1533,6 +1526,10 @@ packages:
   tr46@0.0.3:
     resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
 
+  tracix@1.0.0:
+    resolution: {integrity: sha512-ci2ELaHnjVg1UIEphKIRejarISwx3ur8QDTbEFb8FjqsfiUMpIiLT/fiak1QTrCgT4MKB2pnEs/vDmzVjTamYw==}
+    engines: {node: '>=18.16.1'}
+
   ts-pattern@5.5.0:
     resolution: {integrity: sha512-jqbIpTsa/KKTJYWgPNsFNbLVpwCgzXfFJ1ukNn4I8hMwyQzHMJnk/BqWzggB0xpkILuKzaO/aMYhS0SkaJyKXg==}
 
@@ -1808,10 +1805,6 @@ snapshots:
 
   '@biomejs/cli-win32-x64@1.9.3':
     optional: true
-
-  '@control.systems/logger@1.0.5':
-    dependencies:
-      fecha: 4.2.3
 
   '@discordjs/voice@0.17.0':
     dependencies:
@@ -2446,8 +2439,6 @@ snapshots:
 
   fdir@6.4.2: {}
 
-  fecha@4.2.3: {}
-
   follow-redirects@1.15.9: {}
 
   form-data@4.0.1:
@@ -2937,6 +2928,8 @@ snapshots:
   toidentifier@1.0.1: {}
 
   tr46@0.0.3: {}
+
+  tracix@1.0.0: {}
 
   ts-pattern@5.5.0: {}
 

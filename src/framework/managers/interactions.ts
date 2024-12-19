@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto'
 import { readFile, stat, writeFile } from 'node:fs/promises'
-import { Color, ColorCode, Logger } from '@control.systems/logger'
 import { fdir } from 'fdir'
 import type {
   ApplicationCommandOptions,
@@ -14,6 +13,7 @@ import {
   Collection
 } from 'oceanic.js'
 import { join, resolve } from 'pathe'
+import { Color, ColorCode, Logger } from 'tracix'
 import {
   type Client,
   type Interaction,

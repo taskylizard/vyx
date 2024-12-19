@@ -1,9 +1,9 @@
 import assert from 'node:assert'
 import { inspect } from 'node:util'
-import { Logger } from '@control.systems/logger'
 import { codeblock, italic } from 'discord-md-tags'
 import { ApplicationCommandOptionTypes } from 'oceanic.js'
 import ms from 'pretty-ms'
+import { Logger } from 'tracix'
 import { defineSlashCommand, env, splitMessage } from '#framework'
 
 const NL = '!!NL!!'

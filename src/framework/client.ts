@@ -1,10 +1,3 @@
-import {
-  ConsoleTransport,
-  LogLevel,
-  Logger,
-  type LoggerOptions,
-  PrettyFormatter
-} from '@control.systems/logger'
 import { PrismaClient } from '@prisma/client'
 import { Redis } from 'ioredis'
 import { createEnv } from 'neon-env'
@@ -25,6 +18,13 @@ import {
 import { type $Fetch, createFetch } from 'ofetch'
 import { join } from 'pathe'
 import { Library, Rainlink } from 'rainlink'
+import {
+  ConsoleTransport,
+  LogLevel,
+  Logger,
+  type LoggerOptions,
+  PrettyFormatter
+} from 'tracix'
 import { InteractionsManager, type Managers, PluginsManager } from './managers'
 import {
   AIModule,
