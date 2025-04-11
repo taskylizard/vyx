@@ -26,14 +26,13 @@ export default defineSlashCommand({
     {
       name: 'anime',
       description: 'Searches by provided query on AniList.',
-      options: [
-        {
-          type: 3,
-          name: 'search',
+      options: {
+        search: {
+          type: 'string',
           description: 'Anime to search for.',
           required: true
         }
-      ],
+      },
       async run(ctx) {
         const query = ctx.options.getString('search', true)
 
@@ -63,7 +62,9 @@ export default defineSlashCommand({
             anime.endDate?.month || '??',
             anime.endDate?.year || '????'
           ].join('.')
-          const animeSeasonRaw = `${capitalize(anime.season ?? 'null')} ${anime.startDate?.year}`
+          const animeSeasonRaw = `${capitalize(anime.season ?? 'null')} ${
+            anime.startDate?.year
+          }`
           const animeSeason = anime.season
             ? animeSeasonRaw
             : 'No season available'
@@ -118,14 +119,13 @@ export default defineSlashCommand({
     {
       name: 'manga',
       description: 'Searches by provided query on AniList.',
-      options: [
-        {
-          type: 3,
-          name: 'search',
+      options: {
+        search: {
+          type: 'string',
           description: 'Manga to search for.',
           required: true
         }
-      ],
+      },
       async run(ctx) {
         const query = ctx.options.getString('search', true)
         try {
@@ -153,7 +153,9 @@ export default defineSlashCommand({
             manga.endDate?.month || '??',
             manga.endDate?.year || '????'
           ].join('.')
-          const seasonRaw = `${capitalize(manga.season ?? 'null')} ${manga.startDate?.year}`
+          const seasonRaw = `${capitalize(manga.season ?? 'null')} ${
+            manga.startDate?.year
+          }`
           const season = manga.season ? seasonRaw : 'No season available'
 
           const embed = new Embed()

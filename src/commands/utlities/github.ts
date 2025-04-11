@@ -27,15 +27,14 @@ export default defineSlashCommand({
   name: 'github',
   description:
     'Get info on a Github repository. The repository must be public.',
-  options: [
-    {
-      name: 'repo',
+  options: {
+    repo: {
       description:
         'The repository as owner/repo or its link. It must be public.',
       type: ApplicationCommandOptionTypes.STRING,
       required: true
     }
-  ],
+  },
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,

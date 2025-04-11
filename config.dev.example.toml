@@ -1,0 +1,23 @@
+env = "development"
+
+[tokens]
+discord = "your_development_discord_bot_token"
+influxdb = "your_development_influxdb_token"
+# revolt = "your_development_revolt_token"
+# divolt = "your_development_divolt_token"
+# adventofcode = "your_development_aoc_session"
+
+[hosts]
+database = "postgresql://postgres:postgres@localhost:5432/vyx_dev"
+redis = "localhost"
+influxdb = "http://localhost:8086"
+# Optional
+lavalink = "localhost:2333"
+ollama = "http://localhost:11434"
+searxng = "http://localhost:8080"
+chroma = "http://localhost:8000"
+
+
+[errors]
+webhookId = "development_webhook_id"
+webhookToken = "development_webhook_token"

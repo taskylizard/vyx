@@ -8,14 +8,13 @@ export default defineSlashCommand([
   {
     name: 'verify',
     description: 'Verify a member into the server.',
-    options: [
-      {
-        name: 'member',
+    options: {
+      member: {
         description: 'The member to verify.',
         type: ApplicationCommandOptionTypes.USER,
         required: true
       }
-    ],
+    },
     check(ctx) {
       if (ctx.member!.roles.includes(VERIFIER_ROLE)) {
         return true

@@ -66,13 +66,31 @@ export class DiscordTransport extends Transport<DiscordTransportOptions> {
 
   async print(data: LogData, formatted: string): Promise<void> {
     switch (data.level) {
-      case LogLevel.ERROR:
-        await this.options.client.rest.webhooks.execute(
-          this.options.id,
-          this.options.token,
-          formatted as ExecuteWebhookOptions
-        )
+      case LogLevel.ERROR: {
+        // Skip webhook execution for specific error messages
+        let shouldSendWebhook = true
+
+        // Check if any input contains the specific error message
+        if (data.input && Array.isArray(data.input)) {
+          const errorMessage = data.input.join(' ')
+          if (
+            errorMessage.includes(
+              "Error: invalid float value for field 'discord': NaN"
+            )
+          ) {
+            shouldSendWebhook = false
+          }
+        }
+
+        if (shouldSendWebhook) {
+          await this.options.client.rest.webhooks.execute(
+            this.options.id,
+            this.options.token,
+            formatted as any // Using type assertion to fix the type error
+          )
+        }
         break
+      }
 
       default:
         break

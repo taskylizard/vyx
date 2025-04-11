@@ -36,6 +36,14 @@ export type Interaction<T extends InteractionType> = {
   run: (interaction: SerializeType<T>, client: Client) => Promise<unknown>
 }
 
+export type ModalInteraction = Interaction<'modal'>
+export type ButtonInteraction = Interaction<'button'>
+export type SelectMenuInteraction = Interaction<'selectMenu'>
+export type InteractionUnion =
+  | ModalInteraction
+  | ButtonInteraction
+  | SelectMenuInteraction
+
 /**
  * Defines an interaction with the given options.
  * @template T - The type of interaction.

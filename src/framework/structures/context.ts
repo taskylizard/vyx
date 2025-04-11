@@ -73,10 +73,6 @@ export class Context {
     return this.interaction.data.options
   }
 
-  public wsl(guildID: string): RainlinkWebsocket | undefined {
-    return this.client.rainlink.nodes.get(guildID)?.connect()
-  }
-
   private removeTimeout() {
     if (this.deferTimeout !== null) {
       clearTimeout(this.deferTimeout)

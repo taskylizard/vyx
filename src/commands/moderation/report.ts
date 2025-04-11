@@ -7,14 +7,13 @@ export default defineSlashCommand({
   requiredPermissions: ['VIEW_AUDIT_LOG', 'MANAGE_GUILD'],
   name: 'reports',
   description: 'Set or remove the server reports channel.',
-  options: [
-    {
-      name: 'channel',
+  options: {
+    channel: {
       description:
         "The report channel, don't pass anything to disable reporting.",
       type: ApplicationCommandOptionTypes.CHANNEL
     }
-  ],
+  },
   async run(ctx) {
     const reportsChannel = ctx.options.getChannel('channel')
       ? BigInt(ctx.options.getChannel('channel', true).id)

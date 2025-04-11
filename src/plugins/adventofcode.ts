@@ -25,9 +25,11 @@ function formatTable(rows: string[][]) {
 
 export default definePlugin({
   name: 'adventofcode',
+  disabled: true,
   onLoad(client) {
+    if (!client.config.tokens.adventofcode) return
     const aoc = new AOCClient({
-      session: client.env.AOC_SESSION
+      session: client.config.tokens.adventofcode
     })
     const lastMessages = new Map<string, Message>()
 

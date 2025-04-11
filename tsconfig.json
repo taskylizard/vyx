@@ -22,8 +22,8 @@
     "noPropertyAccessFromIndexSignature": false,
     "baseUrl": "./src/",
     "paths": {
-      "@/*": ["./*"],
-      "#framework": ["./framework"]
+      "#framework": ["./framework"],
+      "@/*": ["./*"]
     }
   },
   "exclude": ["trash", "dist"]

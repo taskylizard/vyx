@@ -8,8 +8,8 @@ import { defineSlashCommand } from '#framework'
 const modules: ApplicationCommandOptionsChoice<ApplicationCommandOptionTypes.STRING>[] =
   [
     { name: '📮 Report', value: 'REPORT' },
-    { name: '🍣 Economy', value: 'ECONOMY' },
-    { name: '🎶 Music', value: 'MUSIC' }
+    { name: '🍣 Economy', value: 'ECONOMY' }
+    // { name: '🎶 Music', value: 'MUSIC' }
   ]
 
 export default defineSlashCommand({
@@ -21,15 +21,14 @@ export default defineSlashCommand({
     {
       name: 'enable',
       description: 'Enable a module.',
-      options: [
-        {
-          name: 'module',
+      options: {
+        module: {
           description: 'The module to enable.',
           type: ApplicationCommandOptionTypes.STRING,
           required: true,
           choices: modules
         }
-      ],
+      },
 
       async run(ctx) {
         const mod = ctx.options.getString('module', true)
@@ -97,15 +96,14 @@ export default defineSlashCommand({
     {
       name: 'disable',
       description: 'Disable a module.',
-      options: [
-        {
-          name: 'module',
+      options: {
+        module: {
           description: 'The module to disable.',
           type: ApplicationCommandOptionTypes.STRING,
           required: true,
           choices: modules
         }
-      ],
+      },
       async run(ctx) {
         const mod = ctx.options.getString('module', true)
 

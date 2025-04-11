@@ -1,0 +1,22 @@
+env = "production"
+
+[tokens]
+discord = "your_production_discord_bot_token"
+influxdb = "your_production_influxdb_token"
+revolt = "your_production_revolt_token"
+divolt = "your_production_divolt_token"
+adventofcode = "your_production_aoc_session"
+
+[hosts]
+database = "postgresql://user:password@production-db.example.com:5432/vyx_prod"
+redis = "redis.example.com"
+influxdb = "https://influxdb.example.com"
+# Optional API endpoints
+lavalink = "lavalink.example.com:2333"
+ollama = "https://ollama.example.com"
+searxng = "https://searxng.example.com"
+chroma = "https://chroma.example.com"
+
+[errors]
+webhookId = "production_webhook_id"
+webhookToken = "production_webhook_token"

@@ -1,9 +1,7 @@
-import { createHash } from 'node:crypto'
-import { readFile, stat, writeFile } from 'node:fs/promises'
-import { fdir } from 'fdir'
 import type {
   ApplicationCommandOptions,
   ApplicationCommandOptionsSubCommand,
+  ApplicationCommandOptionsWithValue,
   CreateApplicationCommandOptions,
   CreateUserApplicationCommandOptions
 } from 'oceanic.js'
@@ -12,35 +10,81 @@ import {
   ApplicationCommandTypes,
   Collection
 } from 'oceanic.js'
-import { join, resolve } from 'pathe'
 import { Color, ColorCode, Logger } from 'tracix'
 import {
   type Client,
+  type CommandOptions,
   type Interaction,
+  type InteractionUnion,
   type SlashCommand,
+  type SubCommandOptions,
   type UserCommand,
-  createGuard,
-  getDirname,
-  importDefault
+  createGuard
 } from '..'
+
+import EconomyCommand from '../../commands/economy'
+import EightBallCommand from '../../commands/fun/8ball'
+import AnilistCommand from '../../commands/fun/anilist'
+import SayhiCommand from '../../commands/fun/sayhi'
+import EvalCommand from '../../commands/moderation/eval'
+import ReportCommand from '../../commands/moderation/report'
+import ModulesCommand from '../../commands/modules'
+import TaskylandCommand from '../../commands/taskyland'
+import GithubCommand from '../../commands/utlities/github'
+import NpmCommand from '../../commands/utlities/npm'
+import ReminderCommand from '../../commands/utlities/reminder'
+import TranslateCommand from '../../commands/utlities/translate'
+import WikipediaCommand from '../../commands/utlities/wikipedia'
+
+const slashCommands = {
+  '8ball': EightBallCommand,
+  anilist: AnilistCommand,
+  economy: EconomyCommand,
+  eval: EvalCommand,
+  github: GithubCommand,
+  modules: ModulesCommand,
+  npm: NpmCommand,
+  reminder: ReminderCommand,
+  report: ReportCommand,
+  sayhi: SayhiCommand,
+  translate: TranslateCommand,
+  wikipedia: WikipediaCommand,
+  taskyland: TaskylandCommand
+} as const
+
+import AvatarUserCommand from '../../user/avatar'
+import ReportUserCommand from '../../user/report'
+
+const userCommands = {
+  avatar: AvatarUserCommand,
+  report: ReportUserCommand
+} as const
+
+import ReminderResolveInteraction from '../../interactions/reminder/resolve'
+import ReminderSubmitInteraction from '../../interactions/reminder/submit'
+import ReportCreateInteraction from '../../interactions/report/create'
+import ReportResolveInteraction from '../../interactions/report/resolve'
+
+const interactions = {
+  'reminder.resolve': ReminderResolveInteraction,
+  'reminder.submit': ReminderSubmitInteraction,
+  'report.create': ReportCreateInteraction,
+  'report.resolve': ReportResolveInteraction
+} as const
 
 export class InteractionsManager {
   public handlers: {
     commands: Collection<string, SlashCommand>
     userCommands: Collection<string, UserCommand>
-    components: Collection<
-      string,
-      Interaction<'button'> | Interaction<'modal'> | Interaction<'selectMenu'>
-    >
+    components: Collection<string, InteractionUnion>
   }
   public readonly client: Client
-  public dir: string
   public cooldowns: Map<string, Map<string, number>>
 
   private logger: Logger
   private testingGuild = '962733982296997978'
 
-  public constructor(client: Client, dir: string) {
+  public constructor(client: Client) {
     this.client = client
     this.handlers = {
       commands: new Collection(),
@@ -49,32 +93,30 @@ export class InteractionsManager {
     }
     this.logger = new Logger(this.constructor.name)
     this.cooldowns = new Map()
-    this.dir = dir
     this.logger.debug('Initialized interactions manager.')
   }
 
   public async load(): Promise<void> {
-    this.logger.debug(`Started loading interactions from ${this.dir}...`)
+    this.logger.debug('Started loading interactions...')
 
-    const load = (directory: string) =>
-      new fdir().withFullPaths().crawl(join(this.dir, directory))
-
-    const commands = await load('commands').withPromise()
-    for (const file of commands) await this.loadSlashCommand(file)
-    const userCommands = await load('user').withPromise()
-    for (const file of userCommands) await this.loadUserCommand(file)
-    const components = await load('interactions').withPromise()
-    for (const file of components) await this.loadComponentInteraction(file)
+    for (const command of Object.keys(slashCommands))
+      await this.loadSlashCommand(command as keyof typeof slashCommands)
+    for (const command of Object.keys(userCommands))
+      await this.loadUserCommand(command as keyof typeof userCommands)
+    for (const interaction of Object.keys(interactions))
+      await this.loadComponentInteraction(
+        interaction as keyof typeof interactions
+      )
 
     this.logger.info(
       `Loaded: ${this.handlers.commands.size} slash commands • ${this.handlers.userCommands.size} user commands • ${this.handlers.components.size} components`
     )
   }
 
-  private async loadUserCommand(path: string) {
+  private loadUserCommand(path: keyof typeof userCommands) {
     let cmd: UserCommand
     try {
-      cmd = await importDefault<UserCommand>(path)
+      cmd = userCommands[path]
       if (this.handlers.userCommands.has(cmd.name)) {
         this.logger.warn(
           `Attempted to load already existing user-command ${cmd.name}`
@@ -91,17 +133,17 @@ export class InteractionsManager {
     }
   }
 
-  private async loadSlashCommand(path: string) {
+  private loadSlashCommand(command: keyof typeof slashCommands) {
     let cmd: SlashCommand | SlashCommand[]
     // Typeguard for single slash command
     const isSingleCommand = createGuard((cmd: SlashCommand | SlashCommand[]) =>
       Array.isArray(cmd) ? undefined : cmd
     )
     try {
-      cmd = await importDefault<SlashCommand | SlashCommand[]>(path)
+      cmd = slashCommands[command]
       if (isSingleCommand(cmd)) {
         if (this.handlers.commands.has(cmd.name)) {
-          this.logger.warn(
+          this.logger.error(
             `Attempted to load already existing slash-command ${cmd.name}`
           )
           throw new Error(`Slash command ${cmd.name} already exists.`)
@@ -129,30 +171,23 @@ export class InteractionsManager {
         }
       }
     } catch (error) {
-      this.logger.error(`Failed to load slash-command ${path}.`, error)
+      this.logger.error(`Failed to load slash-command ${command}.`, error)
       throw error
     }
   }
 
   /**
    * Loads a interaction.
-   * @param path interaction path
+   * @param command interaction path
    * @returns The instance of loaded interaction
    */
-  public async loadComponentInteraction(
-    path: string
-  ): Promise<
-    Interaction<'button'> | Interaction<'modal'> | Interaction<'selectMenu'>
-  > {
-    let component:
-      | Interaction<'button'>
-      | Interaction<'modal'>
-      | Interaction<'selectMenu'>
+  public loadComponentInteraction(
+    command: keyof typeof interactions
+  ): InteractionUnion {
+    let component: InteractionUnion
 
     try {
-      component = await importDefault<
-        Interaction<'button'> | Interaction<'modal'> | Interaction<'selectMenu'>
-      >(path)
+      component = interactions[command]
       if (this.handlers.components.has(component.id)) {
         this.logger.warn(
           `Attempted to load already existing component interaction ${component.id}`
@@ -164,13 +199,18 @@ export class InteractionsManager {
       this.logger.debug(`Loaded component interaction ${component.id}.`)
       return component
     } catch (error) {
-      this.logger.error(`Failed to load component interaction ${path}.`, error)
+      this.logger.error(
+        `Failed to load component interaction ${command}.`,
+        error
+      )
       throw error
     }
   }
 
   public async syncModules() {
-    for await (const guild of this.client.guilds.values()) {
+    const guilds = [...this.client.guilds.values()]
+
+    for (const guild of guilds) {
       const config = await this.client.prisma.config.findUnique({
         where: { guildId: BigInt(guild.id) },
         select: { modules: true }
@@ -196,8 +236,9 @@ export class InteractionsManager {
 
   /**
    * Updates all application commands.
+   * @param forceRegister Whether to force register commands, bypassing the cache check
    */
-  public async updateCommands(): Promise<void> {
+  public async updateCommands(forceRegister = false): Promise<void> {
     const slashCommands: CreateApplicationCommandOptions[] = []
     const guildSlashCommands = new Collection<
       string,
@@ -208,7 +249,7 @@ export class InteractionsManager {
     )
 
     try {
-      if (process.env.NODE_ENV !== 'production') {
+      if (this.client.config.env !== 'production') {
         this.logger.info(
           `Running in ${Color.get(ColorCode.RED)('development')} mode, syncing to guild...`
         )
@@ -226,7 +267,6 @@ export class InteractionsManager {
           .catch(this.logger.error)
       } else {
         // Production
-
         this.logger.info(
           `Running in ${Color.get(ColorCode.BRIGHT_GREEN)('production')} mode.`
         )
@@ -236,38 +276,30 @@ export class InteractionsManager {
           .filter((command) => !command.moduleId)
           .filter((command) => !command.disabled)
           .values()) {
-          if (
-            !command.guilds ||
-            typeof command.guilds === 'undefined' ||
-            command.guilds.length === 0
-          ) {
+          if (!command.guilds || command.guilds.length === 0) {
             // Global commands
             slashCommands.push(this.toSlashJson(command))
           } else {
             // Guild commands
-            for (const id of command.guilds!) {
-              if (!guildSlashCommands.has(id)) guildSlashCommands.set(id, [])
-              guildSlashCommands.get(id)!.push(this.toSlashJson(command))
+            for (const id of command.guilds) {
+              if (!guildSlashCommands.has(id)) {
+                guildSlashCommands.set(id, [])
+              }
+              const commands = guildSlashCommands.get(id)
+              if (commands) {
+                commands.push(this.toSlashJson(command))
+              }
             }
           }
         }
 
-        // Stringify commands array and calculate sha-256 hash, then store them as cache.
-        const commandsHash = createHash('sha256')
-          .update(JSON.stringify([...slashCommands, ...userCommandList]))
-          .digest('hex')
+        // Register all commands, since we're either forcing it or not using the cache
+        this.logger.info(
+          forceRegister
+            ? 'Force registration enabled, registering all commands.'
+            : 'Registering all commands.'
+        )
 
-        const changesFile = resolve(getDirname(import.meta.url), '.cache')
-
-        // Check if commands have changed before re-registering them again.
-        if ((await stat(changesFile)).isFile()) {
-          const oldHash = await readFile(changesFile, 'utf-8')
-          if (oldHash === commandsHash) {
-            this.logger.info('No changes detected, will not try to register.')
-            await this.syncModules()
-            return
-          }
-        }
         // Then bulk set every one.
         await this.client.application
           .bulkEditGlobalCommands([...slashCommands, ...userCommandList])
@@ -289,9 +321,6 @@ export class InteractionsManager {
             )
           }
         }
-
-        // Write commands hash cache.
-        await writeFile(changesFile, commandsHash)
       }
     } catch (error) {
       this.logger.error('Failed to update application commands.', error)
@@ -302,6 +331,47 @@ export class InteractionsManager {
     )
 
     return await this.syncModules()
+  }
+
+  /**
+   * Clears all application commands globally and in test guild
+   */
+  public async clearCommands(): Promise<void> {
+    try {
+      this.logger.info('Clearing all application commands...')
+
+      // Clear global commands
+      await this.client.application
+        .bulkEditGlobalCommands([])
+        .catch(this.logger.error)
+
+      // Clear commands in testing guild
+      if (this.testingGuild) {
+        await this.client.application
+          .bulkEditGuildCommands(this.testingGuild, [])
+          .catch(this.logger.error)
+      }
+
+      // Also clear commands in all guilds where we have custom commands
+      const guilds = [...this.client.guilds.values()]
+      for (const guild of guilds) {
+        await this.client.application
+          .bulkEditGuildCommands(guild.id, [])
+          .catch((error) => {
+            this.logger.error(
+              `Failed to clear commands in guild ${guild.id}:`,
+              error
+            )
+          })
+      }
+
+      this.logger.info(
+        'All application commands have been cleared successfully.'
+      )
+    } catch (error) {
+      this.logger.error('Failed to clear application commands:', error)
+      throw error
+    }
   }
 
   public toSlashJson(command: SlashCommand): CreateApplicationCommandOptions {
@@ -317,7 +387,7 @@ export class InteractionsManager {
               name: subsubcommand.name,
               description: subsubcommand.description,
               type: ApplicationCommandOptionTypes.SUB_COMMAND,
-              options: subsubcommand.options
+              options: this.normalizeSubcommandOptions(subsubcommand.options)
             })
           }
           options.push({
@@ -331,11 +401,13 @@ export class InteractionsManager {
             name: subcommand.name,
             description: subcommand.description,
             type: ApplicationCommandOptionTypes.SUB_COMMAND,
-            options: subcommand.options
+            options: this.normalizeSubcommandOptions(subcommand.options)
           })
         }
       }
-    } else if (command.options) options = command.options
+    } else if (command.options) {
+      options = this.normalizeCommandOptions(command.options)
+    }
 
     return {
       type: ApplicationCommandTypes.CHAT_INPUT,
@@ -347,6 +419,68 @@ export class InteractionsManager {
       contexts: command.contexts,
       defaultMemberPermissions: command.defaultMemberPermissions
     }
+  }
+
+  /**
+   * Normalize command options by converting string types to their numeric equivalents
+   */
+  private normalizeCommandOptions(
+    options?: CommandOptions
+  ): ApplicationCommandOptions[] {
+    if (!options) return []
+
+    return Object.entries(options).map(([optionName, optionData]) => {
+      // Create a new object that always has a name property from the object key
+      const opt: Record<string, any> = { ...optionData, name: optionName }
+
+      if (typeof opt.type === 'string') {
+        const typeMap: Record<string, ApplicationCommandOptionTypes> = {
+          string: ApplicationCommandOptionTypes.STRING,
+          integer: ApplicationCommandOptionTypes.INTEGER,
+          boolean: ApplicationCommandOptionTypes.BOOLEAN,
+          user: ApplicationCommandOptionTypes.USER,
+          channel: ApplicationCommandOptionTypes.CHANNEL,
+          role: ApplicationCommandOptionTypes.ROLE,
+          mentionable: ApplicationCommandOptionTypes.MENTIONABLE,
+          number: ApplicationCommandOptionTypes.NUMBER,
+          attachment: ApplicationCommandOptionTypes.ATTACHMENT,
+          sub_command: ApplicationCommandOptionTypes.SUB_COMMAND,
+          sub_command_group: ApplicationCommandOptionTypes.SUB_COMMAND_GROUP
+        }
+        opt.type = typeMap[opt.type] ?? ApplicationCommandOptionTypes.STRING
+      }
+      return opt as ApplicationCommandOptions
+    })
+  }
+
+  /**
+   * Normalize subcommand options by converting string types to their numeric equivalents
+   */
+  private normalizeSubcommandOptions(
+    options?: SubCommandOptions
+  ): ApplicationCommandOptionsWithValue[] {
+    if (!options) return []
+
+    return Object.entries(options).map(([optionName, optionData]) => {
+      // Create a new object that always has a name property from the object key
+      const opt: Record<string, any> = { ...optionData, name: optionName }
+
+      if (typeof opt.type === 'string') {
+        const typeMap: Record<string, ApplicationCommandOptionTypes> = {
+          string: ApplicationCommandOptionTypes.STRING,
+          integer: ApplicationCommandOptionTypes.INTEGER,
+          boolean: ApplicationCommandOptionTypes.BOOLEAN,
+          user: ApplicationCommandOptionTypes.USER,
+          channel: ApplicationCommandOptionTypes.CHANNEL,
+          role: ApplicationCommandOptionTypes.ROLE,
+          mentionable: ApplicationCommandOptionTypes.MENTIONABLE,
+          number: ApplicationCommandOptionTypes.NUMBER,
+          attachment: ApplicationCommandOptionTypes.ATTACHMENT
+        }
+        opt.type = typeMap[opt.type] ?? ApplicationCommandOptionTypes.STRING
+      }
+      return opt as ApplicationCommandOptionsWithValue
+    })
   }
 
   private toUserJson(

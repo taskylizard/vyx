@@ -12,32 +12,30 @@ import type {
   Uncached
 } from 'oceanic.js'
 import { Logger } from 'tracix'
-import { type Client, env } from '../client'
+import type { Client } from '../client'
 
-export class Analytics {
-  public constructor(private client: Client) {
-    this.writeApi = this.influx!.getWriteApi('tasker', 'vyx', 's')
-    this.queryApi = this.influx!.getQueryApi('tasker')
-  }
-
-  public influx: InfluxDB = new InfluxDB({
-    url: env.INFLUXDB_URL,
-    token: env.INFLUXDB_ADMIN_TOKEN
-  })
-
+export class AnalyticsModule {
   private logger: Logger = new Logger(this.constructor.name)
-  public writeApi!: WriteApi
-  public queryApi!: QueryApi
+  public influx: InfluxDB
+  public writeApi: WriteApi
+  public queryApi: QueryApi
+
+  public constructor(private client: Client) {
+    this.influx = new InfluxDB({
+      url: client.config.hosts.influxdb,
+      token: client.config.tokens.influxdb
+    })
+    this.writeApi = this.influx.getWriteApi('tasker', 'vyx', 's')
+    this.queryApi = this.influx.getQueryApi('tasker')
+  }
 
   public async writeStats() {
     const users = new Point('Users').floatField(
       'discord',
       await this.client.getUsersCount()
     )
-    // .floatField('revolt', await this.client.revolt.getUsersCount())
-    // .floatField('divolt', await this.client.divolt.getUsersCount())
 
-    let discordPing = this.client.shards.map((shard) => shard.latency)[0]
+    let discordPing = this.client.shards.map((shard) => shard.latency)[0] ?? 0
 
     if (
       Number.isNaN(discordPing) ||
@@ -48,11 +46,36 @@ export class Analytics {
       discordPing = 0
 
     const ping = new Point('Ping').floatField('discord', discordPing)
-    // .floatField('revolt', this.client.revolt.events.ping())
-    // .floatField('divolt', this.client.divolt.events.ping())
+
+    const points = [users, ping]
+
+    // Write guild member counts
+    for (const guild of this.client.guilds.values()) {
+      try {
+        const memberCount =
+          guild.memberCount ??
+          (
+            await guild.fetchMembers({
+              limit: Number.POSITIVE_INFINITY
+            })
+          ).length
+
+        const guildPoint = new Point(guild.id)
+          .stringField('name', guild.name)
+          .stringField('id', guild.id)
+          .floatField('member_count', memberCount)
+          .timestamp(new Date())
+        points.push(guildPoint)
+      } catch (error) {
+        this.logger.error(
+          `Failed to fetch members for guild ${guild.name}:`,
+          error
+        )
+      }
+    }
 
     try {
-      this.writeApi.writePoints([users, ping])
+      this.writeApi.writePoints(points)
     } catch (error) {
       this.logger.error(error)
     }

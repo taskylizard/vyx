@@ -1,0 +1,7 @@
+`$obj` where {
+    $obj <: `process.env`,
+    register_diagnostic(
+        span = $obj,
+        message = "Prefer using `env` from `Client` instead of `process.env`",
+    )
+}

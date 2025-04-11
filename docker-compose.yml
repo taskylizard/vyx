@@ -1,5 +1,6 @@
 networks:
   vyx:
+    driver: bridge
 
 volumes:
   postgres-data:
@@ -12,6 +13,7 @@ services:
     build: .
     env_file:
       - .env.prod
+      - config.prod.toml
     networks:
       - vyx
     restart: unless-stopped
@@ -21,13 +23,9 @@ services:
         max-size: "1g"
         max-file: "3"
     container_name: vyx
-    volumes:
-      - "./state/downloads/:/app/state/downloads/"
     depends_on:
       postgres:
         condition: service_healthy
-      lavalink:
-        condition: service_started
       dragonfly:
         condition: service_healthy
       influx:
@@ -57,24 +55,6 @@ services:
       timeout: 60s
       retries: 5
       start_period: 80s
-
-  lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4
-    container_name: lavalink-vyx
-    restart: unless-stopped
-    environment:
-      - _JAVA_OPTIONS=-Xmx6G
-      - SERVER_PORT=2333
-      - LAVALINK_SERVER_PASSWORD=youshallnotpass
-    volumes:
-      - ./docker/lavalink/application.yml:/opt/Lavalink/application.yml
-      - ./docker/lavalink/plugins/:/opt/Lavalink/plugins/
-    networks:
-      - vyx
-    expose:
-      - 2333
-    ports:
-      - "2333:2333"
 
   dragonfly:
     container_name: dragonfly-vyx
@@ -191,42 +171,3 @@ services:
       - vyx
     environment:
       ENABLE_METRICS: "true"
-
-  searxng:
-    container_name: searxng-vyx
-    image: docker.io/searxng/searxng:latest
-    restart: unless-stopped
-    networks:
-      - vyx
-    ports:
-      - "127.0.0.1:8765:8080"
-    volumes:
-      - ./docker/searxng:/etc/searxng:rw
-    environment:
-      - SEARXNG_BASE_URL=https://${SEARXNG_HOSTNAME:-localhost}/
-      - UWSGI_WORKERS=${SEARXNG_UWSGI_WORKERS:-4}
-      - UWSGI_THREADS=${SEARXNG_UWSGI_THREADS:-4}
-    cap_drop:
-      - ALL
-    cap_add:
-      - CHOWN
-      - SETGID
-      - SETUID
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "1m"
-        max-file: "1"
-
-  chroma:
-    container_name: chroma-vyx
-    image: ghcr.io/chroma-core/chroma:latest
-    environment:
-      - IS_PERSISTENT=TRUE
-      - ANONYMIZED_TELEMETRY=False
-    volumes:
-      - ./docker/chroma:/chroma/chroma/
-    ports:
-      - 8087:8000
-    networks:
-      - vyx

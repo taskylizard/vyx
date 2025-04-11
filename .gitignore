@@ -184,3 +184,5 @@ revcord.sqlite
 state/downloads
 docker/searxng/settings.yml
 docker/chroma/
+config.dev.toml
+config.prod.toml

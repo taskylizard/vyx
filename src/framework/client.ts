@@ -1,6 +1,7 @@
+import { existsSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
 import { Redis } from 'ioredis'
-import { createEnv } from 'neon-env'
 import {
   type AnyInteractionGateway,
   Client as BaseClient,
@@ -17,7 +18,6 @@ import {
 } from 'oceanic.js'
 import { type $Fetch, createFetch } from 'ofetch'
 import { join } from 'pathe'
-import { Library, Rainlink } from 'rainlink'
 import {
   ConsoleTransport,
   LogLevel,
@@ -27,64 +27,110 @@ import {
 } from 'tracix'
 import { InteractionsManager, type Managers, PluginsManager } from './managers'
 import {
-  AIModule,
-  Analytics,
+  AnalyticsModule,
   EconomyModule,
   type Modules,
   SchedulerModule,
   ShopModule
 } from './modules'
-import { RevoltClient } from './revolt/client'
 import { Context } from './structures/context'
-import { getDirname } from './utils/common'
+import { type ConfigType, createConfig } from './utils/config'
 import { DiscordFormatter, DiscordTransport } from './webhook'
 
-export const env = createEnv({
-  DISCORD_TOKEN: { type: 'string' },
-  REVOLT_TOKEN: { type: 'string' },
-  DIVOLT_TOKEN: { type: 'string' },
-  DATABASE_URL: { type: 'string' },
-  NODE_ENV: {
+const getEnvironment = () =>
+  process.env.NODE_ENV?.toLowerCase() === 'production'
+    ? 'production'
+    : 'development'
+
+const configSchema = {
+  tokens: {
+    type: 'object',
+    properties: {
+      discord: { type: 'string' },
+      revolt: { type: 'string', optional: true },
+      divolt: { type: 'string', optional: true },
+      adventofcode: { type: 'string', optional: true },
+      influxdb: { type: 'string' }
+    }
+  },
+  hosts: {
+    type: 'object',
+    properties: {
+      database: { type: 'string' },
+      redis: { type: 'string' },
+      influxdb: { type: 'string' },
+      lavalink: { type: 'string', optional: true },
+      ollama: { type: 'string', optional: true },
+      searxng: { type: 'string', optional: true },
+      chroma: { type: 'string', optional: true }
+    }
+  },
+  env: {
     type: 'string',
-    choices: ['development', 'production'],
+    choices: ['development', 'production'] as const,
     default: 'development'
   },
-  REDIS_HOST: { type: 'string' },
-  LAVALINK_HOST: { type: 'string' },
-  INFLUXDB_URL: { type: 'string' },
-  ERRORS_WEBHOOK_ID: { type: 'string' },
-  ERRORS_WEBHOOK_TOKEN: { type: 'string' },
-  INFLUXDB_ADMIN_TOKEN: { type: 'string' },
-  OLLAMA_API_HOST: { type: 'string' },
-  SEARXNG_API_HOST: { type: 'string' },
-  CHROMA_API_HOST: { type: 'string' },
-  AOC_SESSION: { type: 'string' }
-})
+  errors: {
+    type: 'object',
+    properties: {
+      webhookId: { type: 'string' },
+      webhookToken: { type: 'string' }
+    }
+  }
+} as const
 
+const envMap = {
+  development: 'dev',
+  production: 'prod'
+}
+export type Environment = 'development' | 'production'
+type Config = ConfigType<typeof configSchema>
 type CompareResult = 'higher' | 'lower' | 'same' | 'invalid' | 'unknown'
-const __dirname = getDirname(import.meta.url)
 
 export class Client extends BaseClient {
   public managers: Managers
   public owners: string[]
   public logger: Logger
-  public env: typeof env
+  public config: Config
   private oceanicLogger: Logger
-  private rainlinkLogger: Logger
   private loggerConfig: LoggerOptions
 
   public prisma: PrismaClient
   public redis: Redis
   public modules: Modules
-  public rainlink: Rainlink
 
-  // public revolt: RevoltClient;
-  // public divolt: RevoltClient;
+  public fetcher: $Fetch
 
-  public fetch: $Fetch
+  /**
+   * Load configuration based on environment
+   * @param forcedEnv Optionally force a specific environment
+   * @returns Config object
+   */
+  private static loadConfig(forcedEnv?: Environment): Config {
+    const env = envMap[forcedEnv || getEnvironment()]
+    const projectRoot = process.cwd()
+    const possibleConfigFiles = [
+      join(projectRoot, `config.${env}.toml`),
+      join(projectRoot, 'config.prod.toml'),
+      join(projectRoot, 'config.dev.toml')
+    ]
 
-  public constructor(
-    options: ClientOptions = {
+    const configPath = possibleConfigFiles.find((path) => existsSync(path))
+
+    if (!configPath) {
+      throw new Error(
+        `No configuration file found. Please create a config.${env}.toml file.`
+      )
+    }
+
+    console.info(`Loading configuration from: ${configPath}`)
+    return createConfig(configSchema, { filePath: configPath })
+  }
+
+  public constructor(options?: ClientOptions, forcedEnv?: Environment) {
+    const config = Client.loadConfig(forcedEnv)
+
+    const defaultOptions: ClientOptions = {
       gateway: {
         getAllUsers: true,
         intents: [
@@ -93,19 +139,18 @@ export class Client extends BaseClient {
           'GUILD_MESSAGES',
           'MESSAGE_CONTENT',
           'ALL'
-        ],
-        compress: 'zlib-stream'
+        ]
       },
       allowedMentions: { everyone: false, repliedUser: true, roles: false },
-      auth: `Bot ${env.DISCORD_TOKEN}`
+      auth: `Bot ${config.tokens.discord}`
     }
-  ) {
-    super(options)
 
-    this.env = env
+    super(options || defaultOptions)
+
+    this.config = config
     this.loggerConfig = {
       levels:
-        env.NODE_ENV === 'production'
+        config.env === 'production'
           ? [LogLevel.INFO]
           : [LogLevel.INFO, LogLevel.TRACE, LogLevel.ERROR, LogLevel.DEBUG],
       transports: [
@@ -113,62 +158,44 @@ export class Client extends BaseClient {
         new DiscordTransport({
           // @ts-expect-error
           formatter: new DiscordFormatter(),
-          id: env.ERRORS_WEBHOOK_ID,
-          token: env.ERRORS_WEBHOOK_TOKEN,
+          id: this.config.errors.webhookId,
+          token: this.config.errors.webhookToken,
           client: this
         })
       ]
     }
-
-    this.logger = new Logger(this.constructor.name, this.loggerConfig)
-    this.oceanicLogger = new Logger('Oceanic', this.loggerConfig)
-    this.rainlinkLogger = new Logger('rainlink', this.loggerConfig)
-    this.logger.debug('Initialized loggers.')
-
-    this.prisma = new PrismaClient()
-    this.redis = new Redis(env.REDIS_HOST)
-    this.rainlink = new Rainlink({
-      library: new Library.OceanicJS(this),
-      nodes: [
-        {
-          name: 'lavalink',
-          host: env.LAVALINK_HOST,
-          port: 2333,
-          auth: 'youshallnotpass',
-          secure: false
-        }
-      ]
-    })
-    this.modules = {
-      economy: new EconomyModule(this.prisma),
-      shop: new ShopModule(this.prisma),
-      scheduler: new SchedulerModule(
-        { port: 6379, host: env.REDIS_HOST },
-        this
-      ),
-      analytics: new Analytics(this),
-      ai: new AIModule(this)
-    }
-
-    this.managers = {
-      interactions: new InteractionsManager(this, join(__dirname, '..')),
-      plugins: new PluginsManager(this, join(__dirname, '..'))
-    }
-
-    // this.revolt = new RevoltClient({}, 'Revolt');
-    // this.divolt = new RevoltClient(
-    //   { baseURL: 'https://divolt.xyz/api' },
-    //   'Divolt'
-    // );
-
-    this.fetch = createFetch({
+    this.fetcher = createFetch({
       defaults: {
         headers: {
-          'api-user-agent': 'vyx (https://github.com/taskylizard/vyx)',
           'User-Agent': 'vyx (https://github.com/taskylizard/vyx)'
         }
       }
     })
+
+    this.logger = new Logger(this.constructor.name, this.loggerConfig)
+    this.oceanicLogger = new Logger('oceanic', this.loggerConfig)
+    this.logger.debug('Initialized loggers.')
+
+    this.logger.info(`Running in ${config.env} mode`)
+
+    this.prisma = new PrismaClient()
+    this.redis = new Redis(this.config.hosts.redis)
+
+    this.modules = {
+      economy: new EconomyModule(this.prisma),
+      shop: new ShopModule(this.prisma),
+      scheduler: new SchedulerModule(
+        { port: 6379, host: this.config.hosts.redis },
+        this
+      ),
+      analytics: new AnalyticsModule(this)
+    }
+
+    this.managers = {
+      interactions: new InteractionsManager(this),
+      plugins: new PluginsManager(this)
+    }
+
     this.owners = []
 
     this.once('ready', async () => {
@@ -192,35 +219,6 @@ export class Client extends BaseClient {
         this.oceanicLogger.error(`Error on shard ${id}:`, err)
       )
       .on('interactionCreate', this.onInteraction)
-
-    this.rainlink
-      .on('nodeConnect', (node) =>
-        this.rainlinkLogger.info(`Lavalink ${node.options.name}: Ready!`)
-      )
-      .on('nodeError', (node, error) =>
-        this.rainlinkLogger.error(
-          `Lavalink ${node.options.name}: Error caught:\n`,
-          error
-        )
-      )
-      .on('nodeClosed', (node) =>
-        this.rainlinkLogger.warn(`Lavalink ${node.options.name}: Closed`)
-      )
-      .on('nodeDisconnect', (node, code, reason) =>
-        this.rainlinkLogger.warn(
-          `Lavalink ${node.options.name}: Disconnected, Code ${code}, Reason ${reason || 'No reason'}`
-        )
-      )
-      .on('trackStart', async (player, track) => {
-        const channel =
-          this.getChannel(player.textId) ??
-          (await this.rest.channels.get(player.textId))
-
-        if (channel.type !== ChannelTypes.GUILD_TEXT) return
-        await channel.createMessage({
-          content: `Now playing **${track.title}** by **${track.author}**`
-        })
-      })
 
     this.logger.info('Initialized Client.')
   }
@@ -497,6 +495,11 @@ export class Client extends BaseClient {
     return true
   }
 
+  /**
+   * Gets the member's top role.
+   * @param member Member
+   * @returns Role
+   */
   public getTopRole(member: Member) {
     return (
       member.roles
@@ -620,10 +623,17 @@ export class Client extends BaseClient {
 
     this.logger.info('Logging in...')
     await super.connect()
-    // await this.revolt.loginBot(env.REVOLT_TOKEN);
-    // await this.divolt.loginBot(env.DIVOLT_TOKEN);
+
+    // Connect to other services if tokens are provided
+    // if (this.config.revolt.token) {
+    //   await this.revolt.loginBot(this.config.revolt.token)
+    // }
+    // if (this.config.divolt.token) {
+    //   await this.divolt.loginBot(this.config.divolt.token)
+    // }
 
     process.on('unhandledRejection', (error: Error) => this.logger.error(error))
+    process.on('unCaughtException', (error: Error) => this.logger.error(error))
 
     process.on('error', (error) => this.logger.error(error))
     process.on('exit', async () => {
@@ -649,5 +659,15 @@ export class Client extends BaseClient {
       count += members
     }
     return count
+  }
+
+  public redactSecrets(text: string) {
+    const NL = '!!NL!!'
+    const NL_PATTERN = new RegExp(NL, 'g')
+    const secrets = Object.keys(this.config).filter(Boolean)
+
+    return text
+      .replaceAll(NL_PATTERN, '\n')
+      .replaceAll(new RegExp(secrets.join('|'), 'gi'), '[redacted]')
   }
 }

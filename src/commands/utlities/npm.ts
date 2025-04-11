@@ -7,14 +7,13 @@ import { Embed, defineSlashCommand } from '#framework'
 export default defineSlashCommand({
   name: 'npm',
   description: 'Searches by provided package name in NPM registry.',
-  options: [
-    {
-      type: 3,
-      name: 'package',
+  options: {
+    package: {
+      type: 'string',
       description: 'Package name.',
       required: true
     }
-  ],
+  },
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,

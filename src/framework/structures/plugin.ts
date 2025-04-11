@@ -1,10 +1,16 @@
+import type { Awaitable } from '@antfu/utils'
+import type { ClientEvents } from 'oceanic.js'
 import type { Client } from '../client'
 import type { Context } from './context'
 
+export type Events = {
+  [K in keyof ClientEvents]?: (...args: ClientEvents[K]) => Awaitable<void>
+}
+
 export type Middleware = (
   ctx: Context,
-  next: () => Promise<void> | void
-) => Promise<void> | void
+  next: () => Awaitable<void>
+) => Awaitable<void>
 
 /**
  * Interface representing a plugin.
@@ -14,6 +20,9 @@ export interface Plugin {
    * The name of the plugin.
    */
   name: string
+
+  /** If the plugin is disabled or not. */
+  disabled?: boolean
 
   /**
    * Function to be called when the plugin is loaded.
@@ -36,8 +45,11 @@ export interface Plugin {
    */
   onExit?: (client: Client) => unknown
 
-  /** Array of middlewares that will run before commands. */
+  /** Middlewares to be run before the command execution. */
   middlewares?: Middleware[]
+
+  /** Object of event listeners. */
+  events?: Events
 }
 
 /**

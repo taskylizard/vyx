@@ -1,4 +1,21 @@
 [tools]
-node = 'latest'
+node = "latest"
 typos = "latest"
 "ubi:trufflesecurity/trufflehog" = "latest"
+
+[hooks]
+postinstall = ['npx corepack enable', 'node --run db:generate']
+
+[env]
+_.path = ['./node_modules/.bin']
+
+[tasks.pnpm-install]
+description = 'Installs dependencies with pnpm'
+run = 'pnpm install'
+sources = ['package.json', 'pnpm-lock.yaml', '.mise.toml']
+outputs = ['node_modules/.pnpm/lock.yaml']
+
+[tasks.dev]
+description = 'Calls your dev script in `package.json`'
+run = 'node --run dev'
+depends = ['pnpm-install']

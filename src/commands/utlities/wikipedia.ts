@@ -28,14 +28,13 @@ interface Response {
 export default defineSlashCommand({
   name: 'wikipedia',
   description: 'Search articles on the Wikipedia.',
-  options: [
-    {
-      name: 'article',
+  options: {
+    article: {
       description: 'The article you want to search.',
       type: ApplicationCommandOptionTypes.STRING,
       required: true
     }
-  ],
+  },
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,
@@ -53,13 +52,7 @@ export default defineSlashCommand({
     )}?redirect=true`
     const notFoundType =
       'https://mediawiki.org/wiki/HyperSwitch/errors/not_found'
-    const options = {
-      headers: {
-        'User-Agent': 'taskyyy/1.0 (User:taskyyy)'
-      }
-    }
-    const rawData = await fetch(url, options)
-    const data: Response = (await rawData.json()) as unknown as Response
+    const data = await ctx.client.fetcher<Response>(url)
 
     return match(data)
       .with({ type: notFoundType }, async () => {
