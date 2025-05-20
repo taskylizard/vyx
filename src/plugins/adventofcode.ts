@@ -27,9 +27,9 @@ export default definePlugin({
   name: 'adventofcode',
   disabled: true,
   onLoad(client) {
-    if (!client.config.tokens.adventofcode) return
+    if (!client.env.AOC_SESSION) return
     const aoc = new AOCClient({
-      session: client.config.tokens.adventofcode
+      session: client.env.AOC_SESSION
     })
     const lastMessages = new Map<string, Message>()
 

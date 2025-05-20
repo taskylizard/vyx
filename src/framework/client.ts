@@ -1,23 +1,19 @@
-import { existsSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { PrismaClient } from '@prisma/client'
 import { Redis } from 'ioredis'
+import { createEnv } from 'neon-env'
 import {
   type AnyInteractionGateway,
   Client as BaseClient,
-  ChannelTypes,
   type ClientOptions,
   type ComponentInteraction,
   ComponentTypes,
-  Member,
+  type Member,
   type ModalSubmitInteraction,
   type PermissionName,
   type RESTApplication,
-  Role,
   type User
 } from 'oceanic.js'
 import { type $Fetch, createFetch } from 'ofetch'
-import { join } from 'pathe'
 import {
   ConsoleTransport,
   LogLevel,
@@ -34,64 +30,35 @@ import {
   ShopModule
 } from './modules'
 import { Context } from './structures/context'
-import { type ConfigType, createConfig } from './utils/config'
 import { DiscordFormatter, DiscordTransport } from './webhook'
 
-const getEnvironment = () =>
-  process.env.NODE_ENV?.toLowerCase() === 'production'
-    ? 'production'
-    : 'development'
-
-const configSchema = {
-  tokens: {
-    type: 'object',
-    properties: {
-      discord: { type: 'string' },
-      revolt: { type: 'string', optional: true },
-      divolt: { type: 'string', optional: true },
-      adventofcode: { type: 'string', optional: true },
-      influxdb: { type: 'string' }
-    }
-  },
-  hosts: {
-    type: 'object',
-    properties: {
-      database: { type: 'string' },
-      redis: { type: 'string' },
-      influxdb: { type: 'string' },
-      lavalink: { type: 'string', optional: true },
-      ollama: { type: 'string', optional: true },
-      searxng: { type: 'string', optional: true },
-      chroma: { type: 'string', optional: true }
-    }
-  },
-  env: {
+export const env = createEnv({
+  DISCORD_TOKEN: { type: 'string' },
+  REVOLT_TOKEN: { type: 'string' },
+  DIVOLT_TOKEN: { type: 'string' },
+  DATABASE_URL: { type: 'string' },
+  NODE_ENV: {
     type: 'string',
-    choices: ['development', 'production'] as const,
+    choices: ['development', 'production'],
     default: 'development'
   },
-  errors: {
-    type: 'object',
-    properties: {
-      webhookId: { type: 'string' },
-      webhookToken: { type: 'string' }
-    }
-  }
-} as const
-
-const envMap = {
-  development: 'dev',
-  production: 'prod'
-}
-export type Environment = 'development' | 'production'
-type Config = ConfigType<typeof configSchema>
-type CompareResult = 'higher' | 'lower' | 'same' | 'invalid' | 'unknown'
+  REDIS_HOST: { type: 'string' },
+  LAVALINK_HOST: { type: 'string' },
+  INFLUXDB_URL: { type: 'string' },
+  ERRORS_WEBHOOK_ID: { type: 'string' },
+  ERRORS_WEBHOOK_TOKEN: { type: 'string' },
+  INFLUXDB_ADMIN_TOKEN: { type: 'string' },
+  OLLAMA_API_HOST: { type: 'string' },
+  SEARXNG_API_HOST: { type: 'string' },
+  CHROMA_API_HOST: { type: 'string' },
+  AOC_SESSION: { type: 'string' }
+})
 
 export class Client extends BaseClient {
   public managers: Managers
   public owners: string[]
   public logger: Logger
-  public config: Config
+  public env: typeof env
   private oceanicLogger: Logger
   private loggerConfig: LoggerOptions
 
@@ -101,36 +68,8 @@ export class Client extends BaseClient {
 
   public fetcher: $Fetch
 
-  /**
-   * Load configuration based on environment
-   * @param forcedEnv Optionally force a specific environment
-   * @returns Config object
-   */
-  private static loadConfig(forcedEnv?: Environment): Config {
-    const env = envMap[forcedEnv || getEnvironment()]
-    const projectRoot = process.cwd()
-    const possibleConfigFiles = [
-      join(projectRoot, `config.${env}.toml`),
-      join(projectRoot, 'config.prod.toml'),
-      join(projectRoot, 'config.dev.toml')
-    ]
-
-    const configPath = possibleConfigFiles.find((path) => existsSync(path))
-
-    if (!configPath) {
-      throw new Error(
-        `No configuration file found. Please create a config.${env}.toml file.`
-      )
-    }
-
-    console.info(`Loading configuration from: ${configPath}`)
-    return createConfig(configSchema, { filePath: configPath })
-  }
-
-  public constructor(options?: ClientOptions, forcedEnv?: Environment) {
-    const config = Client.loadConfig(forcedEnv)
-
-    const defaultOptions: ClientOptions = {
+  public constructor(
+    options: ClientOptions = {
       gateway: {
         getAllUsers: true,
         intents: [
@@ -142,15 +81,15 @@ export class Client extends BaseClient {
         ]
       },
       allowedMentions: { everyone: false, repliedUser: true, roles: false },
-      auth: `Bot ${config.tokens.discord}`
+      auth: `Bot ${env.DISCORD_TOKEN}`
     }
+  ) {
+    super(options)
 
-    super(options || defaultOptions)
-
-    this.config = config
+    this.env = env
     this.loggerConfig = {
       levels:
-        config.env === 'production'
+        env.NODE_ENV === 'production'
           ? [LogLevel.INFO]
           : [LogLevel.INFO, LogLevel.TRACE, LogLevel.ERROR, LogLevel.DEBUG],
       transports: [
@@ -158,8 +97,8 @@ export class Client extends BaseClient {
         new DiscordTransport({
           // @ts-expect-error
           formatter: new DiscordFormatter(),
-          id: this.config.errors.webhookId,
-          token: this.config.errors.webhookToken,
+          id: env.ERRORS_WEBHOOK_ID,
+          token: env.ERRORS_WEBHOOK_TOKEN,
           client: this
         })
       ]
@@ -176,16 +115,16 @@ export class Client extends BaseClient {
     this.oceanicLogger = new Logger('oceanic', this.loggerConfig)
     this.logger.debug('Initialized loggers.')
 
-    this.logger.info(`Running in ${config.env} mode`)
+    this.logger.info(`Running in ${env.NODE_ENV} mode`)
 
     this.prisma = new PrismaClient()
-    this.redis = new Redis(this.config.hosts.redis)
+    this.redis = new Redis(env.REDIS_HOST)
 
     this.modules = {
       economy: new EconomyModule(this.prisma),
       shop: new ShopModule(this.prisma),
       scheduler: new SchedulerModule(
-        { port: 6379, host: this.config.hosts.redis },
+        { port: 6379, host: env.REDIS_HOST },
         this
       ),
       analytics: new AnalyticsModule(this)
@@ -496,122 +435,6 @@ export class Client extends BaseClient {
   }
 
   /**
-   * Gets the member's top role.
-   * @param member Member
-   * @returns Role
-   */
-  public getTopRole(member: Member) {
-    return (
-      member.roles
-        .map((role) => member.guild.roles.get(role)!)
-        .sort((a, b) => b.position - a.position)[0] ?? null
-    )
-  }
-
-  /** higher = from is higher than to */
-  public compareMemberToMember(
-    from: Member,
-    to: Member | string
-  ): CompareResult {
-    if (!(to instanceof Member)) {
-      // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.members.get(to)!
-    }
-    if (!to) {
-      return 'invalid'
-    }
-    if (from.guild.ownerID === from.id) {
-      return 'higher'
-    }
-    if (to.guild.ownerID === to.id) {
-      return 'lower'
-    }
-    const a = this.getTopRole(from)?.position ?? -1
-    const b = this.getTopRole(to)?.position ?? -1
-    if (a > b) {
-      return 'higher'
-    }
-    if (a < b) {
-      return 'lower'
-    }
-    if (a === b) {
-      return 'same'
-    }
-    return 'unknown'
-  }
-
-  /** higher = current member's top role is higher than compared role */
-  public compareMemberToRole(from: Member, to: Role | string): CompareResult {
-    if (!(to instanceof Role)) {
-      // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.roles.get(to)!
-    }
-    if (!to) {
-      return 'invalid'
-    }
-    if (from.guild.ownerID === to.id) {
-      return 'lower'
-    }
-    const a = this.getTopRole(from).position ?? -1
-    if (a > to.position) {
-      return 'higher'
-    }
-    if (a < to.position) {
-      return 'lower'
-    }
-    if (a === to.position) {
-      return 'same'
-    }
-    return 'unknown'
-  }
-
-  /** higher = current role is higher than compared member's top role */
-  public compareRoleToMember(from: Role, to: Member | string): CompareResult {
-    if (!(to instanceof Member)) {
-      // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.members.get(to)!
-    }
-    if (!to) {
-      return 'invalid'
-    }
-    if (from.guild.ownerID === to.id) {
-      return 'lower'
-    }
-    const pos = this.getTopRole(to)?.position ?? -1
-    if (from.position > pos) {
-      return 'higher'
-    }
-    if (from.position < pos) {
-      return 'lower'
-    }
-    if (from.position === pos) {
-      return 'same'
-    }
-    return 'unknown'
-  }
-
-  /** higher = current role is higher than compared role */
-  public compareRoleToRole(from: Role, to: Role | string): CompareResult {
-    if (!(to instanceof Role)) {
-      // biome-ignore lint/style/noParameterAssign: lol
-      to = from.guild.roles.get(to)!
-    }
-    if (!to) {
-      return 'invalid'
-    }
-    if (from.position > to.position) {
-      return 'higher'
-    }
-    if (from.position < to.position) {
-      return 'lower'
-    }
-    if (from.position === to.position) {
-      return 'same'
-    }
-    return 'unknown'
-  }
-
-  /**
    * Connect to Discord.
    */
   public async start(): Promise<void> {
@@ -664,7 +487,7 @@ export class Client extends BaseClient {
   public redactSecrets(text: string) {
     const NL = '!!NL!!'
     const NL_PATTERN = new RegExp(NL, 'g')
-    const secrets = Object.keys(this.config).filter(Boolean)
+    const secrets = Object.keys(this.env).filter(Boolean)
 
     return text
       .replaceAll(NL_PATTERN, '\n')

@@ -1,4 +1,17 @@
 import { fileURLToPath } from 'node:url'
+import {
+  type AnyTextableChannel,
+  type AnyThreadChannel,
+  type Channel,
+  type ChannelTypes,
+  Collection,
+  type MessageTypes,
+  TextableChannelTypes,
+  type TextableChannels,
+  ThreadChannelTypes,
+  type ThreadChannels,
+  UndeletableMessageTypes
+} from 'oceanic.js'
 import { dirname } from 'pathe'
 
 /**
@@ -99,6 +112,47 @@ export function createGuard<T, U extends T>(
 ): (maybe: T) => maybe is U {
   return (maybe: T): maybe is U => check(maybe) !== undefined
 }
+
+export const isThreadChannel = createGuard<Channel, AnyThreadChannel>(
+  (channel) =>
+    isThreadChannelType(channel.type)
+      ? (channel as AnyThreadChannel)
+      : undefined
+)
+
+export const isThreadChannelType = createGuard<ChannelTypes, ThreadChannels>(
+  (type) =>
+    ThreadChannelTypes.includes(type as ThreadChannels)
+      ? (type as ThreadChannels)
+      : undefined
+)
+
+export const isTextableChannel = createGuard<Channel, AnyTextableChannel>(
+  (channel) =>
+    isTextableChannelType(channel.type)
+      ? (channel as AnyTextableChannel)
+      : undefined
+)
+
+export const isTextableChannelType = createGuard<
+  ChannelTypes,
+  TextableChannels
+>((type) =>
+  TextableChannelTypes.includes(type as TextableChannels)
+    ? (type as TextableChannels)
+    : undefined
+)
+
+export const isUndeletableMessageType = createGuard<
+  MessageTypes,
+  (typeof UndeletableMessageTypes)[number]
+>((type) =>
+  UndeletableMessageTypes.includes(
+    type as (typeof UndeletableMessageTypes)[number]
+  )
+    ? (type as (typeof UndeletableMessageTypes)[number])
+    : undefined
+)
 
 export const emojis = [
   '🎊',
@@ -331,3 +385,91 @@ export function coroutine<T>(
  *   console.error(`Error: ${result.error}`);
  * }
  */
+
+export class ComponentState<T> {
+  private static stateMap = new Collection<string, unknown>()
+  private readonly componentId: string
+
+  /**
+   * Creates a new component state instance
+   * @param componentId - The unique ID of the component
+   * @param initialState - The initial state (optional)
+   */
+  private constructor(componentId: string, initialState?: T) {
+    this.componentId = componentId
+
+    if (
+      initialState !== undefined &&
+      !ComponentState.stateMap.has(componentId)
+    ) {
+      ComponentState.stateMap.set(componentId, initialState)
+    }
+  }
+
+  /**
+   * Gets the current state
+   * @returns The current state or undefined if not set
+   */
+  get(): T | undefined {
+    return ComponentState.stateMap.get(this.componentId) as T | undefined
+  }
+
+  /**
+   * Sets a new state
+   * @param newState - The new state to set
+   * @returns The updated state
+   */
+  set(newState: T): T {
+    ComponentState.stateMap.set(this.componentId, newState)
+    return newState
+  }
+
+  /**
+   * Updates the state using a function
+   * @param updateFn - A function that receives the current state and returns the new state
+   * @returns The updated state
+   */
+  update(updateFn: (currentState: T | undefined) => T): T {
+    const currentState = this.get()
+    const newState = updateFn(currentState)
+    return this.set(newState)
+  }
+
+  /**
+   * Removes the state
+   */
+  remove(): void {
+    ComponentState.stateMap.delete(this.componentId)
+  }
+
+  /**
+   * Checks if state exists for this component
+   * @returns True if state exists, false otherwise
+   */
+  exists(): boolean {
+    return ComponentState.stateMap.has(this.componentId)
+  }
+
+  /**
+   * Creates or retrieves a state instance for a component
+   * @param componentId - The unique ID of the component
+   * @param initialState - The initial state (optional)
+   * @returns A ComponentState instance
+   */
+  static state<S>(componentId: string, initialState?: S): ComponentState<S> {
+    return new ComponentState<S>(componentId, initialState)
+  }
+}
+
+/**
+ * Create or retrieve state for a component
+ * @param componentId - The unique ID of the component
+ * @param initialState - The initial state (optional)
+ * @returns A ComponentState instance
+ */
+export function state<S>(
+  componentId: string,
+  initialState?: S
+): ComponentState<S> {
+  return ComponentState.state<S>(componentId, initialState)
+}

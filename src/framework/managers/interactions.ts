@@ -14,7 +14,6 @@ import { Color, ColorCode, Logger } from 'tracix'
 import {
   type Client,
   type CommandOptions,
-  type Interaction,
   type InteractionUnion,
   type SlashCommand,
   type SubCommandOptions,
@@ -26,6 +25,7 @@ import EconomyCommand from '../../commands/economy'
 import EightBallCommand from '../../commands/fun/8ball'
 import AnilistCommand from '../../commands/fun/anilist'
 import SayhiCommand from '../../commands/fun/sayhi'
+import TicTacToeCommand from '../../commands/fun/tictactoe'
 import EvalCommand from '../../commands/moderation/eval'
 import ReportCommand from '../../commands/moderation/report'
 import ModulesCommand from '../../commands/modules'
@@ -49,7 +49,8 @@ const slashCommands = {
   sayhi: SayhiCommand,
   translate: TranslateCommand,
   wikipedia: WikipediaCommand,
-  taskyland: TaskylandCommand
+  taskyland: TaskylandCommand,
+  tictactoe: TicTacToeCommand
 } as const
 
 import AvatarUserCommand from '../../user/avatar'
@@ -249,7 +250,7 @@ export class InteractionsManager {
     )
 
     try {
-      if (this.client.config.env !== 'production') {
+      if (this.client.env.NODE_ENV !== 'production') {
         this.logger.info(
           `Running in ${Color.get(ColorCode.RED)('development')} mode, syncing to guild...`
         )

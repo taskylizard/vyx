@@ -4,7 +4,14 @@ import {
   InteractionContextTypes
 } from 'oceanic.js'
 import { match } from 'ts-pattern'
-import { Embed, defineSlashCommand } from '#framework'
+import {
+  type Client,
+  Embed,
+  type Result,
+  defineSlashCommand,
+  error,
+  ok
+} from '#framework'
 
 interface Response {
   type: 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found' | 'no-extract'
@@ -14,15 +21,49 @@ interface Response {
   extract: string
   timestamp: string
   content_urls: {
-    mobile: {
-      page: string
-      revisions: string
-    }
-    desktop: {
-      page: string
-      revisions: string
-    }
+    mobile: { page: string; revisions: string }
+    desktop: { page: string; revisions: string }
   }
+}
+
+async function fetchWikipediaSummary(
+  client: Client,
+  article: string
+): Promise<Result<Response>> {
+  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article)}?redirect=true`
+  try {
+    const res = await client.fetcher<Response>(url)
+    return ok(res)
+  } catch (_err) {
+    return error('Failed to fetch Wikipedia summary, this page may not exist.')
+  }
+}
+
+function createWikipediaEmbed(data: Response): Embed {
+  const embed = new Embed()
+    .setTitle(`${data.title} on Wikipedia`)
+    .setFooter({
+      text: `Last Updated: ${new Date(data.timestamp).toDateString()}`
+    })
+    .setDescription(
+      `*${data.description ?? 'This article has no short description.'}*`
+    )
+    .addFields([
+      {
+        name: 'Extract',
+        value:
+          data.type === 'no-extract'
+            ? '*No extract available - feel free to take a look at the page using the links below*'
+            : data.extract
+      },
+      {
+        name: 'Links',
+        value: `[View article](${data.content_urls.desktop.page}) / [mobile view](${data.content_urls.mobile.page}) • [Revisions](${data.content_urls.desktop.revisions}) / [mobile view](${data.content_urls.mobile.revisions})`
+      }
+    ])
+
+  if (data.thumbnail?.source) embed.setImage(data.thumbnail.source)
+  return embed
 }
 
 export default defineSlashCommand({
@@ -46,68 +87,37 @@ export default defineSlashCommand({
   ],
 
   async run(ctx) {
-    const article = ctx.options.getString('article', true)
-    const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
-      article
-    )}?redirect=true`
+    const result = await fetchWikipediaSummary(
+      ctx.client,
+      ctx.options.getString('article', true)
+    )
+
+    if (!result.ok) {
+      return await ctx.reply([
+        new Embed()
+          .setColor(ctx.colors.RED)
+          .setTitle('Error')
+          .setDescription(result.error)
+      ])
+    }
+
+    const data = result.value
     const notFoundType =
       'https://mediawiki.org/wiki/HyperSwitch/errors/not_found'
-    const data = await ctx.client.fetcher<Response>(url)
 
     return match(data)
       .with({ type: notFoundType }, async () => {
-        const errorEmbed = new Embed()
-          .setColor(ctx.colors.RED)
-          .setTitle('Article not found')
-          .setDescription(
-            `${article} doesn't seem to be an article - did you spell the title correctly?`
-          )
-        return await ctx.reply([errorEmbed])
+        return await ctx.reply([
+          new Embed()
+            .setColor(ctx.colors.RED)
+            .setTitle('Article not found')
+            .setDescription(
+              `${data.title} doesn't seem to be an article - did you spell the title correctly?`
+            )
+        ])
       })
-      .with({ type: 'no-extract' }, async (data) => {
-        const embed = new Embed()
-          .setTitle(`${data.title} on Wikipedia`)
-          .setFooter({
-            text: `Last Updated: ${new Date(data.timestamp).toDateString()}`
-          })
-          .setDescription(
-            `*${data.description ?? 'This article has no short description.'}*`
-          )
-          .addFields([
-            {
-              name: 'Extract',
-              value:
-                '*No extract available - feel free to take a look at the page using the links below*'
-            },
-            {
-              name: 'Links',
-              value: `[View article](${data.content_urls.desktop.page}) / [mobile view](${data.content_urls.mobile.page}) • [Revisions](${data.content_urls.desktop.revisions}) / [mobile view](${data.content_urls.mobile.revisions})`
-            }
-          ])
-        data.thumbnail?.source && embed.setImage(data.thumbnail.source)
-        return await ctx.reply([embed])
-      })
-      .otherwise(async (data) => {
-        const embed = new Embed()
-          .setTitle(`${data.title} on Wikipedia`)
-          .setFooter({
-            text: `Last Updated: ${new Date(data.timestamp).toDateString()}`
-          })
-          .setDescription(
-            `*${data.description ?? 'This article has no short description.'}*`
-          )
-          .addFields([
-            {
-              name: 'Extract',
-              value: data.extract
-            },
-            {
-              name: 'Links',
-              value: `[View article](${data.content_urls.desktop.page}) / [mobile view](${data.content_urls.mobile.page}) • [Revisions](${data.content_urls.desktop.revisions}) / [mobile view](${data.content_urls.mobile.revisions})`
-            }
-          ])
-        data.thumbnail?.source && embed.setImage(data.thumbnail.source)
-        return await ctx.reply([embed])
+      .otherwise(async () => {
+        return await ctx.reply([createWikipediaEmbed(data)])
       })
   }
 })

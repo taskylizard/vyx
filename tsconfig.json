@@ -24,7 +24,8 @@
     "paths": {
       "#framework": ["./framework"],
       "@/*": ["./*"]
-    }
+    },
+    "incremental": true
   },
   "exclude": ["trash", "dist"]
 }

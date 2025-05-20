@@ -5,13 +5,14 @@ import type {
   ComponentInteraction,
   EmbedOptions,
   Guild,
+  InteractionCallbackResponse,
   InteractionContent,
   InteractionOptionsWrapper,
   Member,
   Message,
+  Uncached,
   User
 } from 'oceanic.js'
-import type { RainlinkWebsocket } from 'rainlink'
 import { type Client, Colors, type SlashCommand } from '..'
 
 type Filter = (interaction: ComponentInteraction) => boolean
@@ -27,7 +28,9 @@ export class Context {
   public colors: typeof Colors = Colors
 
   private deferTimeout: NodeJS.Timeout | null
-  private deferPromise: Promise<void> | null
+  private deferPromise: Promise<
+    InteractionCallbackResponse<AnyInteractionChannel | Uncached>
+  > | null
 
   public constructor(
     public readonly client: Client,

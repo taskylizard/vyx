@@ -22,8 +22,8 @@ export class AnalyticsModule {
 
   public constructor(private client: Client) {
     this.influx = new InfluxDB({
-      url: client.config.hosts.influxdb,
-      token: client.config.tokens.influxdb
+      url: client.env.INFLUXDB_URL,
+      token: client.env.INFLUXDB_ADMIN_TOKEN
     })
     this.writeApi = this.influx.getWriteApi('tasker', 'vyx', 's')
     this.queryApi = this.influx.getQueryApi('tasker')
