@@ -1,9 +1,13 @@
-import { ComponentTypes, Constants, TextInputStyles } from 'oceanic.js'
+import {
+  ComponentTypes,
+  InteractionContextTypes,
+  TextInputStyles
+} from 'oceanic.js'
 import { defineUserCommand } from '#framework'
 
 export default defineUserCommand({
   name: 'Report this member',
-  contexts: [Constants.InteractionContextTypes.GUILD],
+  contexts: [InteractionContextTypes.GUILD],
   async run(interaction) {
     if (!interaction.guildID || !interaction.member) {
       return await interaction.reply({

@@ -1,7 +1,8 @@
 import type { Module } from '@prisma/client'
 import {
   ApplicationCommandOptionTypes,
-  type ApplicationCommandOptionsChoice
+  type ApplicationCommandOptionsChoice,
+  type CreateGuildApplicationCommandOptions
 } from 'oceanic.js'
 import { defineSlashCommand } from '#framework'
 
@@ -68,7 +69,9 @@ export default defineSlashCommand({
             // That means they don't exist in the guild, so we add them back.
             await ctx.client.application.createGuildCommand(
               ctx.interaction.guildID!,
-              ctx.client.managers.interactions.toSlashJson(command)
+              ctx.client.managers.interactions.toSlashJson(
+                command
+              ) as CreateGuildApplicationCommandOptions
             )
 
             return await ctx.reply(
@@ -85,7 +88,9 @@ export default defineSlashCommand({
 
         await ctx.client.application.createGuildCommand(
           ctx.interaction.guildID!,
-          ctx.client.managers.interactions.toSlashJson(command)
+          ctx.client.managers.interactions.toSlashJson(
+            command
+          ) as CreateGuildApplicationCommandOptions
         )
 
         return await ctx.reply(

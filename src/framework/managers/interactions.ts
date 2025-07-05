@@ -3,6 +3,7 @@ import type {
   ApplicationCommandOptionsSubCommand,
   ApplicationCommandOptionsWithValue,
   CreateApplicationCommandOptions,
+  CreateGuildApplicationCommandOptions,
   CreateUserApplicationCommandOptions
 } from 'oceanic.js'
 import {
@@ -101,13 +102,11 @@ export class InteractionsManager {
     this.logger.debug('Started loading interactions...')
 
     for (const command of Object.keys(slashCommands))
-      await this.loadSlashCommand(command as keyof typeof slashCommands)
+      this.loadSlashCommand(command as keyof typeof slashCommands)
     for (const command of Object.keys(userCommands))
-      await this.loadUserCommand(command as keyof typeof userCommands)
+      this.loadUserCommand(command as keyof typeof userCommands)
     for (const interaction of Object.keys(interactions))
-      await this.loadComponentInteraction(
-        interaction as keyof typeof interactions
-      )
+      this.loadComponentInteraction(interaction as keyof typeof interactions)
 
     this.logger.info(
       `Loaded: ${this.handlers.commands.size} slash commands • ${this.handlers.userCommands.size} user commands • ${this.handlers.components.size} components`
@@ -227,7 +226,7 @@ export class InteractionsManager {
         if (!command) return
         await this.client.application.createGuildCommand(
           guild.id,
-          this.toSlashJson(command)
+          this.toSlashJson(command) as CreateGuildApplicationCommandOptions
         )
       }
     }
@@ -264,7 +263,7 @@ export class InteractionsManager {
           .bulkEditGuildCommands(this.testingGuild, [
             ...commandData,
             ...userCommandList
-          ])
+          ] as CreateGuildApplicationCommandOptions[])
           .catch(this.logger.error)
       } else {
         // Production
@@ -314,7 +313,10 @@ export class InteractionsManager {
 
           if (guild) {
             await this.client.application
-              .bulkEditGuildCommands(guild.id, guildCommandData)
+              .bulkEditGuildCommands(
+                guild.id,
+                guildCommandData as CreateGuildApplicationCommandOptions[]
+              )
               .catch(this.logger.error)
           } else {
             this.logger.warn(

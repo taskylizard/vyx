@@ -58,6 +58,7 @@
     "pg": "^8.14.1",
     "pidusage": "4.0.0",
     "pretty-ms": "^9.1.0",
+    "pyodide": "^0.28.0",
     "rainlink": "^1.2.5",
     "revolt.js": "7.0.3",
     "tracix": "^1.0.0",

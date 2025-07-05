@@ -3,12 +3,11 @@ import { inspect } from 'node:util'
 import { bold, codeblock, code as inlineCode, italic } from 'discord-md-tags'
 import { ApplicationCommandOptionTypes } from 'oceanic.js'
 import ms from 'pretty-ms'
+import pyodideModule from 'pyodide/pyodide.js'
 import { Logger } from 'tracix'
 import { Embed, defineSlashCommand, splitMessage } from '#framework'
 
-/** Number of nanoseconds in a millisecond. */
 const nsInMs = 1_000_000
-
 let lastResult = null
 const times: {
   /** Timestamp of when the script began in nanoseconds. */
@@ -19,6 +18,7 @@ const times: {
   diff?: bigint
 } = {}
 const logger = new Logger('Eval')
+let pyodide: any | null = null
 
 export default defineSlashCommand({
   name: 'eval',
@@ -31,10 +31,26 @@ export default defineSlashCommand({
       type: ApplicationCommandOptionTypes.STRING,
       description: 'Code to evaluate.',
       required: false
+    },
+    type: {
+      type: ApplicationCommandOptionTypes.STRING,
+      choices: [
+        { name: 'JavaScript', value: 'js' },
+        { name: 'Python', value: 'py' }
+      ],
+      description: 'Language to evaluate.',
+      required: false
+    },
+    packages: {
+      type: ApplicationCommandOptionTypes.STRING,
+      description: 'Python packages to install, separated by commas.',
+      required: false
     }
   },
   async run(ctx) {
     const code = ctx.options.getString('code', false)
+    const language = ctx.options.getString('type', false)
+    const pyPackages = ctx.options.getString('packages', false)
 
     function formatResult(
       result: string,
@@ -93,8 +109,8 @@ export default defineSlashCommand({
 
     if (!code) {
       const description =
-        // biome-ignore lint/style/useTemplate: <explanation>
-        // biome-ignore lint/complexity/noUselessStringConcat: <explanation>
+        // biome-ignore lint/style/useTemplate: Ragebait at its finest
+        // biome-ignore lint/complexity/noUselessStringConcat: what's the point of this, they said
         'JavaScript code to evaluate.\n' +
         bold`Scoped variables:` +
         '\n' +
@@ -114,6 +130,34 @@ export default defineSlashCommand({
       return await ctx.reply([
         new Embed().setTitle('Usage').setDescription(description)
       ])
+    }
+
+    if (language === 'py') {
+      let output = ''
+      const packages = pyPackages ? pyPackages.split(',') : []
+      // Setup pyodide now
+      if (!pyodide) {
+        pyodide = await pyodideModule.loadPyodide({
+          packages
+        })
+      } else {
+        // Already loaded, just update packages
+        await pyodide.loadPackage(packages)
+      }
+
+      try {
+        output = (await pyodide.runPythonAsync(code)) ?? 'No output'
+      } catch (_error) {
+        const error = _error as Error
+        logger.error('Error while running pyodide:', error)
+        output = error.message.trim() ?? 'Errored but no message'
+      }
+      // Truncate output to 2000 characters
+      output =
+        typeof output === 'string' && output.length > 2000
+          ? output.slice(0, 2000)
+          : output
+      return await ctx.reply(output)
     }
 
     const _ctx = ctx

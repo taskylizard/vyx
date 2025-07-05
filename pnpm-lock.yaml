@@ -86,6 +86,9 @@ importers:
       pretty-ms:
         specifier: ^9.1.0
         version: 9.1.0
+      pyodide:
+        specifier: ^0.28.0
+        version: 0.28.0
       rainlink:
         specifier: ^1.2.5
         version: 1.2.5
@@ -1519,6 +1522,10 @@ packages:
     engines: {node: '>=16.13'}
     hasBin: true
 
+  pyodide@0.28.0:
+    resolution: {integrity: sha512-QML/Gh8eu50q5zZKLNpW6rgS0XUdK+94OSL54AUSKV8eJAxgwZrMebqj+CyM0EbF3EUX8JFJU3ryaxBViHammQ==}
+    engines: {node: '>=18.0.0'}
+
   quansync@0.2.10:
     resolution: {integrity: sha512-t41VRkMYbkHyCYmOvx/6URnN80H7k4X0lLdBMGsz+maAwrJQYB1djpV6vHrQIBE0WBSGqhtEHrK9U3DWWH8v7A==}
 
@@ -2877,6 +2884,13 @@ snapshots:
       '@prisma/engines': 5.22.0
     optionalDependencies:
       fsevents: 2.3.3
+
+  pyodide@0.28.0:
+    dependencies:
+      ws: 8.18.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   quansync@0.2.10: {}
 
