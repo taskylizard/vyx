@@ -30,6 +30,7 @@ import {
   ShopModule
 } from './modules'
 import { Context } from './structures/context'
+import type { SlashCommand, SubCommand } from './structures/slashcommand'
 import { DiscordFormatter, DiscordTransport } from './webhook'
 
 export const env = createEnv({
@@ -216,30 +217,12 @@ export class Client extends BaseClient {
     const subcommand = interaction.data.options.getSubCommand(false)
 
     if (subcommand) {
-      let result = cmd?.subcommands?.find(
-        (subcmd) => subcmd.name === subcommand[0]
-      )
-      if (!result) {
-        this.logger.trace(`SubCommand ${subcommand[0]} not found`)
+      const resolvedCommand = this.resolveSubcommand(cmd, subcommand)
+      if (!resolvedCommand) {
+        this.logger.trace(`SubCommand path ${subcommand.join(' → ')} not found`)
         return
       }
-
-      // HACK: fix this garbage and handle nested levels
-      if (
-        result &&
-        !result.run &&
-        result.subcommands &&
-        result.subcommands.length > 0
-      ) {
-        result = result?.subcommands?.find(
-          (subcmd) => subcmd.name === subcommand[1]
-        )
-        if (!result) {
-          this.logger.trace(`SubCommand ${subcommand[1]} not found`)
-          return
-        }
-      }
-      cmd = result
+      cmd = resolvedCommand
     }
 
     this.logger.trace(`Found command ${cmd.name}`)
@@ -248,6 +231,25 @@ export class Client extends BaseClient {
     this.logger.trace(`Created Context for interaction /${cmd.name}`)
 
     await this.handleMiddlewares(ctx)
+  }
+
+  private resolveSubcommand(
+    command: SlashCommand,
+    subcommandPath: string[]
+  ): SlashCommand | SubCommand | null {
+    let current: SlashCommand | SubCommand = command
+
+    for (const subcommandName of subcommandPath) {
+      const subcommand = current.subcommands?.find(
+        (subcmd: SubCommand) => subcmd.name === subcommandName
+      )
+      if (!subcommand) {
+        return null
+      }
+      current = subcommand
+    }
+
+    return current
   }
 
   private async handleMiddlewares(ctx: Context): Promise<void> {
