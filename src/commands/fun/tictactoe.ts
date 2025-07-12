@@ -28,9 +28,6 @@ export default defineSlashCommand({
     }
   },
   async run(ctx) {
-    const EMPTY = null,
-      X = '❌',
-      O = '⭕'
     const board: (string | null)[] = new Array(9).fill(EMPTY)
     const mode = ctx.options.getString('mode') ?? 'ai'
     const opponent = ctx.options.getUser('opponent')
@@ -152,62 +149,60 @@ export default defineSlashCommand({
       turn = turn === X ? O : X
       await inter.editParent({ components: makeRows(updateButtons()) })
     }
-
-    function checkWinner(b: (string | null)[]) {
-      const wins = [
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
-        [0, 4, 8],
-        [2, 4, 6]
-      ]
-      for (const [a, b1, c] of wins)
-        if (b[a] && b[a] === b[b1] && b[b1] === b[c]) return b[a]
-      return null
-    }
-
-    function isDraw(b: (string | null)[]) {
-      return b.every((cell) => cell !== EMPTY) && !checkWinner(b)
-    }
-
-    function bestMove(b: (string | null)[]) {
-      let best = Number.NEGATIVE_INFINITY,
-        move = -1
-      for (let i = 0; i < 9; i++) {
-        if (b[i]) continue
-        b[i] = O
-        const score = minimax(b, 0, false)
-        b[i] = EMPTY
-        if (score > best) {
-          best = score
-          move = i
-        }
-      }
-      return move
-    }
-
-    function minimax(
-      b: (string | null)[],
-      depth: number,
-      isMax: boolean
-    ): number {
-      const winner = checkWinner(b)
-      if (winner === O) return 10 - depth
-      if (winner === X) return depth - 10
-      if (isDraw(b)) return 0
-
-      let best = isMax ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY
-      for (let i = 0; i < 9; i++) {
-        if (b[i]) continue
-        b[i] = isMax ? O : X
-        const score = minimax(b, depth + 1, !isMax)
-        b[i] = EMPTY
-        best = isMax ? Math.max(score, best) : Math.min(score, best)
-      }
-      return best
-    }
   }
 })
+
+const EMPTY = null,
+  X = '❌',
+  O = '⭕'
+function checkWinner(b: (string | null)[]) {
+  const wins = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6]
+  ]
+  for (const [a, b1, c] of wins)
+    if (b[a] && b[a] === b[b1] && b[b1] === b[c]) return b[a]
+  return null
+}
+
+function isDraw(b: (string | null)[]) {
+  return b.every((cell) => cell !== EMPTY) && !checkWinner(b)
+}
+
+function bestMove(b: (string | null)[]) {
+  let best = Number.NEGATIVE_INFINITY,
+    move = -1
+  for (let i = 0; i < 9; i++) {
+    if (b[i]) continue
+    b[i] = O
+    const score = minimax(b, 0, false)
+    b[i] = EMPTY
+    if (score > best) {
+      best = score
+      move = i
+    }
+  }
+  return move
+}
+function minimax(b: (string | null)[], depth: number, isMax: boolean): number {
+  const winner = checkWinner(b)
+  if (winner === O) return 10 - depth
+  if (winner === X) return depth - 10
+  if (isDraw(b)) return 0
+
+  let best = isMax ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY
+  for (let i = 0; i < 9; i++) {
+    if (b[i]) continue
+    b[i] = isMax ? O : X
+    const score = minimax(b, depth + 1, !isMax)
+    b[i] = EMPTY
+    best = isMax ? Math.max(score, best) : Math.min(score, best)
+  }
+  return best
+}
