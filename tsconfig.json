@@ -23,6 +23,7 @@
     "baseUrl": "./src/",
     "paths": {
       "#framework": ["./framework"],
+      "#framework/*": ["./framework/*"],
       "@/*": ["./*"]
     },
     "incremental": true

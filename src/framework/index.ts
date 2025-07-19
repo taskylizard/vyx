@@ -23,3 +23,5 @@ export * from './utils/common'
 export * from './utils/embed'
 export * from './utils/interaction-collector'
 export * from './utils/markdown'
+
+export type Ai = any

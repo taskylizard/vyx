@@ -51,7 +51,8 @@ export const env = createEnv({
   OLLAMA_API_HOST: { type: 'string' },
   SEARXNG_API_HOST: { type: 'string' },
   CHROMA_API_HOST: { type: 'string' },
-  AOC_SESSION: { type: 'string' }
+  AOC_SESSION: { type: 'string' },
+  AI: { type: 'string' }
 })
 
 export class Client extends BaseClient {

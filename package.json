@@ -33,10 +33,12 @@
   },
   "dependencies": {
     "@antfu/utils": "9.2.0",
+    "@cloudflare/ai": "^1.2.2",
     "@influxdata/influxdb-client": "^1.35.0",
     "@oceanicjs/builders": "^1.1.11",
     "@prisma/client": "5.22.0",
     "@vitalets/google-translate-api": "9.2.1",
+    "ai": "^4.3.19",
     "anilist": "^0.12.4",
     "aocjs": "^1.0.2",
     "bullmq": "5.48.1",
@@ -62,6 +64,7 @@
     "revolt.js": "7.0.3",
     "tracix": "^1.0.0",
     "ts-pattern": "^5.5.0",
+    "workers-ai-provider": "^0.7.2",
     "zlib-sync": "^0.1.9",
     "zod": "^3.24.2"
   },
