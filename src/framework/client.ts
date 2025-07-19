@@ -8,6 +8,7 @@ import {
   type ComponentInteraction,
   ComponentTypes,
   type Member,
+  MessageFlags,
   type ModalSubmitInteraction,
   type PermissionName,
   type RESTApplication,
@@ -23,6 +24,7 @@ import {
 } from 'tracix'
 import { InteractionsManager, type Managers, PluginsManager } from './managers'
 import {
+  AIModule,
   AnalyticsModule,
   EconomyModule,
   type Modules,
@@ -44,12 +46,13 @@ export const env = createEnv({
     default: 'development'
   },
   REDIS_HOST: { type: 'string' },
-  LAVALINK_HOST: { type: 'string' },
   INFLUXDB_URL: { type: 'string' },
   ERRORS_WEBHOOK_ID: { type: 'string' },
   ERRORS_WEBHOOK_TOKEN: { type: 'string' },
   INFLUXDB_ADMIN_TOKEN: { type: 'string' },
-  OLLAMA_API_HOST: { type: 'string' },
+  HUGGINGFACE_API_KEY: { type: 'string' },
+  CLOUDFLARE_AI_ACCOUNT_ID: { type: 'string' },
+  CLOUDFLARE_AI_API_KEY: { type: 'string' },
   SEARXNG_API_HOST: { type: 'string' },
   CHROMA_API_HOST: { type: 'string' },
   AOC_SESSION: { type: 'string' }
@@ -128,7 +131,8 @@ export class Client extends BaseClient {
         { port: 6379, host: env.REDIS_HOST },
         this
       ),
-      analytics: new AnalyticsModule(this)
+      analytics: new AnalyticsModule(this),
+      ai: new AIModule(this)
     }
 
     this.managers = {
@@ -441,7 +445,7 @@ export class Client extends BaseClient {
    */
   public async start(): Promise<void> {
     await this.managers.plugins.load()
-    await this.managers.interactions.load()
+    this.managers.interactions.load()
 
     await this.prisma.$connect()
     this.logger.info('Connected to prisma.')

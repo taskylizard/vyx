@@ -22,38 +22,6 @@ import {
   createGuard
 } from '..'
 
-import EconomyCommand from '../../commands/economy'
-import EightBallCommand from '../../commands/fun/8ball'
-import AnilistCommand from '../../commands/fun/anilist'
-import SayhiCommand from '../../commands/fun/sayhi'
-import TicTacToeCommand from '../../commands/fun/tictactoe'
-import EvalCommand from '../../commands/moderation/eval'
-import ReportCommand from '../../commands/moderation/report'
-import ModulesCommand from '../../commands/modules'
-import TaskylandCommand from '../../commands/taskyland'
-import GithubCommand from '../../commands/utlities/github'
-import NpmCommand from '../../commands/utlities/npm'
-import ReminderCommand from '../../commands/utlities/reminder'
-import TranslateCommand from '../../commands/utlities/translate'
-import WikipediaCommand from '../../commands/utlities/wikipedia'
-
-const slashCommands = {
-  '8ball': EightBallCommand,
-  anilist: AnilistCommand,
-  economy: EconomyCommand,
-  eval: EvalCommand,
-  github: GithubCommand,
-  modules: ModulesCommand,
-  npm: NpmCommand,
-  reminder: ReminderCommand,
-  report: ReportCommand,
-  sayhi: SayhiCommand,
-  translate: TranslateCommand,
-  wikipedia: WikipediaCommand,
-  taskyland: TaskylandCommand,
-  tictactoe: TicTacToeCommand
-} as const
-
 import AvatarUserCommand from '../../user/avatar'
 import ReportUserCommand from '../../user/report'
 
@@ -62,6 +30,7 @@ const userCommands = {
   report: ReportUserCommand
 } as const
 
+import { slashCommands } from '@/commands'
 import ReminderResolveInteraction from '../../interactions/reminder/resolve'
 import ReminderSubmitInteraction from '../../interactions/reminder/submit'
 import ReportCreateInteraction from '../../interactions/report/create'
@@ -98,7 +67,7 @@ export class InteractionsManager {
     this.logger.debug('Initialized interactions manager.')
   }
 
-  public async load(): Promise<void> {
+  public load(): void {
     this.logger.debug('Started loading interactions...')
 
     for (const command of Object.keys(slashCommands))
@@ -301,9 +270,10 @@ export class InteractionsManager {
         )
 
         // Then bulk set every one.
-        await this.client.application
-          .bulkEditGlobalCommands([...slashCommands, ...userCommandList])
-          .catch(this.logger.error)
+        await this.client.application.bulkEditGlobalCommands([
+          ...slashCommands,
+          ...userCommandList
+        ])
 
         // Bulk setting Guild commands.
         for (const [id, guildCommandData] of guildSlashCommands.entries()) {
@@ -326,7 +296,7 @@ export class InteractionsManager {
         }
       }
     } catch (error) {
-      this.logger.error('Failed to update application commands.', error)
+      this.logger.error('Failed to update application commands:', error)
     }
 
     this.logger.info(

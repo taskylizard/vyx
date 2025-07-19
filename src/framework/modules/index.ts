@@ -1,3 +1,4 @@
+import type { AIModule } from './ai.ts'
 import type { AnalyticsModule } from './analytics'
 import type { EconomyModule } from './economy'
 import type { SchedulerModule } from './scheduler'
@@ -7,10 +8,12 @@ export * from './shop'
 export * from './economy'
 export * from './scheduler'
 export * from './analytics'
+export * from './ai.ts'
 
 export interface Modules {
   economy: EconomyModule
   shop: ShopModule
   scheduler: SchedulerModule
   analytics: AnalyticsModule
+  ai: AIModule
 }
