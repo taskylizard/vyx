@@ -1,0 +1,16 @@
+{
+  "name": "@packages/env",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "typed-env": "catalog:prod",
+    "@packages/typescript-config": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:dev"
+  }
+}

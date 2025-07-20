@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Config {
+  guildId        BigInt   @id @map("guild_id")
+  reportsChannel BigInt?  @map("reports_channel")
+  currency       String?
+  modules        Module[]
+
+  @@map("config")
+}
+
+enum Module {
+  REPORT
+  MUSIC
+  ECONOMY
+}
+
+model Report {
+  reportId       String       @map("report_id")
+  guildId        BigInt       @map("guild_id")
+  createdMember  BigInt       @map("created_member")
+  reportedMember BigInt       @map("reported_member")
+  reason         String
+  status         ReportStatus @default(value: OPEN)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  resolvedAt     DateTime?    @map("resolved_at")
+
+  @@id([reportId, guildId])
+  @@map("reports")
+}
+
+enum ReportStatus {
+  OPEN
+  CLOSED
+}
+
+model Reminder {
+  id                Int      @id @default(autoincrement())
+  userId            String   @map("user_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+  time              DateTime
+  content           String
+  messageLink       String   @map("message_link")
+  reminderMessageId String?  @unique @map("reminder_message_id")
+}
+
+model EconomyProfile {
+  guildId   BigInt @map("guild_id")
+  userId    BigInt @map("user_id")
+  walletBal Int    @map("wallet_bal")
+  bankBal   Int    @map("bank_bal")
+
+  @@id([guildId, userId])
+  @@map("economy")
+}
+
+model ShopItem {
+  itemId      Int     @map("item_id")
+  guildId     BigInt  @map("guild_id")
+  name        String
+  description String
+  role        BigInt?
+  price       Float
+
+  @@id([itemId, guildId])
+  @@map("shop_items")
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime
+  updatedAt     DateTime
+  role          String?
+  banned        Boolean?
+  banReason     String?
+  banExpires    DateTime?
+  sessions      Session[]
+  accounts      Account[]
+
+  @@unique([email])
+  @@map("user")
+}
+
+model Session {
+  id             String   @id
+  expiresAt      DateTime
+  token          String
+  createdAt      DateTime
+  updatedAt      DateTime
+  ipAddress      String?
+  userAgent      String?
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  impersonatedBy String?
+
+  @@unique([token])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
+  @@map("account")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
+}

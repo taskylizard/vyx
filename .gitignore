@@ -186,3 +186,7 @@ docker/searxng/settings.yml
 docker/chroma/
 config.dev.toml
 config.prod.toml
+inference/__pycache__
+inference
+.nitro
+.turbo

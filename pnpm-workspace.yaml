@@ -1,0 +1,134 @@
+packages:
+  - apps/*
+  - packages/*
+
+onlyBuiltDependencies:
+  - "@parcel/watcher"
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "@tailwindcss/oxide"
+  - bufferutil
+  - esbuild
+  - lefthook
+  - msgpackr-extract
+  - onnxruntime-node
+  - oxc-resolver
+  - pncat
+  - prisma
+  - protobufjs
+  - sharp
+  - vue-demi
+  - zlib-sync
+
+shellEmulator: true
+verifyDepsBeforeRun: install
+catalogs:
+  backend:
+    drizzle-kit: ^0.30.5
+    drizzle-orm: ^0.41.0
+    drizzle-prisma-generator: ^0.1.7
+  build:
+    tsdown: ^0.13.0
+    "@tailwindcss/vite": ^4.1.11
+  cli:
+    "@antfu/nip": ^0.1.0
+    dotenv-cli: ^9.0.0
+    pncat: ^0.2.6
+    taze: 19.0.4
+    turbo: ^2.5.5
+  dev:
+    "@total-typescript/ts-reset": ^0.6.1
+    knip: ^5.62.0
+    lefthook: ^1.8.2
+    prisma: ^6.12.0
+    typescript: ~5.8.0
+    vue-tsc: ^2.2.10
+  frontend:
+    "@pinia/nuxt": 0.11.2
+    pinia: ^3.0.3
+    reka-ui: ^2.3.2
+    vue: ^3.5.17
+    vue-router: ^4.5.1
+  icons:
+    "@iconify-json/lucide": ^1.2.57
+    "@iconify-json/radix-icons": ^1.2.2
+    "@nuxt/icon": 1.15.0
+    lucide-vue-next: ^0.525.0
+  lint:
+    "@biomejs/biome": 2.1.2
+    "@taskylizard/biome-config": ^1.0.6
+  node:
+    consola: ^3.4.2
+    pathe: 2.0.3
+  prod:
+    "@agentic/core": ^8.4.4
+    "@ai-sdk/groq": ^1.2.9
+    "@ai-sdk/openai-compatible": ^0.2.16
+    "@ai-sdk/provider": ^1.1.3
+    "@antfu/utils": 9.2.0
+    "@cloudflare/workers-types": ^4.20250719.0
+    "@huggingface/inference": ^4.5.3
+    "@influxdata/influxdb-client": ^1.35.0
+    "@nuxt/devtools": 2.6.2
+    "@nuxt/fonts": 0.11.4
+    "@nuxt/image": 1.10.0
+    "@nuxt/scripts": 0.11.10
+    "@nuxtjs/color-mode": 3.5.2
+    "@oceanicjs/builders": ^1.1.11
+    "@prisma/client": 6.12.0
+    "@unhead/vue": ^2.0.3
+    "@vitalets/google-translate-api": 9.2.1
+    ai: ^4.3.19
+    anilist: ^0.12.4
+    aocjs: ^1.0.2
+    better-auth: ^1.3.2
+    bufferutil: ^4.0.9
+    bullmq: 5.48.1
+    confbox: ^0.2.1
+    cors: ^2.8.5
+    date-fns: ^4.1.0
+    denque: ^2.1.0
+    discord-md-tags: ^1.0.0
+    ioredis: ^5.4.1
+    mathjs: ^13.2.1
+    ms: ^2.1.3
+    nuxt: ^4.0.1
+    oceanic.js: ^1.12.0
+    ofetch: ^1.4.1
+    ordana: ^0.4.0
+    p-limit: ^6.1.0
+    p-retry: ^6.2.1
+    parse-duration: ^1.1.0
+    pg: ^8.14.1
+    pidusage: 4.0.0
+    pretty-ms: ^9.1.0
+    pyodide: ^0.28.0
+    rainlink: ^1.2.5
+    revolt.js: 7.0.3
+    shadcn-nuxt: 2.2.0
+    tracix: ^1.0.0
+    ts-pattern: ^5.5.0
+    typed-env: ^2.0.0
+    vee-validate: ^4.15.1
+    vue-sonner: ^2.0.2
+    workers-ai-provider: ^0.7.2
+  script:
+    tsx: 4.7.0
+  style:
+    tailwind-merge: ^3.3.1
+    tailwindcss: ^4.1.11
+    tw-animate-css: ^1.3.5
+  types:
+    "@types/cors": ^2.8.19
+    "@types/ms": ^0.7.34
+    "@types/node": ^22.15.32
+    "@types/pg": ^8.11.11
+    "@types/pidusage": ^2.0.5
+  utils:
+    "@vee-validate/zod": ^4.15.1
+    "@vueuse/core": ^13.5.0
+    "@vueuse/integrations": ^13.5.0
+    "@vueuse/nuxt": 13.5.0
+    class-variance-authority: ^0.7.1
+    clsx: ^2.1.1
+    zod: ^4.0.5

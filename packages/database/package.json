@@ -1,0 +1,36 @@
+{
+  "name": "@packages/database",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./prisma/*": "./src/generated/*",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "with-env": "dotenv -e ../../.env --",
+    "db:migrate:deploy": "pnpm with-env prisma migrate deploy",
+    "db:migrate:dev": "pnpm with-env prisma migrate dev",
+    "db:push": "pnpm with-env prisma db push",
+    "db:format": "prisma format",
+    "db:generate": "prisma generate",
+    "db:studio": "pnpm with-env prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "catalog:prod",
+    "drizzle-orm": "catalog:backend",
+    "@packages/typescript-config": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:build",
+    "drizzle-prisma-generator": "catalog:backend",
+    "prisma": "catalog:dev",
+    "tsx": "catalog:script",
+    "typescript": "catalog:dev"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts"
+}
