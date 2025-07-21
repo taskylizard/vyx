@@ -1,0 +1,88 @@
+{
+  "name": "@apps/bot",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/framework/index.ts",
+      "default": "./src/framework/index.ts"
+    }
+  },
+  "imports": {
+    "#framework": {
+      "types": "./src/framework/index.ts",
+      "default": "./src/framework/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --build",
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "format": "biome format src/ --write",
+    "lint": "biome lint src/",
+    "lint:fix": "biome lint src/ --write",
+    "lint:fix:unsafe": "biome lint src/ --write --unsafe",
+    "clearcommands": "tsx src/main.ts --clearCommands"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:lint",
+    "@taskylizard/biome-config": "catalog:lint",
+    "@total-typescript/ts-reset": "catalog:dev",
+    "@types/ms": "catalog:types",
+    "@types/node": "catalog:types",
+    "@types/pg": "catalog:types",
+    "@types/pidusage": "catalog:types",
+    "drizzle-kit": "catalog:backend",
+    "prisma": "catalog:dev",
+    "tsx": "catalog:script",
+    "typescript": "catalog:dev"
+  },
+  "dependencies": {
+    "@packages/env": "workspace:*",
+    "@agentic/core": "catalog:prod",
+    "@ai-sdk/groq": "catalog:prod",
+    "@ai-sdk/openai-compatible": "catalog:prod",
+    "@ai-sdk/provider": "catalog:prod",
+    "@ai-sdk/provider-utils": "catalog:prod",
+    "@antfu/utils": "catalog:prod",
+    "@cloudflare/workers-types": "catalog:prod",
+    "@huggingface/inference": "catalog:prod",
+    "@huggingface/transformers": "catalog:prod",
+    "@influxdata/influxdb-client": "catalog:prod",
+    "@oceanicjs/builders": "catalog:prod",
+    "@prisma/client": "catalog:prod",
+    "@vitalets/google-translate-api": "catalog:prod",
+    "ai": "catalog:prod",
+    "anilist": "catalog:prod",
+    "aocjs": "catalog:prod",
+    "bullmq": "catalog:prod",
+    "confbox": "catalog:prod",
+    "date-fns": "catalog:prod",
+    "denque": "catalog:prod",
+    "discord-md-tags": "catalog:prod",
+    "dotenv": "catalog:node",
+    "drizzle-orm": "catalog:backend",
+    "ioredis": "catalog:prod",
+    "mathjs": "catalog:prod",
+    "ms": "catalog:prod",
+    "typed-env": "catalog:prod",
+    "oceanic.js": "catalog:prod",
+    "ofetch": "catalog:prod",
+    "ordana": "catalog:prod",
+    "p-limit": "catalog:prod",
+    "p-retry": "catalog:prod",
+    "parse-duration": "catalog:prod",
+    "pathe": "catalog:node",
+    "pg": "catalog:prod",
+    "pidusage": "catalog:prod",
+    "pretty-ms": "catalog:prod",
+    "pyodide": "catalog:prod",
+    "rainlink": "catalog:prod",
+    "revolt.js": "catalog:prod",
+    "tracix": "catalog:prod",
+    "ts-pattern": "catalog:prod",
+    "workers-ai-provider": "catalog:prod",
+    "zod": "catalog:utils"
+  },
+  "packageManager": "pnpm@9.12.3+sha512.cce0f9de9c5a7c95bef944169cc5dfe8741abfb145078c0d508b868056848a87c81e626246cb60967cbd7fd29a6c062ef73ff840d96b3c86c40ac92cf4a813ee"
+}

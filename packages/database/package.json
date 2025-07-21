@@ -1,0 +1,32 @@
+{
+  "name": "@packages/database",
+  "private": true,
+  "version": "1.0.0",
+  "exports": {
+    ".": "./src/client.ts",
+    "./drizzle": "./src/drizzle.ts"
+  },
+  "scripts": {
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "dev": "tsdown src/* --watch",
+    "format": "prisma format",
+    "generate": "prisma generate",
+    "prebuild": "pnpm run generate",
+    "predev": "pnpm run generate",
+    "studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "catalog:prod",
+    "drizzle-orm": "catalog:backend",
+    "@packages/typescript-config": "workspace:*"
+  },
+  "devDependencies": {
+    "drizzle-prisma-generator": "catalog:backend",
+    "prisma": "catalog:dev",
+    "tsdown": "catalog:build",
+    "tsx": "catalog:script",
+    "typescript": "catalog:dev"
+  }
+}
