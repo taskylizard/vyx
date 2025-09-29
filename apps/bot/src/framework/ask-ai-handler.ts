@@ -130,7 +130,9 @@ export async function handleMention(client: Client, message: Message) {
   const textLength = responseText.length
   let editOptions: any = {}
 
-  if (textLength <= 4096) {
+  if (textLength <= 2000) {
+    editOptions.content = responseText
+  } else if (textLength < 4096) {
     editOptions.embeds = [{ description: responseText }]
   } else {
     editOptions.content = responseText.slice(0, 2000)
@@ -184,7 +186,9 @@ export async function handleReply(client: Client, message: Message) {
   const textLength = responseText.length
   let editOptions: any = {}
 
-  if (textLength <= 4096) {
+  if (textLength <= 2000) {
+    editOptions.content = responseText
+  } else if (textLength < 4096) {
     editOptions.embeds = [{ description: responseText }]
   } else {
     editOptions.content = responseText.slice(0, 2000)
