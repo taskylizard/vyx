@@ -5,77 +5,77 @@ import {
   ComponentMessage,
   Section,
   Separator,
-  TextDisplay,
-} from "@packages/components-jsx";
-import { Fragment, h } from "@packages/components-jsx/jsx-runtime";
+  TextDisplay
+} from '@packages/components-jsx'
+import { Fragment, h } from '@packages/components-jsx/jsx-runtime'
 import {
   generateQueryResponse,
   generateServerSystemPrompt,
   type Props,
-  type Role,
-} from "@packages/inference-engine";
+  type Role
+} from '@packages/inference-engine'
 import {
   ButtonStyles,
   ChannelTypes,
   type Message,
   MessageFlags,
-  SeparatorSpacingSize,
-} from "oceanic.js";
-import { Client } from "./client";
-import { fetchMessageCached, isTextableGuildChannel } from "./utils/discord";
+  SeparatorSpacingSize
+} from 'oceanic.js'
+import { Client } from './client'
+import { fetchMessageCached, isTextableGuildChannel } from './utils/discord'
 
 const compareMessages = (a: Message, b: Message) => {
-  const aId = BigInt(a.id);
-  const bId = BigInt(b.id);
-  if (aId === bId) return 0;
-  return aId < bId ? -1 : 1;
-};
+  const aId = BigInt(a.id)
+  const bId = BigInt(b.id)
+  if (aId === bId) return 0
+  return aId < bId ? -1 : 1
+}
 
-const extractComponentText = (components: Message["components"]) => {
-  if (!components) return "";
+const extractComponentText = (components: Message['components']) => {
+  if (!components) return ''
 
-  const collected: string[] = [];
-  const visit = (items: Message["components"]) => {
-    if (!items) return;
+  const collected: string[] = []
+  const visit = (items: Message['components']) => {
+    if (!items) return
     for (const item of items) {
-      if (!item) continue;
-      if ("content" in item && typeof item.content === "string") {
-        collected.push(item.content);
+      if (!item) continue
+      if ('content' in item && typeof item.content === 'string') {
+        collected.push(item.content)
       }
-      if ("components" in item && Array.isArray(item.components)) {
-        visit(item.components as Message["components"]);
+      if ('components' in item && Array.isArray(item.components)) {
+        visit(item.components as Message['components'])
       }
     }
-  };
+  }
 
-  visit(components);
-  return collected.join("\n").trim();
-};
+  visit(components)
+  return collected.join('\n').trim()
+}
 
 const getMessageContent = (message: Message) => {
-  const { content, components, embeds } = message;
-  if (content?.trim()) return content.trim();
+  const { content, components, embeds } = message
+  if (content?.trim()) return content.trim()
 
-  const componentText = extractComponentText(components);
-  if (componentText) return componentText;
+  const componentText = extractComponentText(components)
+  if (componentText) return componentText
 
-  if (!embeds) return "";
+  if (!embeds) return ''
   const embedText = embeds
     .map((embed) =>
       [embed.title, embed.description]
         .filter((value): value is string => Boolean(value && value.trim()))
-        .join("\n"),
+        .join('\n')
     )
     .filter(Boolean)
-    .join("\n");
+    .join('\n')
 
-  return embedText.trim();
-};
+  return embedText.trim()
+}
 
 export async function followReplyChain(
   history: Message[],
   client: Client,
-  msg: Message,
+  msg: Message
 ) {
   while (
     msg.referencedMessage?.id &&
@@ -85,16 +85,16 @@ export async function followReplyChain(
     const repliedMessage = await fetchMessageCached(
       client,
       msg.channel!,
-      msg.referencedMessage.id,
-    ).catch(() => null);
-    if (!repliedMessage) break;
+      msg.referencedMessage.id
+    ).catch(() => null)
+    if (!repliedMessage) break
 
-    const isCurrentBotMessage = repliedMessage.author.id === client.user.id;
+    const isCurrentBotMessage = repliedMessage.author.id === client.user.id
     if (!repliedMessage.author.bot || isCurrentBotMessage) {
-      history.unshift(repliedMessage);
+      history.unshift(repliedMessage)
     }
 
-    msg = repliedMessage;
+    msg = repliedMessage
   }
 }
 
@@ -102,46 +102,46 @@ export async function createMessageHistory(
   client: Client,
   message: Message,
   MAX_MESSAGES = 20, // Maximum number of messages to fetch including replies
-  MAX_FETCHES = 10, // Maximum number of messages to fetch excluding replies
+  MAX_FETCHES = 10 // Maximum number of messages to fetch excluding replies
 ): Promise<Message[]> {
-  const history: Message[] = [];
+  const history: Message[] = []
 
-  await followReplyChain(history, client, message);
+  await followReplyChain(history, client, message)
 
-  let lastMessageId = message.id;
+  let lastMessageId = message.id
   while (history.length < MAX_FETCHES) {
     const messages = await message.channel?.getMessages({
       before: lastMessageId,
-      limit: MAX_FETCHES,
-    });
-    if (!messages || messages.length === 0) break;
+      limit: MAX_FETCHES
+    })
+    if (!messages || messages.length === 0) break
 
     for (const msg of messages.values()) {
-      lastMessageId = msg.id;
-      if (history.length >= MAX_MESSAGES) break;
-      const isCurrentBotMessage = msg.author.id === client.user.id;
-      if (msg.author.bot && !isCurrentBotMessage) continue;
+      lastMessageId = msg.id
+      if (history.length >= MAX_MESSAGES) break
+      const isCurrentBotMessage = msg.author.id === client.user.id
+      if (msg.author.bot && !isCurrentBotMessage) continue
 
-      history.push(msg);
+      history.push(msg)
 
-      await followReplyChain(history, client, msg);
+      await followReplyChain(history, client, msg)
     }
   }
 
-  return history;
+  return history
 }
 
 export async function handleForumMessage(client: Client, message: Message) {
-  if (!message.channel) return;
+  if (!message.channel) return
 
-  const question = getMessageContent(message);
-  if (!question) return;
+  const question = getMessageContent(message)
+  if (!question) return
   if (
     message.channel?.type === ChannelTypes.PUBLIC_THREAD &&
     message.channel.parent?.type === ChannelTypes.GUILD_FORUM &&
     message.author.id !== message.channel.ownerID
   ) {
-    return;
+    return
   }
   if (
     message.channel?.type === ChannelTypes.PUBLIC_THREAD &&
@@ -150,13 +150,13 @@ export async function handleForumMessage(client: Client, message: Message) {
     const firstMessage = await message.channel
       .getMessages({ limit: 1 })
       .then((messages) => messages.at(0))
-      .catch(() => null);
+      .catch(() => null)
     if (
       firstMessage?.reactions &&
-      firstMessage.reactions.filter((reaction) => reaction.emoji.name === "🛟")
-        .length > 0
+      firstMessage.reactions.filter((reaction) => reaction.emoji.name === '🛟')
+          .length > 0
     ) {
-      return;
+      return
     }
   }
 
@@ -164,21 +164,21 @@ export async function handleForumMessage(client: Client, message: Message) {
     messageReference: message.messageReference,
     components: [<TextDisplay>Searching for an answer...</TextDisplay>],
     allowedMentions: { repliedUser: false },
-    flags: MessageFlags.IS_COMPONENTS_V2,
-  });
-  const history = await createMessageHistory(client, message);
-  const sortedHistory = [...history].sort(compareMessages);
+    flags: MessageFlags.IS_COMPONENTS_V2
+  })
+  const history = await createMessageHistory(client, message)
+  const sortedHistory = [...history].sort(compareMessages)
 
   // Get guild settings for query engine
   const settings = await client.modules.queryEngine.getSettings(
-    message.guildID!,
-  );
+    message.guildID!
+  )
 
   const systemPrompt = generateServerSystemPrompt(
     settings!.personality,
     settings!.exampleQna,
-    settings!.systemPrompt,
-  );
+    settings!.systemPrompt
+  )
 
   if (!settings?.compiled) {
     await reply.edit(
@@ -186,35 +186,35 @@ export async function handleForumMessage(client: Client, message: Message) {
         <TextDisplay>
           Query engine not configured. Please run `/query-engine setup` first.
         </TextDisplay>
-      </ComponentMessage>,
-    );
-    return;
+      </ComponentMessage>
+    )
+    return
   }
 
   const props: Props = {
     history: [
       ...sortedHistory.map((msg) => ({
-        role: (msg.author.id === client.user.id ? "assistant" : "user") as Role,
-        content: getMessageContent(msg),
+        role: (msg.author.id === client.user.id ? 'assistant' : 'user') as Role,
+        content: getMessageContent(msg)
       })),
       {
-        role: "user",
-        content: question,
-      },
+        role: 'user',
+        content: question
+      }
     ],
     guild: {
       id: message.guildID!,
-      system: systemPrompt,
-    },
-  };
+      system: systemPrompt
+    }
+  }
 
   try {
-    const response = await generateQueryResponse(props);
+    const response = await generateQueryResponse(props)
 
     // Ensure we have a valid string response
-    let validResponse = "";
-    if (response && typeof response === "string" && response.trim()) {
-      validResponse = response.trim();
+    let validResponse = ''
+    if (response && typeof response === 'string' && response.trim()) {
+      validResponse = response.trim()
     } else {
       await reply.edit(
         <ComponentMessage>
@@ -222,35 +222,35 @@ export async function handleForumMessage(client: Client, message: Message) {
             Sorry, I couldn't generate a response. Please try again or ask a
             human for help.
           </TextDisplay>
-        </ComponentMessage>,
-      );
-      return;
+        </ComponentMessage>
+      )
+      return
     }
 
     const replyContent = (
-      <TextDisplay>{validResponse || "No response generated"}</TextDisplay>
-    );
+      <TextDisplay>{validResponse || 'No response generated'}</TextDisplay>
+    )
 
     const seperator = (
       <Separator spacing={SeparatorSpacingSize.SMALL} divider={true} />
-    );
+    )
 
     const ActionSection1 = (
       <Section
         accessory={
-          <Button customID="resolved" style={ButtonStyles.SUCCESS}>
+          <Button customID='resolved' style={ButtonStyles.SUCCESS}>
             Yes!
           </Button>
         }
       >
         <TextDisplay>**Was this helpful?**</TextDisplay>
       </Section>
-    );
+    )
     const ActionFooter = (
       <TextDisplay>
         -# You can post another message to continue the conversation!
       </TextDisplay>
-    );
+    )
 
     await reply.edit(
       <ComponentMessage>
@@ -258,17 +258,17 @@ export async function handleForumMessage(client: Client, message: Message) {
         {seperator}
         {ActionSection1}
         {ActionFooter}
-      </ComponentMessage>,
-    );
+      </ComponentMessage>
+    )
   } catch (error) {
-    console.error("Error generating query response:", error);
+    console.error('Error generating query response:', error)
     await reply.edit(
       <ComponentMessage>
         <TextDisplay>
           Sorry, I encountered an error while searching for an answer. Please
           try again later.
         </TextDisplay>
-      </ComponentMessage>,
-    );
+      </ComponentMessage>
+    )
   }
 }
