@@ -1,8 +1,8 @@
 import { defineSlashCommand, Embed } from '#framework'
-import { Prisma, prisma } from '@packages/database'
 import { getMessages, smugshroom } from '@packages/inference-engine'
 
 import { buildPromptContext, requestAskAI } from '#framework'
+import type { Prisma } from '@packages/database'
 import {
   ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
@@ -169,7 +169,9 @@ export default defineSlashCommand({
         const action = ctx.options.getString('action', true)
         const guildId = BigInt(ctx.guild.id)
         const channelId = BigInt(channel.id)
-        const config = await prisma.config.findUnique({ where: { guildId } })
+        const config = await ctx.client.prisma.config.findUnique({
+          where: { guildId }
+        })
         let whitelistedChannels = config?.aiWhitelistedChannels || []
         if (action === 'add') {
           if (!whitelistedChannels.includes(channelId)) {
@@ -180,7 +182,7 @@ export default defineSlashCommand({
             id !== channelId
           )
         }
-        await prisma.config.upsert({
+        await ctx.client.prisma.config.upsert({
           where: { guildId },
           update: {
             aiWhitelistedChannels: whitelistedChannels
@@ -190,7 +192,7 @@ export default defineSlashCommand({
             aiWhitelistedChannels: whitelistedChannels
           } as Prisma.ConfigUncheckedCreateInput
         })
-        const updatedConfig = await prisma.config.findUnique({
+        const updatedConfig = await ctx.client.prisma.config.findUnique({
           where: { guildId }
         })
         const list = (updatedConfig?.aiWhitelistedChannels as bigint[])?.map((
