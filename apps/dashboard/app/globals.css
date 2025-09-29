@@ -1,38 +1,47 @@
 body {
-	--uno: "bg-neutral-1 text-neutral-12 font-sans";
-	tab-size: 4;
-	font-feature-settings: normal;
-	font-variation-settings: normal;
-	text-rendering: optimizeLegibility;
-	font-variant-ligatures: no-contextual;
+  --uno: "bg-neutral-1 text-neutral-12 font-sans";
+  tab-size: 4;
+  font-feature-settings: normal;
+  font-variation-settings: normal;
+  text-rendering: optimizeLegibility;
+  font-variant-ligatures: no-contextual;
 }
 
 html {
-	-webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::-webkit-scrollbar {
-	width: 0.4rem;
+  width: 0.4rem;
 }
 
 ::-webkit-scrollbar-track {
-	background: rgb(var(--neutral-2) / 0.5);
+  background: rgb(var(--neutral-2) / 0.5);
 }
 
 ::-webkit-scrollbar-thumb {
-	background: rgb(var(--neutral-5));
+  background: rgb(var(--neutral-5));
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: rgb(var(--neutral-8));
+  background: rgb(var(--neutral-8));
 }
 
 ::-moz-selection {
-	background: rgb(var(--primary-8));
-	color: white;
+  background: rgb(var(--primary-8));
+  color: white;
 }
 
 ::selection {
-	background: rgb(var(--primary-8));
-	color: white;
+  background: rgb(var(--primary-8));
+  color: white;
+}
+
+/* Collapsible details chevron rotation */
+details[open] > summary .chevron-icon {
+  transform: rotate(90deg);
+}
+
+.chevron-icon {
+  transition: transform 0.2s ease;
 }

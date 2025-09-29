@@ -1,18 +1,45 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated"
+  provider     = "prisma-client-js"
+  output       = "../src/generated"
+  runtime      = "bun"
+  moduleFormat = "esm"
 }
+
+// generator drizzle {
+//   provider = "drizzle-prisma-generator"
+//   output   = "../src/generated/drizzle" // Where to put generated Drizle tables
+// }
 
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+model Case {
+  caseId        Int    @map("case_id")
+  guildId       BigInt @map("guild_id")
+  caseCreator   BigInt @map("case_creator")
+  moderatedUser BigInt @map("moderated_user")
+  type          String
+  reason        String
+  createdAt     BigInt @map("created_at")
+
+  @@id([caseId, guildId])
+  @@index([moderatedUser])
+  @@map("cases")
+}
+
 model Config {
-  guildId        BigInt   @id @map("guild_id")
-  reportsChannel BigInt?  @map("reports_channel")
-  currency       String?
-  modules        Module[]
+  guildId              BigInt   @id @map("guild_id")
+  reportsChannel       BigInt?  @map("reports_channel")
+  logsEnabled          Boolean  @default(false) @map("logs_enabled")
+  logsChannel          BigInt?  @map("logs_channel")
+  logModerationActions Boolean? @map("log_moderation_actions")
+  logMessageEdits      Boolean? @map("log_message_edits")
+  logMessageDeletes    Boolean? @map("log_message_deletes")
+
+  currency String?
+  modules  Module[]
 
   @@map("config")
 }
@@ -21,6 +48,28 @@ enum Module {
   REPORT
   MUSIC
   ECONOMY
+  MODERATION
+  QUERY_ENGINE
+}
+
+enum AutomodRuleType {
+  WORD
+  REGEX
+}
+
+model AutomodRule {
+  id        Int             @id @default(autoincrement())
+  guildId   BigInt          @map("guild_id")
+  type      AutomodRuleType
+  pattern   String
+  createdBy BigInt          @map("created_by")
+  enabled   Boolean         @default(true)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@index([guildId])
+  @@index([guildId, type])
+  @@map("automod_rules")
 }
 
 model Report {
@@ -137,4 +186,59 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+}
+
+model QueryEngineData {
+  id      Int      @id @default(autoincrement())
+  guildId BigInt   @map("guild_id")
+  owner   String
+  repo    String
+  path    String?
+  addedAt DateTime @default(now()) @map("added_at")
+
+  @@unique([guildId, owner, repo, path])
+  @@map("query_engine_data")
+}
+
+model QueryEngineSettings {
+  guildId        BigInt   @id @map("guild_id")
+  personality    String?  @default("<personality></personality>") @map("personality")
+  exampleQna     String?  @default("<example><question></question><bad_answer></bad_answer><bad_points></bad_points><good_answer></good_answer></example>") @map("example_qna")
+  systemPrompt   String?  @default("You have access to a tool that allows you to view the documentation. Make sure to use it for every query.") @map("system_prompt")
+  compiled       Boolean  @default(false) @map("compiled")
+  forumChannelId BigInt?  @map("forum_channel_id")
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("query_engine_settings")
+}
+
+model Personality {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  status    PersonalityStatus @default(PROCESSING)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  memories PersonalityMemory[]
+
+  @@map("personalities")
+}
+
+enum PersonalityStatus {
+  PROCESSING
+  ACTIVE
+  INACTIVE
+}
+
+model PersonalityMemory {
+  id              String   @id @default(cuid())
+  personalityName String
+  userId          String // Discord user ID of person who the personality learned from
+  content         String   @db.Text
+  context         String?  @db.Text // Optional context about when/how it was learned
+  createdAt       DateTime @default(now())
+
+  personality Personality @relation(fields: [personalityName], references: [id], onDelete: Cascade)
+
+  @@map("personality_memories")
 }

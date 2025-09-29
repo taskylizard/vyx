@@ -13,9 +13,9 @@ type SerializeType<T extends InteractionType> = T extends 'modal'
   ? ModalSubmitInteraction
   : T extends 'button'
     ? ComponentInteraction<ComponentTypes.BUTTON, AnyTextableGuildChannel>
-    : T extends 'selectMenu'
-      ? ComponentInteraction<SelectMenuTypes, AnyTextableGuildChannel>
-      : never
+  : T extends 'selectMenu'
+    ? ComponentInteraction<SelectMenuTypes, AnyTextableGuildChannel>
+  : never
 
 /**
  * Represents an interaction with specific permissions and a run method.
@@ -29,7 +29,7 @@ export type Interaction<T extends InteractionType> = {
   type: T
   /**
    * The function to run when the interaction is executed.
-   * @param {T} interaction - The interaction instance.
+   * @param {SerializeType<T>} interaction - The interaction instance.
    * @param {Client} client - The client instance.
    * @returns {Promise<unknown>} A promise that resolves when the interaction is executed.
    */
@@ -39,6 +39,15 @@ export type Interaction<T extends InteractionType> = {
 export type ModalInteraction = Interaction<'modal'>
 export type ButtonInteraction = Interaction<'button'>
 export type SelectMenuInteraction = Interaction<'selectMenu'>
+
+export type ComponentInteractionHandler = {
+  id: string
+  run: (
+    interaction: ComponentInteraction | ModalSubmitInteraction,
+    client: Client
+  ) => Promise<unknown>
+}
+
 export type InteractionUnion =
   | ModalInteraction
   | ButtonInteraction

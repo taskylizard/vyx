@@ -1,4 +1,4 @@
-import { Embed, defineSlashCommand } from '#framework'
+import { defineSlashCommand, Embed } from '#framework'
 
 export default defineSlashCommand({
   name: 'work',
@@ -13,11 +13,10 @@ export default defineSlashCommand({
       'You coded a website for a small company! They paid you '
     ]
 
-    const description = `${
-      messages[random]
-    }${money} ${await ctx.client.modules.economy.getCurrency(
-      ctx.interaction.guildID!
-    )}`
+    const description = `${messages[random]}${money} ${await ctx.client.modules
+      .economy.getCurrency(
+        ctx.interaction.guildID!
+      )}`
 
     const embed = new Embed()
       .setTitle('You worked!')

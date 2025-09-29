@@ -1,12 +1,16 @@
 import type { Guild } from 'oceanic.js'
-import { requireAuthenticatedUser, fetchUserAdminGuilds, filterGuildsByUserPermissions } from '../../utils/session'
+import {
+  fetchUserAdminGuilds,
+  filterGuildsByUserPermissions,
+  requireAuthenticatedUser
+} from '../../utils/session'
 
 export default defineEventHandler(async (event) => {
   const session = await requireAuthenticatedUser(event)
   const userAdminGuilds = await fetchUserAdminGuilds(session, event)
 
   const bot = event.context.bot
-  
+
   if (!bot || !bot.ready) {
     throw createError({
       statusCode: 503,

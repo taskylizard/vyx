@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "query_engine_settings" ALTER COLUMN "rag_system_prompt" SET DEFAULT 'You have access to a tool that allows you to view the service documentation. make sure to use it for every query.';

@@ -1,5 +1,5 @@
-import { Member, type TextChannel } from 'oceanic.js'
 import { definePlugin } from '#framework'
+import { Member, type TextChannel } from 'oceanic.js'
 
 const LOG_CHANNEL = '1297069885393866814'
 const GUILD = '785056354673885221'

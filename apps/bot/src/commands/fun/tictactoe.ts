@@ -1,3 +1,4 @@
+import { defineSlashCommand, state } from '#framework'
 import {
   ApplicationCommandOptionTypes,
   type ButtonComponent,
@@ -6,13 +7,13 @@ import {
   type MessageComponent,
   type User
 } from 'oceanic.js'
-import { defineSlashCommand, state } from '#framework'
 
 export default defineSlashCommand({
   name: 'tictactoe',
   description: 'Play Tic Tac Toe against a friend or AI!',
-  options: {
-    mode: {
+  options: [
+    {
+      name: 'mode',
       type: ApplicationCommandOptionTypes.STRING,
       description: 'Play against AI (default) or another user',
       required: false,
@@ -21,24 +22,27 @@ export default defineSlashCommand({
         { name: 'Multiplayer', value: 'multi' }
       ]
     },
-    opponent: {
+    {
+      name: 'opponent',
       type: ApplicationCommandOptionTypes.USER,
       description: 'The user to play against (required for multiplayer)',
       required: false
     }
-  },
+  ],
   async run(ctx) {
     const board: (string | null)[] = new Array(9).fill(EMPTY)
     const mode = ctx.options.getString('mode') ?? 'ai'
     const opponent = ctx.options.getUser('opponent')
 
-    if (mode === 'multi' && !opponent)
+    if (mode === 'multi' && !opponent) {
       return await ctx.reply(
         'You must specify an opponent for multiplayer mode.'
       )
+    }
 
-    if (opponent && opponent.bot)
+    if (opponent && opponent.bot) {
       return await ctx.reply('You cannot play against a bot.')
+    }
 
     const PLAYER_X = ctx.user
     const PLAYER_O = mode === 'multi' ? opponent! : ('AI' as const)
@@ -55,12 +59,11 @@ export default defineSlashCommand({
       board.map((v, i) => ({
         type: ComponentTypes.BUTTON,
         customID: `ttt:${i}`,
-        style:
-          v === X
-            ? ButtonStyles.PRIMARY
-            : v === O
-              ? ButtonStyles.DANGER
-              : ButtonStyles.SECONDARY,
+        style: v === X
+          ? ButtonStyles.PRIMARY
+          : v === O
+          ? ButtonStyles.DANGER
+          : ButtonStyles.SECONDARY,
         label: v ?? '\u200b',
         disabled: !!v || status.get()
       }))
@@ -72,10 +75,9 @@ export default defineSlashCommand({
     ]
 
     await ctx.reply({
-      content:
-        mode === 'ai'
-          ? 'Your move!'
-          : `${PLAYER_X.username} vs ${name(PLAYER_O)}`,
+      content: mode === 'ai'
+        ? 'Your move!'
+        : `${PLAYER_X.username} vs ${name(PLAYER_O)}`,
       components: makeRows(updateButtons())
     })
 
@@ -113,7 +115,7 @@ export default defineSlashCommand({
           return mode === 'ai'
             ? id === ctx.user.id
             : id === PLAYER_X.id ||
-                (typeof PLAYER_O !== 'string' && id === PLAYER_O.id)
+              (typeof PLAYER_O !== 'string' && id === PLAYER_O.id)
         },
         timeout: 60000
       })

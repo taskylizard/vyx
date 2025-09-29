@@ -190,3 +190,6 @@ inference/__pycache__
 inference
 .nitro
 .turbo
+data/
+personalities/
+.env.deployer

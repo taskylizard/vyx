@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event) => {
   const bot = event.context.bot
-  
+
   if (!bot) {
     throw createError({
       statusCode: 503,

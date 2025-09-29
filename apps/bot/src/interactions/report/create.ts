@@ -1,5 +1,5 @@
+import { defineInteraction, Embed } from '#framework'
 import { ButtonStyles, ComponentTypes, type TextChannel } from 'oceanic.js'
-import { Embed, defineInteraction } from '#framework'
 
 export default defineInteraction({
   id: 'action.report.create',
@@ -9,8 +9,9 @@ export default defineInteraction({
       !interaction.member ||
       !interaction.guildID ||
       !interaction.isModalSubmitInteraction()
-    )
+    ) {
       return
+    }
     await interaction.defer(64)
 
     const existingReport = await client.prisma.report.findFirst({
@@ -52,8 +53,7 @@ export default defineInteraction({
 
     const reason = interaction.data.components.getTextInput('reason', true)
     const reportMemberId = interaction.data.customID.split('-')[1]?.trim() ?? ''
-    const reportedMember =
-      interaction.guild!.members.get(reportMemberId) ??
+    const reportedMember = interaction.guild!.members.get(reportMemberId) ??
       (await client.rest.guilds.getMember(interaction.guildID, reportMemberId))
 
     if (!reportedMember) {
@@ -89,7 +89,8 @@ export default defineInteraction({
         },
         {
           name: 'Submitted By',
-          value: `${interaction.member.username} (${interaction.member.mention})`
+          value:
+            `${interaction.member.username} (${interaction.member.mention})`
         }
       ])
       .setTimestamp(new Date().toISOString())

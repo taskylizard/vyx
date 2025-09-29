@@ -1,15 +1,17 @@
 import { defineSlashCommand } from '#framework'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
 
 export default defineSlashCommand({
   name: 'deposit',
   description: 'Deposit your money in the bank.',
-  options: {
-    amount: {
+  options: [
+    {
+      name: 'amount',
       description: 'The amount to deposit',
       required: true,
-      type: 'integer'
+      type: ApplicationCommandOptionTypes.INTEGER
     }
-  },
+  ],
   async run(ctx) {
     const toDeposit = ctx.options.getInteger('amount', true)
     const balance = await ctx.client.modules.economy.get(
@@ -22,9 +24,10 @@ export default defineSlashCommand({
     }
 
     await ctx.reply(
-      `Successfully deposited ${toDeposit} ${await ctx.client.modules.economy.getCurrency(
-        ctx.interaction.guildID!
-      )} to your bank!`
+      `Successfully deposited ${toDeposit} ${await ctx.client.modules.economy
+        .getCurrency(
+          ctx.interaction.guildID!
+        )} to your bank!`
     )
 
     await ctx.client.modules.economy.deposit(

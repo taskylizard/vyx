@@ -1,17 +1,17 @@
-import cors from "cors";
-import { logger } from "../utils/utils";
-import env from "@packages/env";
+import env from '@packages/env'
+import cors from 'cors'
+import { logger } from '../utils/utils'
 
 export default defineNitroPlugin((plugin) => {
-  const allowedOrigins = ["http://localhost:3000", "http://localhost:5173"];
+  const allowedOrigins = ['http://localhost:3000', 'http://localhost:5173']
 
   // Add production domain if available
   if (process.env.BETTER_AUTH_URL) {
     try {
-      const url = new URL(env.BETTER_AUTH_URL);
-      allowedOrigins.push(url.origin);
+      const url = new URL(env.BETTER_AUTH_URL)
+      allowedOrigins.push(url.origin)
     } catch (e) {
-      logger.warn("Invalid BETTER_AUTH_URL:", env.BETTER_AUTH_URL);
+      logger.warn('Invalid BETTER_AUTH_URL:', env.BETTER_AUTH_URL)
     }
   }
 
@@ -19,8 +19,8 @@ export default defineNitroPlugin((plugin) => {
     fromNodeMiddleware(
       cors({
         origin: allowedOrigins,
-        credentials: true,
-      }),
-    ),
-  );
-});
+        credentials: true
+      })
+    )
+  )
+})

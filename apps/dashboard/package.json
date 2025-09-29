@@ -3,16 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "with-env": "dotenv -e ../../.env --",
     "typecheck": "nuxt typecheck",
-    "build": "pnpm with-env nuxt build",
-    "dev": "pnpm with-env nuxt dev",
+    "build": "infisical run --env=prod -- nuxt build",
+    "dev": "infisical run --env=dev -- nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
-    "start": "pnpm with-env node .output/server/index.mjs"
+    "start": "node .output/server/index.mjs"
   },
   "dependencies": {
+    "@oceanicjs/builders": "latest",
+    "@packages/components-jsx": "workspace:*",
     "@apps/bot": "workspace:*",
     "@packages/database": "workspace:*",
     "@packages/env": "workspace:*",
@@ -51,11 +51,12 @@
     "zod": "catalog:utils"
   },
   "devDependencies": {
+    "@packages/typescript-config": "workspace:*",
     "@iconify-json/lucide": "catalog:icons",
     "@iconify-json/radix-icons": "catalog:icons",
     "@tailwindcss/vite": "catalog:build",
     "@types/cors": "catalog:types",
-    "@types/node": "catalog:types",
+    "@types/bun": "catalog:types",
     "tailwindcss": "catalog:style",
     "typescript": "catalog:dev",
     "vue-tsc": "catalog:dev"

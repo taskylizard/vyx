@@ -1,14 +1,15 @@
-import { capitalize } from '@antfu/utils'
 import {
-  ApplicationIntegrationTypes,
-  InteractionContextTypes
-} from 'oceanic.js'
-import {
-  Embed,
   defineSlashCommand,
+  Embed,
   searchAnilist,
   truncateString
 } from '#framework'
+import { capitalize } from '@antfu/utils'
+import {
+  ApplicationCommandOptionTypes,
+  ApplicationIntegrationTypes,
+  InteractionContextTypes
+} from 'oceanic.js'
 
 export default defineSlashCommand({
   name: 'anilist',
@@ -26,13 +27,14 @@ export default defineSlashCommand({
     {
       name: 'anime',
       description: 'Searches by provided query on AniList.',
-      options: {
-        search: {
-          type: 'string',
+      options: [
+        {
+          name: 'search',
+          type: ApplicationCommandOptionTypes.STRING,
           description: 'Anime to search for.',
           required: true
         }
-      },
+      ],
       async run(ctx) {
         const query = ctx.options.getString('search', true)
 
@@ -47,8 +49,9 @@ export default defineSlashCommand({
           const english = anime.title?.english || 'English not available'
           const animeDescription =
             anime.description?.replace(/<\/?[^>]+(>|$)/g, '') ??
-            '(No description)'
-          const animeEpisodesRaw = `${anime.episodes} episodes | ${anime.duration} minute episodes`
+              '(No description)'
+          const animeEpisodesRaw =
+            `${anime.episodes} episodes | ${anime.duration} minute episodes`
           const animeEpisodes = anime.episodes
             ? animeEpisodesRaw
             : 'No episodes available'
@@ -62,9 +65,9 @@ export default defineSlashCommand({
             anime.endDate?.month || '??',
             anime.endDate?.year || '????'
           ].join('.')
-          const animeSeasonRaw = `${capitalize(anime.season ?? 'null')} ${
-            anime.startDate?.year
-          }`
+          const animeSeasonRaw = `${
+            capitalize(anime.season ?? 'null')
+          } ${anime.startDate?.year}`
           const animeSeason = anime.season
             ? animeSeasonRaw
             : 'No season available'
@@ -119,13 +122,14 @@ export default defineSlashCommand({
     {
       name: 'manga',
       description: 'Searches by provided query on AniList.',
-      options: {
-        search: {
-          type: 'string',
+      options: [
+        {
+          name: 'search',
+          type: ApplicationCommandOptionTypes.STRING,
           description: 'Manga to search for.',
           required: true
         }
-      },
+      ],
       async run(ctx) {
         const query = ctx.options.getString('search', true)
         try {
@@ -139,7 +143,7 @@ export default defineSlashCommand({
           const english = manga.title?.english || 'English not available'
           const description =
             manga.description?.replace(/<\/?[^>]+(>|$)/g, '') ??
-            '(No description)'
+              '(No description)'
           const volumes = manga.volumes
             ? `${manga.volumes} Episodes | ${manga.chapters} Chapters`
             : 'No volumes available'
@@ -153,9 +157,9 @@ export default defineSlashCommand({
             manga.endDate?.month || '??',
             manga.endDate?.year || '????'
           ].join('.')
-          const seasonRaw = `${capitalize(manga.season ?? 'null')} ${
-            manga.startDate?.year
-          }`
+          const seasonRaw = `${
+            capitalize(manga.season ?? 'null')
+          } ${manga.startDate?.year}`
           const season = manga.season ? seasonRaw : 'No season available'
 
           const embed = new Embed()

@@ -1,15 +1,17 @@
 import { defineSlashCommand } from '#framework'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
 
 export default defineSlashCommand({
   name: 'delete',
   description: 'Delete a shop item.',
-  options: {
-    item: {
+  options: [
+    {
+      name: 'item',
       description: 'Name of the item.',
       required: true,
-      type: 'string'
+      type: ApplicationCommandOptionTypes.STRING
     }
-  },
+  ],
   async run(ctx) {
     const name = ctx.options.getString('item', true)
     const itemObj = await ctx.client.modules.shop.get(

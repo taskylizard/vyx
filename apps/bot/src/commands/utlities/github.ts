@@ -1,10 +1,9 @@
-import { code } from 'discord-md-tags'
+import { defineSlashCommand, Embed } from '#framework'
 import {
   ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js'
-import { Embed, defineSlashCommand } from '#framework'
 
 interface Response {
   name: string
@@ -27,14 +26,15 @@ export default defineSlashCommand({
   name: 'github',
   description:
     'Get info on a Github repository. The repository must be public.',
-  options: {
-    repo: {
+  options: [
+    {
+      name: 'repo',
       description:
         'The repository as owner/repo or its link. It must be public.',
       type: ApplicationCommandOptionTypes.STRING,
       required: true
     }
-  },
+  ],
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,
@@ -57,10 +57,11 @@ export default defineSlashCommand({
     const rawData = await fetch(url)
     const repo: Response = (await rawData.json()) as unknown as Response
     if (repo) {
-      if (!repo.name)
+      if (!repo.name) {
         return ctx.reply(
           'That repository could be found - did you spell its name correctly, and is it private?'
         )
+      }
     }
     const rawCommitData = await fetch(commitsUrl)
     const commits: Commit[] =
@@ -104,9 +105,7 @@ export default defineSlashCommand({
       )
       .addField(
         'Links',
-        `[View on GitHub](${repo.html_url}) • [Issues](${
-          repo.html_url
-        }/issues) • [Pull requests](${repo.html_url}/pulls) ${
+        `[View on GitHub](${repo.html_url}) • [Issues](${repo.html_url}/issues) • [Pull requests](${repo.html_url}/pulls) ${
           repo.homepage ? ` • [Homepage](${repo.homepage})` : ''
         }`
       )

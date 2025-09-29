@@ -24,8 +24,9 @@ export function splitMessage(
   const text = resolveString(string)
   if (text.length <= maxLength) return [text]
   const splitText = text.split(char)
-  if (splitText.some((chunk: string | any[]) => chunk.length > maxLength))
+  if (splitText.some((chunk: string | any[]) => chunk.length > maxLength)) {
     throw new RangeError('SPLIT_MAX_LEN')
+  }
   const messages = []
   let msg = ''
   for (const chunk of splitText) {

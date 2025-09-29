@@ -1,13 +1,12 @@
-import { readFile } from 'node:fs/promises'
+import { defineSlashCommand, Embed } from '#framework'
+import { getMessages, smugshroom } from '@packages/inference-engine'
+
+import { buildPromptContext, requestAskAI } from '#framework'
 import {
+  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js'
-import { Embed, defineSlashCommand } from '#framework'
-import {
-  getMessages,
-  textifyMessageForTaskModels
-} from '../../framework/modules/ai-internals/smugshroom'
 
 export default defineSlashCommand({
   name: 'ai',
@@ -26,28 +25,40 @@ export default defineSlashCommand({
     {
       name: 'chat',
       description: 'Chat with AI, ask it questions.',
-      options: {
-        prompt: {
-          type: 'string',
+      options: [
+        {
+          name: 'prompt',
+          type: ApplicationCommandOptionTypes.STRING,
           description: 'Meaningful prompt, use quotes if necessary.',
           required: true
         },
-        tools: {
-          type: 'boolean',
-          description: 'Use tools like math, search, and wikipedia.',
+        {
+          name: 'ephemeral',
+          type: ApplicationCommandOptionTypes.BOOLEAN,
+          description:
+            'Ephemeral, only visible to the user who ran the command.',
           required: false
         }
-      },
+      ],
       cooldown: 5,
       async run(ctx) {
         const prompt = ctx.options.getString('prompt', true)
-        const useTool = ctx.options.getBoolean('tools', false)
-        const loading = await readFile('public/loading.gif')
-        const buffer = Buffer.from(loading)
+        const ephemeral = ctx.options.getBoolean('ephemeral', false)
+
+        if (ephemeral) {
+          await ctx.defer(64)
+        }
+
+        const loading = await Bun.fetch(
+          'https://github.com/taskylizard/kanikou/blob/trunk/apps/bot/public/loading.gif?raw=true'
+        )
+        const response = await loading.arrayBuffer()
+        const buffer = Buffer.from(response)
 
         const embed = new Embed()
           .setFooter({
-            text: 'Generative content may produce offensive results, use responsibly.'
+            text:
+              'Generative content may produce offensive results, use responsibly.'
           })
           .setAuthor({
             name: prompt,
@@ -65,12 +76,22 @@ export default defineSlashCommand({
           ]
         })
 
-        const generation = await ctx.client.modules.ai.chat(prompt, useTool)
+        const context = buildPromptContext(ctx.client, [], prompt)
+        const generation = await requestAskAI(
+          ctx.client,
+          context,
+          'mention',
+          ctx.user.id,
+          ctx.interaction.guildID ?? undefined,
+          ctx.user.username,
+          ctx.guild?.name ?? undefined
+        )
+
         if (!generation.ok) {
           const em = embed
             .setImage(null!)
             .setDescription(
-              ":warning: This prompt is unsafe to generate text from. Please don't misuse AI cycles."
+              ':warning: Some error occurred while generating text. Please try again.'
             )
           return await ctx.interaction.editOriginal({
             embeds: [em],
@@ -81,7 +102,7 @@ export default defineSlashCommand({
 
         const em = embed
           .setImage(null!)
-          .setDescription(generation.result ?? 'No output')
+          .setDescription(generation.text ?? 'No output')
 
         return await ctx.interaction.editOriginal({
           embeds: [em],
@@ -103,7 +124,7 @@ export default defineSlashCommand({
           return await ctx.reply('No messages were found.')
         }
 
-        const _summary = await ctx.client.modules.ai.smugshroom(messages)
+        const _summary = await smugshroom(messages)
         const removeQuotes = (text: string) => text.replace(/"([^"]*)"/g, '$1')
         const summary = removeQuotes(_summary)
         return await ctx.interaction.editFollowup(message.id, {

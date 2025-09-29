@@ -4,5 +4,10 @@
   "private": true,
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "@types/bun": "latest",
+    "@packages/components-jsx": "workspace:*"
   }
 }

@@ -4,16 +4,17 @@ import { ButtonStyles, type MessageActionRow } from 'oceanic.js'
 import type { Client } from '../client'
 
 export class SchedulerModule {
-  private connection: ConnectionOptions
   public reminder: Queue
   public reminderWorker: Worker
 
   public constructor(
-    public config: ConnectionOptions,
     private client: Client
   ) {
-    this.connection = config
-    this.reminder = new Queue('{reminder}', { connection: this.connection })
+    const connectionOptions: ConnectionOptions = {
+      host: this.client.env.REDIS_HOST,
+      port: Number(this.client.env.REDIS_PORT)
+    }
+    this.reminder = new Queue('{reminder}', { connection: connectionOptions })
     this.reminderWorker = new Worker(
       '{reminder}',
       // biome-ignore lint/suspicious/useAwait: no idea lol
@@ -22,7 +23,7 @@ export class SchedulerModule {
           this.handleReminder(job.data.id)
         }
       },
-      { connection: this.connection }
+      { connection: connectionOptions }
     )
   }
 
@@ -46,13 +47,13 @@ export class SchedulerModule {
       )
       .toJSON() as MessageActionRow
 
-    const dm =
-      this.client.privateChannels.find(
-        (channel) => channel.recipient.id === reminder.userId
-      ) ?? (await this.client.rest.users.createDM(reminder.userId))
+    const dm = this.client.privateChannels.find(
+      (channel) => channel.recipient.id === reminder.userId
+    ) ?? (await this.client.rest.users.createDM(reminder.userId))
 
     const message = await dm.createMessage({
-      content: `Hey <@${reminder.userId}>! Just wanted to remind you to \`${reminder.content}\`...`,
+      content:
+        `Hey <@${reminder.userId}>! Just wanted to remind you to \`${reminder.content}\`...`,
       components: [buttonRow]
     })
 

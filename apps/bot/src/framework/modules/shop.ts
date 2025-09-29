@@ -13,7 +13,6 @@ export class ShopModule {
   table: Prisma.ShopItemDelegate<DefaultArgs>
 
   constructor(private client: PrismaClient) {
-    this.client = client
     this.table = this.client.shopItem
   }
 

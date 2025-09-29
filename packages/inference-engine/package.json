@@ -1,0 +1,35 @@
+{
+  "name": "@packages/inference-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "seed": "bun src/query-engine/seed.ts",
+    "queryengine:eval": "infisical run --env=dev -- bun src/query-engine/evals.ts",
+    "askai:eval": "bun src/ask-ai-engine/evals.ts",
+    "personality:eval": "infisical run --env=dev -- bun src/personality-engine/evals.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@packages/typescript-config": "workspace:*",
+    "@types/bun": "catalog:types",
+    "openapi-typescript": "^7.9.1",
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@apps/bot": "workspace:^",
+    "@llamaindex/google": "0.3.21",
+    "@llamaindex/huggingface": "0.1.29",
+    "@llamaindex/qdrant": "^0.1.31",
+    "@llamaindex/readers": "3.1.20",
+    "@packages/database": "workspace:*",
+    "@packages/env": "workspace:^",
+    "@qdrant/js-client-rest": "~1.15.1",
+    "llamaindex": "0.11.29",
+    "oceanic.js": "catalog:prod",
+    "openapi-fetch": "^0.14.0",
+    "zod": "4.1.8"
+  }
+}

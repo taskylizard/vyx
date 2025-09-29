@@ -1,7 +1,7 @@
+import { type Client, definePlugin } from '#framework'
 import { Client as AOCClient } from 'aocjs'
 import { codeblock } from 'discord-md-tags'
 import type { CreateMessageOptions, Message, TextChannel } from 'oceanic.js'
-import { type Client, definePlugin } from '#framework'
 
 const LEADERBOARD_URL =
   'https://adventofcode.com/2024/leaderboard/private/view/1776951'
@@ -10,8 +10,9 @@ const CHANNEL_IDS = ['1313106215110311936', '1313106634322739290']
 const ZWSP = '\u200B'
 function formatTable(rows: string[][]) {
   if (rows.length === 0) return ZWSP
-  const highestLengths = Array.from({ length: rows[0]?.length ?? 0 }, (_, a) =>
-    Math.max(...rows.map((row) => row[a]?.length ?? 0))
+  const highestLengths = Array.from(
+    { length: rows[0]?.length ?? 0 },
+    (_, a) => Math.max(...rows.map((row) => row[a]?.length ?? 0))
   )
 
   return (
@@ -26,7 +27,7 @@ function formatTable(rows: string[][]) {
 
 export default definePlugin({
   name: 'adventofcode',
-  disabled: true,
+  disabled: !!process.env.AOC_SESSION,
   onLoad(client) {
     if (!client.env.AOC_SESSION) return
     const aoc = new AOCClient({
@@ -58,7 +59,10 @@ export default definePlugin({
           `(${user.local_score}P)`
         ])
 
-      const content = `Last Submission: <t:${lastStarTs}> by ${lastStarUser}\nLast Updated: <t:${Math.floor(Date.now() / 1000)}>\n${codeblock`${formatTable(rows)}`}`
+      const content =
+        `Last Submission: <t:${lastStarTs}> by ${lastStarUser}\nLast Updated: <t:${
+          Math.floor(Date.now() / 1000)
+        }>\n${codeblock`${formatTable(rows)}`}`
 
       const options = {
         embeds: [
@@ -79,8 +83,9 @@ export default definePlugin({
           const lastMessage = lastMessages.get(channelId)
 
           if (lastMessage) {
-            if (lastMessage.embeds[0]?.description !== content)
+            if (lastMessage.embeds[0]?.description !== content) {
               lastMessages.set(channelId, await lastMessage.edit(options))
+            }
           } else {
             const messages = await channel.getMessages({ limit: 1 })
             const initialMessage = messages[0]

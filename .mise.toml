@@ -1,21 +1,37 @@
 [tools]
 node = "latest"
+"npm:@infisical/cli" = "latest"
 typos = "latest"
 "ubi:trufflesecurity/trufflehog" = "latest"
 
-[hooks]
-postinstall = ['npx corepack enable', 'node --run db:generate']
-
 [env]
 _.path = ['./node_modules/.bin']
+_.file = '.env.deployer'
 
-[tasks.pnpm-install]
-description = 'Installs dependencies with pnpm'
-run = 'pnpm install'
-sources = ['package.json', 'pnpm-lock.yaml', '.mise.toml']
-outputs = ['node_modules/.pnpm/lock.yaml']
+[tasks.start-dev]
+description = "start docker-compose for dev environment and bot"
+run = """
+infisical run --env=dev -- docker compose -f docker-compose.dev.yml up -d && wait 20 && bun --filter="@packages/database" run db:push
+"""
 
 [tasks.dev]
-description = 'Calls your dev script in `package.json`'
-run = 'node --run dev'
-depends = ['pnpm-install']
+description = "start dev environment and bot"
+run = "bun run bot:dev"
+
+[tasks.stop-dev]
+description = "stop docker-compose for dev environment"
+run = """
+docker compose -f docker-compose.dev.yml down --remove-orphans --volumes
+"""
+
+[tasks.start-prod]
+description = "start docker-compose for production environment"
+run = """
+infisical run --env=prod -- docker compose -f docker-compose.yml up -d
+"""
+
+[tasks.stop-prod]
+description = "stop production docker-compose"
+run = """
+docker compose -f docker-compose.yml down
+"""

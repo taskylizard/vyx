@@ -1,22 +1,8 @@
 import type { ClientEvents } from 'oceanic.js'
-import AdventOfCodePlugin from '../../plugins/adventofcode'
-import AnalyticsPlugin from '../../plugins/analytics'
-import EventsPlugin from '../../plugins/events'
-import PrivateersclubPlugin from '../../plugins/privateersclub'
-import TaskylandPlugin from '../../plugins/taskyland'
-import WotakuPlugin from '../../plugins/wotaku'
+import { plugins } from '../../plugins/index'
 import type { Client } from '../client'
 import type { Middleware, Plugin } from '../structures/plugin'
 import { logger } from '../utils/logger'
-
-const plugins = {
-  adventofcode: AdventOfCodePlugin,
-  analytics: AnalyticsPlugin,
-  events: EventsPlugin,
-  privateersclub: PrivateersclubPlugin,
-  taskyland: TaskylandPlugin,
-  wotaku: WotakuPlugin
-} as const
 
 export class PluginsManager {
   public plugins: Map<string, Plugin>
@@ -42,8 +28,9 @@ export class PluginsManager {
 
   public async load(): Promise<void> {
     this.pluginsLogger.debug('Started loading plugins...')
-    for (const plugin of Object.keys(plugins))
+    for (const plugin of Object.keys(plugins)) {
       await this.loadPlugin(plugin as keyof typeof plugins)
+    }
 
     this.pluginsLogger.info(`Loaded ${this.plugins.size} plugins.`)
   }

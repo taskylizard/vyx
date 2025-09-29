@@ -1,0 +1,17 @@
+{
+  "name": "testing-library",
+  "module": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "oceanic.js": "^1.12.0"
+  }
+}

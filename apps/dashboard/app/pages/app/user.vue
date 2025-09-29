@@ -1,39 +1,176 @@
 <script setup lang="ts">
-import { toast } from "vue-sonner";
-import type { Server } from "~/types/server";
+import { toast } from 'vue-sonner'
+import type { Server } from '~/types/server'
 
 definePageMeta({
-  layout: "dashboard",
-});
+  layout: 'dashboard'
+})
 
-const { user, session, client } = useAuth();
+const { user } = useAuth()
+const runtimeConfig = useRuntimeConfig()
+const route = useRoute()
 
-const error = useRoute().query?.error;
+const oauthError = route.query?.error
 onMounted(() => {
-  if (error) {
-    toast("Error", {
-      description: `Error: ${error}`,
-    });
+  if (oauthError) {
+    toast('Error', {
+      description: `Error: ${oauthError}`
+    })
   }
-});
+})
 
-// Use injected servers data from layout
-const servers = inject<Ref<Server[]>>("servers", ref([]));
-const serversPending = inject<Ref<boolean>>("serversLoading", ref(false));
+const servers = inject<Ref<Server[]>>('servers', ref([]))
+const serversPending = inject<Ref<boolean>>('serversLoading', ref(false))
+const serversError = inject<Ref<Error | null>>('serversError', ref(null))
 
-const { data } = useAsyncData("user", () => client.getSession());
+type DecoratedServer = Server & {
+  lastVisitedAt: string | null
+  hasAdminAccess: boolean
+  isOwner: boolean
+}
+
+const searchTerm = ref('')
+const hasSearch = computed(() => Boolean(searchTerm.value.trim()))
+
+const recentServersCookie = useCookie<Record<string, string>>(
+  'vyx-recent-servers',
+  {
+    default: () => ({}),
+    sameSite: 'lax'
+  }
+)
+
+const refreshServers = async () => {
+  await refreshNuxtData('discord-servers')
+}
+
+const decoratedServers = computed<DecoratedServer[]>(() => {
+  const cookieValue = recentServersCookie.value || {}
+  return servers.value.map((server) => {
+    const permissionValue = Number(server.permissions || '0')
+    return {
+      ...server,
+      lastVisitedAt: cookieValue[server.id] || null,
+      hasAdminAccess: Boolean(permissionValue & 0x8),
+      isOwner: Boolean(server.owner)
+    }
+  })
+})
+
+const filteredServers = computed<DecoratedServer[]>(() => {
+  const term = searchTerm.value.trim().toLowerCase()
+  return decoratedServers.value
+    .filter((server) => {
+      if (!term) {
+        return true
+      }
+      const matchesName = server.name?.toLowerCase().includes(term)
+      const matchesId = server.id.includes(term)
+      return matchesName || matchesId
+    })
+    .sort((a, b) => a.name.localeCompare(b.name))
+})
+
+const totalServers = computed(() => servers.value.length)
+const visibleServers = computed(() => filteredServers.value)
+
+const extractErrorMessage = (error: unknown): string => {
+  const maybe = error as {
+    data?: { statusMessage?: string }
+    statusMessage?: string
+    message?: string
+  }
+  if (maybe?.data?.statusMessage) {
+    return maybe.data.statusMessage
+  }
+  if (maybe?.statusMessage) {
+    return maybe.statusMessage
+  }
+  if (maybe?.message) {
+    return maybe.message
+  }
+  return 'Something went wrong while loading your servers'
+}
+
+let lastToastMessage: string | null = null
+watch(
+  serversError,
+  (err) => {
+    if (!err) {
+      lastToastMessage = null
+      return
+    }
+    const message = extractErrorMessage(err)
+    if (message === lastToastMessage) {
+      return
+    }
+    lastToastMessage = message
+    toast('Failed to load servers', {
+      description: message
+    })
+  },
+  { immediate: true }
+)
+
+const handleInvite = () => {
+  const inviteUrl = runtimeConfig.public.links?.invite
+  if (!inviteUrl) {
+    toast('Invite URL missing', {
+      description: 'Ask an admin to configure the bot invite link'
+    })
+    return
+  }
+  if (import.meta.client) {
+    window.open(inviteUrl, '_blank', 'noopener,noreferrer')
+  }
+}
+
+const handleRefresh = () => {
+  refreshServers()
+}
+
+const clearSearch = () => {
+  searchTerm.value = ''
+}
+
+const formatActivity = (value: string | null): string => {
+  if (!value) {
+    return 'No recent visits yet'
+  }
+  const seconds = Math.floor((Date.now() - new Date(value).getTime()) / 1000)
+  if (seconds < 60) {
+    return 'Visited just now'
+  }
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) {
+    const unit = minutes === 1 ? 'minute' : 'minutes'
+    return `Visited ${minutes} ${unit} ago`
+  }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    const unit = hours === 1 ? 'hour' : 'hours'
+    return `Visited ${hours} ${unit} ago`
+  }
+  const days = Math.floor(hours / 24)
+  if (days < 30) {
+    const unit = days === 1 ? 'day' : 'days'
+    return `Visited ${days} ${unit} ago`
+  }
+  const months = Math.floor(days / 30)
+  const unit = months === 1 ? 'month' : 'months'
+  return `Visited ${months} ${unit} ago`
+}
 </script>
 
 <template>
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <h2 class="text-neutral-12 text-3xl font-bold">
-        Welcome back, {{ user?.name || "User" }}!
+        Welcome back, {{ user?.name || 'User' }}!
       </h2>
     </div>
 
     <div class="space-y-8">
-      <!-- Header Section -->
       <div class="space-y-3">
         <div class="flex items-center gap-2">
           <Icon name="lucide:server" class="h-5 w-5 text-neutral-11" />
@@ -47,11 +184,13 @@ const { data } = useAsyncData("user", () => client.getSession());
         </p>
       </div>
 
-      <!-- Loading State -->
       <div v-if="serversPending" class="space-y-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          <div v-for="i in 6" :key="`skeleton-${i}`"
-            class="rounded-xl border border-neutral-6 bg-neutral-2 p-6 animate-pulse">
+          <div
+            v-for="i in 6"
+            :key="`skeleton-${i}`"
+            class="rounded-xl border border-neutral-6 bg-neutral-2 p-6 animate-pulse"
+          >
             <div class="flex flex-col items-center space-y-4">
               <div class="w-16 h-16 bg-neutral-4 rounded-full" />
               <div class="space-y-2 w-full">
@@ -68,8 +207,7 @@ const { data } = useAsyncData("user", () => client.getSession());
         </div>
       </div>
 
-      <!-- Empty State -->
-      <div v-else-if="!servers.length" class="text-center py-16">
+      <div v-else-if="!totalServers" class="text-center py-16">
         <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-neutral-3 mb-6">
           <Icon name="lucide:server-off" class="h-10 w-10 text-neutral-8" />
         </div>
@@ -81,69 +219,179 @@ const { data } = useAsyncData("user", () => client.getSession());
           permissions and the bot is installed.
         </p>
         <div class="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button variant="outline" size="sm" class="gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            class="gap-2"
+            @click="handleInvite"
+          >
             <Icon name="lucide:external-link" class="h-4 w-4" />
             Invite Bot to Server
           </Button>
-          <Button variant="ghost" size="sm" class="gap-2">
-            <Icon name="lucide:refresh-cw" class="h-4 w-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            class="gap-2"
+            :disabled="serversPending"
+            @click="handleRefresh"
+          >
+            <Icon
+              v-if="serversPending"
+              name="lucide:loader-2"
+              class="h-4 w-4 animate-spin"
+            />
+            <Icon v-else name="lucide:refresh-cw" class="h-4 w-4" />
             Refresh List
           </Button>
         </div>
       </div>
 
-      <!-- Server Grid -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        <Card v-for="server in servers" :key="server.id"
-          class="group relative overflow-hidden border-neutral-6 bg-neutral-1 hover:bg-neutral-2 hover:border-neutral-7 transition-all duration-200 hover:shadow-lg hover:shadow-neutral-12/5">
-          <CardContent class="p-6">
-            <div class="flex flex-col items-center space-y-4">
-              <!-- Server Avatar -->
-              <div class="relative">
-                <Avatar class="w-16 h-16 ring-2 ring-neutral-6 group-hover:ring-neutral-7 transition-all duration-200">
-                  <AvatarImage :src="server.icon
+      <div v-else class="space-y-6">
+        <Alert
+          v-if="serversError"
+          variant="destructive"
+          class="border-destructive/40 bg-destructive/5"
+        >
+          <Icon name="lucide:alert-triangle" class="h-4 w-4" />
+          <AlertTitle>Unable to load servers</AlertTitle>
+          <AlertDescription class="flex items-center gap-3">
+            <span>{{ extractErrorMessage(serversError) }}</span>
+            <Button variant="outline" size="sm" @click="handleRefresh">
+              Try again
+            </Button>
+          </AlertDescription>
+        </Alert>
+
+        <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div class="w-full md:max-w-sm lg:max-w-md">
+            <Label for="server-search">Search</Label>
+            <Input
+              id="server-search"
+              v-model="searchTerm"
+              placeholder="Search by name or ID…"
+              autocomplete="off"
+              :spellcheck="false"
+            />
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              class="gap-2"
+              :disabled="serversPending"
+              @click="handleRefresh"
+            >
+              <Icon
+                v-if="serversPending"
+                name="lucide:loader-2"
+                class="h-4 w-4 animate-spin"
+              />
+              <Icon v-else name="lucide:refresh-cw" class="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button
+              v-if="hasSearch"
+              variant="outline"
+              size="sm"
+              class="gap-2"
+              @click="clearSearch"
+            >
+              <Icon name="lucide:eraser" class="h-4 w-4" />
+              Clear search
+            </Button>
+          </div>
+        </div>
+
+        <div
+          v-if="!visibleServers.length"
+          class="rounded-xl border border-neutral-6 bg-neutral-2 px-6 py-12 text-center"
+        >
+          <p class="text-neutral-11 text-sm">
+            No servers match your search right now. Try different keywords or
+            refresh the list.
+          </p>
+        </div>
+
+        <div
+          v-else
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
+        >
+          <Card
+            v-for="server in visibleServers"
+            :key="server.id"
+            class="group relative h-full overflow-hidden border-neutral-6 bg-neutral-1 transition-all duration-200 hover:border-neutral-7 hover:bg-neutral-2 hover:shadow-lg hover:shadow-neutral-12/5"
+          >
+            <CardContent class="p-6">
+              <div class="flex flex-col items-center space-y-4">
+                <div class="relative">
+                  <Avatar
+                    class="w-16 h-16 ring-2 ring-neutral-6 group-hover:ring-neutral-7 transition-all duration-200"
+                  >
+                    <AvatarImage
+                      :src="server.icon
                       ? `https://cdn.discordapp.com/icons/${server.id}/${server.icon}.png?size=128`
-                      : server.name
-                    " :alt="server.name" class="object-cover" />
-                  <AvatarFallback
-                    class="bg-gradient-to-br from-neutral-5 to-neutral-6 text-neutral-12 text-lg font-semibold">
-                    {{ server.name.charAt(0).toUpperCase() }}
-                  </AvatarFallback>
-                </Avatar>
+                      : server.name"
+                      :alt="server.name"
+                      class="object-cover"
+                    />
+                    <AvatarFallback
+                      class="bg-gradient-to-br from-neutral-5 to-neutral-6 text-neutral-12 text-lg font-semibold"
+                    >
+                      {{
+                        server.name.charAt(0)
+                        .toUpperCase()
+                      }}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+
+                <div class="flex-1 min-w-0 w-full text-center space-y-2">
+                  <h3
+                    class="text-neutral-12 font-semibold text-base leading-tight truncate"
+                    :title="server.name"
+                  >
+                    {{ server.name }}
+                  </h3>
+                  <p class="text-neutral-11 text-xs font-mono bg-neutral-3 px-2 py-1 rounded-md inline-block">
+                    {{ server.id }}
+                  </p>
+                  <p class="text-neutral-10 text-xs">
+                    {{
+                      formatActivity(
+                        server.lastVisitedAt
+                      )
+                    }}
+                  </p>
+                </div>
+
+                <NuxtLink :to="`/app/server/${server.id}`" class="w-full">
+                  <Button
+                    class="w-full group-hover:bg-neutral-12 group-hover:text-neutral-1 transition-all duration-200 gap-2 shadow-sm"
+                    size="sm"
+                  >
+                    <Icon name="lucide:settings" class="h-4 w-4" />
+                    Configure Server
+                    <Icon
+                      name="lucide:arrow-right"
+                      class="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    />
+                  </Button>
+                </NuxtLink>
               </div>
+            </CardContent>
+          </Card>
+        </div>
 
-              <!-- Server Info -->
-              <div class="flex-1 min-w-0 w-full text-center space-y-2">
-                <h3 class="text-neutral-12 font-semibold text-base leading-tight truncate" :title="server.name">
-                  {{ server.name }}
-                </h3>
-                <p class="text-neutral-11 text-xs font-mono bg-neutral-3 px-2 py-1 rounded-md inline-block">
-                  {{ server.id }}
-                </p>
-              </div>
-
-              <!-- Action Button -->
-              <NuxtLink :to="`/app/server/${server.id}`" class="w-full">
-                <Button
-                  class="w-full group-hover:bg-neutral-12 group-hover:text-neutral-1 transition-all duration-200 gap-2 shadow-sm"
-                  size="sm">
-                  <Icon name="lucide:settings" class="h-4 w-4" />
-                  Configure Server
-                  <Icon name="lucide:arrow-right"
-                    class="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                </Button>
-              </NuxtLink>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <!-- Server Count -->
-      <div v-if="servers.length > 0" class="flex items-center justify-center text-neutral-11 text-sm">
-        <Icon name="lucide:server" class="h-4 w-4 mr-2" />
-        Managing {{ servers.length }} server{{
-          servers.length === 1 ? "" : "s"
-        }}
+        <div class="flex flex-col items-center justify-center gap-1 text-neutral-11 text-sm">
+          <span>
+            Showing {{ visibleServers.length }} of {{ totalServers }} server{{
+              totalServers === 1 ? '' : 's'
+            }}
+          </span>
+          <span v-if="hasSearch" class="text-xs">
+            Search applied
+          </span>
+        </div>
       </div>
     </div>
   </div>

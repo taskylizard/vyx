@@ -1,17 +1,17 @@
 import {
+  type Client,
+  defineSlashCommand,
+  Embed,
+  error,
+  ok,
+  type Result
+} from '#framework'
+import {
   ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js'
 import { match } from 'ts-pattern'
-import {
-  type Client,
-  Embed,
-  type Result,
-  defineSlashCommand,
-  error,
-  ok
-} from '#framework'
 
 interface Response {
   type: 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found' | 'no-extract'
@@ -30,7 +30,9 @@ async function fetchWikipediaSummary(
   client: Client,
   article: string
 ): Promise<Result<Response>> {
-  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(article)}?redirect=true`
+  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${
+    encodeURIComponent(article)
+  }?redirect=true`
   try {
     const res = await client.fetcher<Response>(url)
     return ok(res)
@@ -51,14 +53,14 @@ function createWikipediaEmbed(data: Response): Embed {
     .addFields([
       {
         name: 'Extract',
-        value:
-          data.type === 'no-extract'
-            ? '*No extract available - feel free to take a look at the page using the links below*'
-            : data.extract
+        value: data.type === 'no-extract'
+          ? '*No extract available - feel free to take a look at the page using the links below*'
+          : data.extract
       },
       {
         name: 'Links',
-        value: `[View article](${data.content_urls.desktop.page}) / [mobile view](${data.content_urls.mobile.page}) • [Revisions](${data.content_urls.desktop.revisions}) / [mobile view](${data.content_urls.mobile.revisions})`
+        value:
+          `[View article](${data.content_urls.desktop.page}) / [mobile view](${data.content_urls.mobile.page}) • [Revisions](${data.content_urls.desktop.revisions}) / [mobile view](${data.content_urls.mobile.revisions})`
       }
     ])
 
@@ -69,13 +71,14 @@ function createWikipediaEmbed(data: Response): Embed {
 export default defineSlashCommand({
   name: 'wikipedia',
   description: 'Search articles on the Wikipedia.',
-  options: {
-    article: {
+  options: [
+    {
+      name: 'article',
       description: 'The article you want to search.',
       type: ApplicationCommandOptionTypes.STRING,
       required: true
     }
-  },
+  ],
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,

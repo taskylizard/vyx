@@ -1,16 +1,18 @@
 import { defineSlashCommand } from '#framework'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
 
 export default defineSlashCommand({
   name: 'currency',
   description: 'Set the server economy currency.',
   requiredPermissions: ['MANAGE_GUILD'],
-  options: {
-    currency: {
+  options: [
+    {
+      name: 'currency',
       description: 'Your currency, can be a emoji or text.',
       required: true,
-      type: 'string'
+      type: ApplicationCommandOptionTypes.STRING
     }
-  },
+  ],
   async run(ctx) {
     const value = ctx.options.getString('currency', true)
 

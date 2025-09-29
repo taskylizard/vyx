@@ -1,9 +1,10 @@
+import { defineSlashCommand } from '#framework'
 import {
+  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js'
 import parse from 'parse-duration'
-import { defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'reminder',
@@ -21,18 +22,20 @@ export default defineSlashCommand({
     {
       name: 'create',
       description: 'Create a reminder.',
-      options: {
-        time: {
-          type: 'string',
+      options: [
+        {
+          name: 'time',
+          type: ApplicationCommandOptionTypes.STRING,
           description: 'The time to remind you in.',
           required: true
         },
-        message: {
-          type: 'string',
+        {
+          name: 'message',
+          type: ApplicationCommandOptionTypes.STRING,
           description: 'What to remind you of?',
           required: true
         }
-      },
+      ],
       async run(ctx) {
         const reminder = ctx.options.getString('message', true)
         const delay = parse(ctx.options.getString('time', true))
@@ -64,11 +67,11 @@ export default defineSlashCommand({
         )
 
         return await ctx.interaction.editFollowup(message.id, {
-          content: `Alright ${
-            ctx.user.mention
-          }, I'll remind you in <t:${Math.trunc(
-            time.getTime() / 1000
-          )}:R> to \`${reminder}\`.`
+          content: `Alright ${ctx.user.mention}, I'll remind you in <t:${
+            Math.trunc(
+              time.getTime() / 1000
+            )
+          }:R> to \`${reminder}\`.`
         })
       }
     },
@@ -94,9 +97,10 @@ export default defineSlashCommand({
 
         let content = "Here's your reminders!\n"
         for (const reminder of reminders) {
-          content += `- \`${reminder.id}\`: ${reminder.content}: [link](${
-            reminder.messageLink
-          }) (<t:${Math.trunc(reminder.time.getTime() / 1000)}:R>)\n`
+          content +=
+            `- \`${reminder.id}\`: ${reminder.content}: [link](${reminder.messageLink}) (<t:${
+              Math.trunc(reminder.time.getTime() / 1000)
+            }:R>)\n`
         }
 
         return await ctx.reply(content)
@@ -105,13 +109,14 @@ export default defineSlashCommand({
     {
       name: 'delete',
       description: 'Delete a reminder.',
-      options: {
-        reminder: {
+      options: [
+        {
+          name: 'reminder',
           description: 'Reminder to delete.',
           required: true,
-          type: 'integer'
+          type: ApplicationCommandOptionTypes.INTEGER
         }
-      },
+      ],
       async run(ctx) {
         const id = ctx.options.getInteger('reminder', true)
         const reminder = await ctx.client.prisma.reminder.delete({

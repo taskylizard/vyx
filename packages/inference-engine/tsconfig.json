@@ -1,0 +1,10 @@
+{
+  "extends": "@packages/typescript-config/base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "@packages/components-jsx"
+  },
+  "include": [
+    "src"
+  ]
+}

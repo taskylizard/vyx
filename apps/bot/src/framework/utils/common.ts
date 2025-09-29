@@ -1,82 +1,4 @@
-import { fileURLToPath } from 'node:url'
-import {
-  type AnyTextableChannel,
-  type AnyThreadChannel,
-  type Channel,
-  type ChannelTypes,
-  Collection,
-  type MessageTypes,
-  TextableChannelTypes,
-  type TextableChannels,
-  ThreadChannelTypes,
-  type ThreadChannels,
-  UndeletableMessageTypes
-} from 'oceanic.js'
-import { dirname } from 'pathe'
-import { logger } from './logger'
-
-/**
- * Imports a module and returns its default export.
- *
- * @param {string} path - The path to the module.
- * @returns {Promise<T>} The default export of the module.
- */
-export async function importDefault<T>(path: string): Promise<T> {
-  return (
-    (await import(path).catch(logger.error)) as {
-      default: T
-    }
-  ).default
-}
-
-/**
- * Formats a duration in milliseconds into a human-readable string.
- *
- * @param {number | undefined} duration - The duration in
-milliseconds.
- * @returns {string} The formatted duration string.
- */
-export function formatDuration(duration: number | undefined): string {
-  if (typeof duration === 'undefined') return '00:00'
-  if (duration > 3600000000) return 'Live'
-
-  let seconds: string | number = Number.parseInt(`${(duration / 1000) % 60}`)
-  let minutes: string | number = Number.parseInt(
-    `${(duration / (1000 * 60)) % 60}`
-  )
-  let hours: string | number = Number.parseInt(
-    `${(duration / (1000 * 60 * 60)) % 24}`
-  )
-
-  hours = hours < 10 ? `0${hours}` : hours
-  minutes = minutes < 10 ? `0${minutes}` : minutes
-  seconds = seconds < 10 ? `0${seconds}` : seconds
-
-  if (duration < 3600000) {
-    return `${minutes}:${seconds}`
-  }
-  return `${hours}:${minutes}:${seconds}`
-}
-
-/**
- * Returns the directory name from a URL.
- *
- * @param {URL | string} url - The URL.
- * @returns {string} The directory name.
- */
-export function getDirname(url: URL | string): string {
-  return dirname(getFilename(url))
-}
-
-/**
- * Returns the file name from a URL.
- *
- * @param {URL | string} url - The URL.
- * @returns {string} The file name.
- */
-export function getFilename(url: URL | string): string {
-  return fileURLToPath(url)
-}
+import { Collection } from 'oceanic.js'
 
 /**
  * Truncates a string to a specified maximum length.
@@ -89,6 +11,39 @@ export function truncateString(string: string, maxLength: number): string {
   return string.length > maxLength
     ? `${string.substring(0, maxLength)}…`
     : string
+}
+
+export const colors = {
+  DEFAULT: 0x000000,
+  WHITE: 0xffffff,
+  AQUA: 0x1abc9c,
+  GREEN: 0x57f287,
+  BLUE: 0x3498db,
+  YELLOW: 0xfee75c,
+  PURPLE: 0x9b59b6,
+  LUMINOUS_VIVID_PINK: 0xe91e63,
+  FUCHSIA: 0xeb459e,
+  GOLD: 0xf1c40f,
+  ORANGE: 0xe67e22,
+  RED: 0xed4245,
+  GREY: 0x95a5a6,
+  NAVY: 0x34495e,
+  DARK_AQUA: 0x11806a,
+  DARK_GREEN: 0x1f8b4c,
+  DARK_BLUE: 0x206694,
+  DARK_PURPLE: 0x71368a,
+  DARK_VIVID_PINK: 0xad1457,
+  DARK_GOLD: 0xc27c0e,
+  DARK_ORANGE: 0xa84300,
+  DARK_RED: 0x992d22,
+  DARK_GREY: 0x979c9f,
+  DARKER_GREY: 0x7f8c8d,
+  LIGHT_GREY: 0xbcc0c0,
+  DARK_NAVY: 0x2c3e50,
+  BLURPLE: 0x5865f2,
+  GREYPLE: 0x99aab5,
+  DARK_BUT_NOT_BLACK: 0x2c2f33,
+  NOT_QUITE_BLACK: 0x23272a
 }
 
 /**
@@ -113,95 +68,6 @@ export function createGuard<T, U extends T>(
 ): (maybe: T) => maybe is U {
   return (maybe: T): maybe is U => check(maybe) !== undefined
 }
-
-export const isThreadChannel = createGuard<Channel, AnyThreadChannel>(
-  (channel) =>
-    isThreadChannelType(channel.type)
-      ? (channel as AnyThreadChannel)
-      : undefined
-)
-
-export const isThreadChannelType = createGuard<ChannelTypes, ThreadChannels>(
-  (type) =>
-    ThreadChannelTypes.includes(type as ThreadChannels)
-      ? (type as ThreadChannels)
-      : undefined
-)
-
-export const isTextableChannel = createGuard<Channel, AnyTextableChannel>(
-  (channel) =>
-    isTextableChannelType(channel.type)
-      ? (channel as AnyTextableChannel)
-      : undefined
-)
-
-export const isTextableChannelType = createGuard<
-  ChannelTypes,
-  TextableChannels
->((type) =>
-  TextableChannelTypes.includes(type as TextableChannels)
-    ? (type as TextableChannels)
-    : undefined
-)
-
-export const isUndeletableMessageType = createGuard<
-  MessageTypes,
-  (typeof UndeletableMessageTypes)[number]
->((type) =>
-  UndeletableMessageTypes.includes(
-    type as (typeof UndeletableMessageTypes)[number]
-  )
-    ? (type as (typeof UndeletableMessageTypes)[number])
-    : undefined
-)
-
-export const emojis = [
-  '🎊',
-  '🎉',
-  '🎈',
-  '🎇',
-  '🎆',
-  '🎅',
-  '🎄',
-  '🎁',
-  '🎀',
-  '🎃',
-  '🕺',
-  '👻',
-  '🤖',
-  '🧙',
-  '🧚',
-  '🧛',
-  '🧜',
-  '🧟',
-  '💇',
-  '🚶',
-  '🏃',
-  '💃',
-  '🕴',
-  '🗣',
-  '👤',
-  '👥',
-  '🤺',
-  '🏇',
-  '⛷',
-  '🏂',
-  '🏌',
-  '🏄',
-  '🚣',
-  '🏊',
-  '⛹',
-  '🏋',
-  '🌺',
-  '🏕',
-  '🏖',
-  '🏗',
-  '🏘',
-  '🏙',
-  '🏚',
-  '🏛',
-  '🏜'
-]
 
 /**
  * Represents a failed operation with an error message.
@@ -388,7 +254,13 @@ export function coroutine<T>(
  */
 
 export class ComponentState<T> {
-  private static stateMap = new Collection<string, unknown>()
+  private static stateMap = new Collection<
+    string,
+    { value: unknown; lastAccessed: number }
+  >()
+  private static cleanupInterval: NodeJS.Timer | null = null
+  private static readonly CLEANUP_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes
+  private static readonly MAX_AGE_MS = 2 * 60 * 60 * 1000 // 2 hours
   private readonly componentId: string
 
   /**
@@ -403,7 +275,59 @@ export class ComponentState<T> {
       initialState !== undefined &&
       !ComponentState.stateMap.has(componentId)
     ) {
-      ComponentState.stateMap.set(componentId, initialState)
+      ComponentState.stateMap.set(componentId, {
+        value: initialState,
+        lastAccessed: Date.now()
+      })
+    }
+
+    // Start cleanup interval if not already running
+    ComponentState.startCleanup()
+  }
+
+  /**
+   * Start the automatic cleanup process
+   */
+  private static startCleanup(): void {
+    if (ComponentState.cleanupInterval === null) {
+      ComponentState.cleanupInterval = setInterval(() => {
+        ComponentState.cleanup()
+      }, ComponentState.CLEANUP_INTERVAL_MS)
+    }
+  }
+
+  /**
+   * Clean up old state entries to prevent memory leaks
+   */
+  private static cleanup(): void {
+    const now = Date.now()
+    const toDelete: string[] = []
+
+    for (const [key, entry] of ComponentState.stateMap.entries()) {
+      if (now - entry.lastAccessed > ComponentState.MAX_AGE_MS) {
+        toDelete.push(key)
+      }
+    }
+
+    for (const key of toDelete) {
+      ComponentState.stateMap.delete(key)
+    }
+  }
+
+  /**
+   * Manually trigger cleanup
+   */
+  public static forceCleanup(): void {
+    ComponentState.cleanup()
+  }
+
+  /**
+   * Stop the cleanup interval (for testing or shutdown)
+   */
+  public static stopCleanup(): void {
+    if (ComponentState.cleanupInterval !== null) {
+      clearInterval(ComponentState.cleanupInterval)
+      ComponentState.cleanupInterval = null
     }
   }
 
@@ -412,7 +336,12 @@ export class ComponentState<T> {
    * @returns The current state or undefined if not set
    */
   get(): T | undefined {
-    return ComponentState.stateMap.get(this.componentId) as T | undefined
+    const entry = ComponentState.stateMap.get(this.componentId)
+    if (entry) {
+      entry.lastAccessed = Date.now()
+      return entry.value as T
+    }
+    return undefined
   }
 
   /**
@@ -421,7 +350,10 @@ export class ComponentState<T> {
    * @returns The updated state
    */
   set(newState: T): T {
-    ComponentState.stateMap.set(this.componentId, newState)
+    ComponentState.stateMap.set(this.componentId, {
+      value: newState,
+      lastAccessed: Date.now()
+    })
     return newState
   }
 

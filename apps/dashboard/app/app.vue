@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ConfigProvider } from "reka-ui";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from '@/components/ui/sonner'
+import { ConfigProvider } from 'reka-ui'
 </script>
 
 <template>

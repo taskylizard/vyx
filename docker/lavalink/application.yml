@@ -19,10 +19,10 @@ plugins:
 
 lavalink:
   plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.4.0"
+    - dependency: 'dev.lavalink.youtube:youtube-plugin:1.4.0'
       snapshot: false # Set to true if you want to use a snapshot version.
   server:
-    password: "youshallnotpass"
+    password: 'youshallnotpass'
     sources:
       # The default Youtube source is now deprecated and won't receive further updates. Please use https://github.com/lavalink-devs/youtube-source#plugin instead.
       youtube: false
@@ -76,8 +76,8 @@ metrics:
     endpoint: /metrics
 
 sentry:
-  dsn: ""
-  environment: ""
+  dsn: ''
+  environment: ''
 #  tags:
 #    some_key: some_value
 #    another_key: another_value

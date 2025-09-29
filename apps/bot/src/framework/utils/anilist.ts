@@ -1,4 +1,4 @@
-import { type Media, type MediaType, anilist } from 'anilist'
+import { anilist, type Media, type MediaType } from 'anilist'
 
 export const FullMediaQuery = anilist.query
   .media()
@@ -39,7 +39,7 @@ export async function searchAnilist(
   })
 
   const data = await FullMediaQuery.fetch()
-  localAnilistCache.set(search, <never>data)
+  localAnilistCache.set(search, <never> data)
 
   return data
 }

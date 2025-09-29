@@ -1,7 +1,7 @@
 import { EmbedBuilder } from '@oceanicjs/builders'
+import type { ConsolaReporter, LogObject } from 'consola'
 import { codeblock } from 'discord-md-tags'
 import type { ExecuteWebhookOptions } from 'oceanic.js'
-import type { ConsolaReporter, LogObject } from 'consola'
 import type { Client } from './client'
 
 interface WebhookReporterOptions {
@@ -30,11 +30,15 @@ export class WebhookReporter implements ConsolaReporter {
 
   private async sendErrorWebhook(logObj: LogObject) {
     // Skip webhook execution for specific error messages
-    const errorMessage = Array.isArray(logObj.args) 
-      ? logObj.args.join(' ') 
+    const errorMessage = Array.isArray(logObj.args)
+      ? logObj.args.join(' ')
       : String(logObj.args || '')
 
-    if (errorMessage.includes("Error: invalid float value for field 'discord': NaN")) {
+    if (
+      errorMessage.includes(
+        "Error: invalid float value for field 'discord': NaN"
+      )
+    ) {
       return
     }
 
@@ -53,18 +57,18 @@ export class WebhookReporter implements ConsolaReporter {
 
   private formatErrorEmbed(logObj: LogObject): ExecuteWebhookOptions {
     const embed = new EmbedBuilder()
-    
+
     if (logObj.date) {
       embed.setTimestamp(logObj.date)
     }
 
-    const message = Array.isArray(logObj.args) 
-      ? logObj.args.join(' ') 
+    const message = Array.isArray(logObj.args)
+      ? logObj.args.join(' ')
       : String(logObj.args || '')
 
     const tag = logObj.tag ? `[${logObj.tag}]` : ''
     const title = `${tag} Error`
-    
+
     embed.setTitle(title)
     embed.setDescription(codeblock('js')`${message}`)
     embed.setColor(14362664) // Red color for errors

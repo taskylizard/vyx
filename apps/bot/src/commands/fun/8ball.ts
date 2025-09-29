@@ -1,6 +1,6 @@
+import { defineSlashCommand, Embed } from '#framework'
 import { sample } from '@antfu/utils'
 import { ApplicationCommandOptionTypes } from 'oceanic.js'
-import { Embed, defineSlashCommand } from '#framework'
 
 const responses = [
   'Most likely',
@@ -29,13 +29,14 @@ const responses = [
 export default defineSlashCommand({
   name: '8ball',
   description: 'Ask the magic 8ball.',
-  options: {
-    question: {
-      type: 'string',
+  options: [
+    {
+      name: 'question',
+      type: ApplicationCommandOptionTypes.STRING,
       description: 'Your question.',
       required: true
     }
-  },
+  ],
   async run(ctx) {
     const question = ctx.options.getString('question', true)
 

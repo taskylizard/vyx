@@ -1,3 +1,3 @@
-import { auth } from "~~/server/utils/auth";
+import { auth } from '~~/server/utils/auth'
 
-export default eventHandler((event) => auth.handler(toWebRequest(event)));
+export default eventHandler((event) => auth.handler(toWebRequest(event)))

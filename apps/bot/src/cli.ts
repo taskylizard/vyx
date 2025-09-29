@@ -1,6 +1,6 @@
+import type { Client } from '#framework'
 import { generateHelpMessage, parse } from 'ordana'
 import type { TopLevelOptions } from 'ordana'
-import type { Client } from '#framework'
 import { logger } from './framework/utils/logger'
 
 const cliOptions: TopLevelOptions = {

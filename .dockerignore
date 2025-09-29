@@ -1,15 +1,79 @@
-.DS_Store
-
+# Node.js and package manager files
 node_modules/
-.vscode/
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tgz
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
 
+# Build outputs and cache
+.next
+.nuxt
+dist
+.output
+.nitro
+.cache
+.turbo
+build/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment files
 .env
 .env.*
+!.env.example
+!.env.prod.example
 
+# Python
 .venv/
 venv/
 __pycache__/
+*.pyc
 
+# Docker files
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Git and CI
+.git/
+.gitignore
 /.github/
 /renovate.json
+
+# Development and testing
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
 /trash/
+
+# Logs
+logs/
+*.log
+
+# Documentation
+README.md
+LICENSE
+*.md
+docs/
+
+# Config files
+.editorconfig
+.eslintrc*
+.prettierrc*
+tsconfig.json
+Makefile

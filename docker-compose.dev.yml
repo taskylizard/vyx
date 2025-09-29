@@ -1,0 +1,60 @@
+# docker-compose.dev.yml
+services:
+  postgres-dev:
+    container_name: postgres-vyx-dev
+    image: postgres:15-alpine
+    ports:
+      - '5434:5432'
+    restart: always
+    volumes:
+      - 'postgres-data-dev:/var/lib/postgresql/data'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready']
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 80s
+    environment:
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpass
+      POSTGRES_DB: devdb
+
+  dragonfly-dev:
+    container_name: dragonfly-vyx-dev
+    image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
+    ulimits:
+      memlock: -1
+    ports:
+      - '6380:6379'
+    command: ['--cluster_mode=emulated', '--lock_on_hashtags']
+    volumes:
+      - dragonfly-data-dev:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 60s
+      retries: 5
+      start_period: 30s
+
+  qdrant-dev:
+    container_name: qdrant-vyx-dev
+    image: qdrant/qdrant:latest
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - qdrant-data-dev:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:6333/health']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  postgres-data-dev:
+  dragonfly-data-dev:
+  qdrant-data-dev:

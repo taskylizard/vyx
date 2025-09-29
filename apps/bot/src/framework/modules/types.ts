@@ -355,16 +355,16 @@ interface WikipediaPageSummaryResponse {
 
 export type {
   SearchEngineCategory,
-  SearchEngineType,
   SearchEngineOptions,
-  SearchEngineResult,
   SearchEngineResponse,
+  SearchEngineResult,
+  SearchEngineType,
   WikipediaPage,
+  WikipediaPageSearchResponse,
+  WikipediaPageSummaryOptions,
   WikipediaPageSummaryResponse,
   WikipediaSearchOptions,
-  WikipediaThumbnail,
-  WikipediaPageSummaryOptions,
-  WikipediaPageSearchResponse
+  WikipediaThumbnail
 }
 
-export { SearchOptionsSchema, SearchEngineSchema, SearchCategorySchema }
+export { SearchCategorySchema, SearchEngineSchema, SearchOptionsSchema }

@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import type { PrimitiveProps } from 'reka-ui'
-import type { HTMLAttributes } from 'vue'
-import { Primitive } from 'reka-ui'
 import { cn } from '@/lib/utils'
+import type { PrimitiveProps } from 'reka-ui'
+import { Primitive } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
 
-const props = withDefaults(defineProps<PrimitiveProps & {
-  size?: 'sm' | 'md'
-  isActive?: boolean
-  class?: HTMLAttributes['class']
-}>(), {
-  as: 'a',
-  size: 'md',
-})
+const props = withDefaults(
+  defineProps<
+    PrimitiveProps & {
+      size?: 'sm' | 'md'
+      isActive?: boolean
+      class?: HTMLAttributes['class']
+    }
+  >(),
+  {
+    as: 'a',
+    size: 'md'
+  }
+)
 </script>
 
 <template>
@@ -28,7 +33,7 @@ const props = withDefaults(defineProps<PrimitiveProps & {
       size === 'sm' && 'text-xs',
       size === 'md' && 'text-sm',
       'group-data-[collapsible=icon]:hidden',
-      props.class,
+      props.class
     )"
   >
     <slot />

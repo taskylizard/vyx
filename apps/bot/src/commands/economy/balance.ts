@@ -1,4 +1,4 @@
-import { Embed, defineSlashCommand } from '#framework'
+import { defineSlashCommand, Embed } from '#framework'
 
 export default defineSlashCommand({
   name: 'balance',

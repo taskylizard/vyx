@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "prisma": {
+      "type": "local",
+      "command": [
+        "bun",
+        "x",
+        "prisma",
+        "mcp"
+      ],
+      "enabled": true
+    }
+  }
+}

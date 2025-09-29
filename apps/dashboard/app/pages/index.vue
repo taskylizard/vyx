@@ -1,39 +1,39 @@
 <script setup lang="ts">
-import { toast } from "vue-sonner";
+import { toast } from 'vue-sonner'
 
 definePageMeta({
-  middleware: ["guest"],
-  layout: "auth",
-});
+  middleware: ['guest'],
+  layout: 'auth'
+})
 
-const auth = useAuth();
-const loading = ref(false);
+const auth = useAuth()
+const loading = ref(false)
 
 async function signIn() {
   try {
-    loading.value = true;
+    loading.value = true
 
     const { error, data } = await auth.signIn.social({
-      provider: "discord",
-      callbackURL: "/app/user",
-    });
+      provider: 'discord',
+      callbackURL: '/app/user'
+    })
 
     if (data) {
-      toast("Success", {
-        description: "Successfully signed in.",
-      });
-      await navigateTo("/app/user");
+      toast('Success', {
+        description: 'Successfully signed in.'
+      })
+      await navigateTo('/app/user')
     } else {
-      toast("Error", {
-        description: `Error: ${error.message}`,
-      });
+      toast('Error', {
+        description: `Error: ${error.message}`
+      })
     }
   } catch (error: any) {
-    toast("Error", {
-      description: `Error: ${error.message}`,
-    });
+    toast('Error', {
+      description: `Error: ${error.message}`
+    })
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 </script>
@@ -49,7 +49,12 @@ async function signIn() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Button class="w-full" variant="outline" :disabled="loading" @click="signIn">
+        <Button
+          class="w-full"
+          variant="outline"
+          :disabled="loading"
+          @click="signIn"
+        >
           <Icon name="simple-icons:discord" class="mr-2 h-4 w-4" />
           Login
         </Button>

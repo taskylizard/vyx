@@ -1,15 +1,15 @@
 export default defineEventHandler(async (event) => {
-  const bot = event.context.bot;
-  const logger = event.context.logger;
+  const bot = event.context.bot
+  const logger = event.context.logger
   if (!bot || !bot.ready) {
     throw createError({
       statusCode: 503,
-      statusMessage: "Bot not available",
-    });
+      statusMessage: 'Bot not available'
+    })
   }
 
   try {
-    const userCount = await bot.getUsersCount();
+    const userCount = await bot.getUsersCount()
 
     return {
       totalUsers: userCount,
@@ -17,13 +17,13 @@ export default defineEventHandler(async (event) => {
       uptime: bot.uptime,
       memoryUsage: process.memoryUsage(),
       nodeVersion: process.version,
-      botVersion: bot.user?.discriminator || "N/A",
-    };
+      botVersion: bot.user?.discriminator || 'N/A'
+    }
   } catch (error) {
-    logger.error("Error fetching bot stats:", error);
+    logger.error('Error fetching bot stats:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: "Failed to fetch bot statistics",
-    });
+      statusMessage: 'Failed to fetch bot statistics'
+    })
   }
-});
+})

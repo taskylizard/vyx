@@ -1,4 +1,4 @@
-import { Embed, defineSlashCommand } from '#framework'
+import { defineSlashCommand, Embed } from '#framework'
 
 export default defineSlashCommand({
   name: 'slut',
@@ -9,9 +9,10 @@ export default defineSlashCommand({
     const embed = new Embed()
       .setTitle('You worked as a slut!')
       .setDescription(
-        `You worked as a slut for 2 hours! You earned ${money} ${await ctx.client.modules.economy.getCurrency(
-          ctx.interaction.guildID!
-        )}`
+        `You worked as a slut for 2 hours! You earned ${money} ${await ctx
+          .client.modules.economy.getCurrency(
+            ctx.interaction.guildID!
+          )}`
       )
     await ctx.client.modules.economy.add(
       ctx.interaction.guildID!,

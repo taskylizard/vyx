@@ -1,15 +1,17 @@
-import { Embed, defineSlashCommand } from '#framework'
+import { defineSlashCommand, Embed } from '#framework'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
 
 export default defineSlashCommand({
   name: 'rob',
   description: 'Rob someone of their money.',
-  options: {
-    user: {
+  options: [
+    {
+      name: 'user',
       description: 'The person you wanna rob.',
       required: true,
-      type: 'user'
+      type: ApplicationCommandOptionTypes.USER
     }
-  },
+  ],
   async run(ctx) {
     const user = ctx.options.getUser('user', true)
 
@@ -69,7 +71,7 @@ export default defineSlashCommand({
     )
     await ctx.client.modules.economy.subtract(
       ctx.interaction.guildID!,
-      ctx.interaction.user,
+      user,
       earned
     )
 

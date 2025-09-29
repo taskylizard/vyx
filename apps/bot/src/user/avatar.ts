@@ -1,9 +1,9 @@
+import { defineUserCommand, Embed } from '#framework'
 import {
   ApplicationIntegrationTypes,
   InteractionContextTypes,
   type User
 } from 'oceanic.js'
-import { Embed, defineUserCommand } from '#framework'
 
 export default defineUserCommand({
   name: 'View User Avatar',
@@ -17,7 +17,7 @@ export default defineUserCommand({
     InteractionContextTypes.PRIVATE_CHANNEL
   ],
   async run(interaction) {
-    const user = <User>interaction.data.target
+    const user = <User> interaction.data.target
     const embed = new Embed().setImage(user.avatarURL())
 
     await interaction.reply({ embeds: [embed] })

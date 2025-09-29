@@ -1,5 +1,5 @@
-import parse from 'parse-duration'
 import { defineInteraction } from '#framework'
+import parse from 'parse-duration'
 
 export default defineInteraction({
   id: 'action.snooze.resolve',
@@ -34,9 +34,11 @@ export default defineInteraction({
     )
 
     return await interaction.editOriginal({
-      content: `Alright ${interaction.user.mention}, I'll re-remind you in <t:${Math.trunc(
-        time.getTime() / 1000
-      )}:R> to \`${reminder.content}\`.`
+      content: `Alright ${interaction.user.mention}, I'll re-remind you in <t:${
+        Math.trunc(
+          time.getTime() / 1000
+        )
+      }:R> to \`${reminder.content}\`.`
     })
   }
 })

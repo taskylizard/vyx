@@ -13,7 +13,8 @@ import type {
   Uncached,
   User
 } from 'oceanic.js'
-import { type Client, Colors, type SlashCommand } from '..'
+import { type Client, colors, type SlashCommand } from '..'
+import * as common from '../utils/discord'
 
 type Filter = (interaction: ComponentInteraction) => boolean
 interface CollectButtonOptions {
@@ -25,12 +26,14 @@ interface CollectButtonOptions {
 export class Context {
   private data: Map<string, unknown> = new Map<string, unknown>()
   public acknowledged: boolean
-  public colors: typeof Colors = Colors
+  public colors: typeof colors = colors
 
   private deferTimeout: NodeJS.Timeout | null
-  private deferPromise: Promise<
-    InteractionCallbackResponse<AnyInteractionChannel | Uncached>
-  > | null
+  private deferPromise:
+    | Promise<
+      InteractionCallbackResponse<AnyInteractionChannel | Uncached>
+    >
+    | null
 
   public constructor(
     public readonly client: Client,
@@ -47,6 +50,11 @@ export class Context {
       },
       Math.max(0, 2000 - (Date.now() - interaction.createdAt.getTime()))
     ).unref()
+  }
+
+  /** Common utility functions */
+  public get common(): typeof common {
+    return common
   }
 
   /** An user who invoked the command */
@@ -76,11 +84,12 @@ export class Context {
     return this.interaction.data.options
   }
 
-  private removeTimeout() {
+  public dispose() {
     if (this.deferTimeout !== null) {
       clearTimeout(this.deferTimeout)
       this.deferTimeout = null
     }
+    this.data.clear()
   }
 
   /**
@@ -110,8 +119,8 @@ export class Context {
     const response: InteractionContent = Array.isArray(content)
       ? { embeds: content, ...(ephemeral ? { flags: 64 } : undefined) }
       : typeof content === 'string'
-        ? { content, ...(ephemeral ? { flags: 64 } : undefined) }
-        : content
+      ? { content, ...(ephemeral ? { flags: 64 } : undefined) }
+      : content
 
     if (!this.acknowledged) {
       if (this.deferPromise !== null) {
@@ -119,7 +128,7 @@ export class Context {
 
         await this.interaction.editOriginal(response)
       } else {
-        this.removeTimeout()
+        this.dispose()
         await this.interaction.reply(response)
         this.acknowledged = true
       }
@@ -131,6 +140,8 @@ export class Context {
    * @param flags Message flags. Use 64 if you want an ephemeral response.
    */
   public async defer(flags?: number): Promise<void> {
+    if (this.acknowledged) return
+    this.dispose()
     await this.interaction.defer(flags)
     this.acknowledged = true
   }
@@ -170,7 +181,6 @@ export class Context {
   }
 
   /**
-   *
    * @param key
    * @returns
    */
@@ -191,8 +201,9 @@ export class Context {
           interaction.type !== 3 ||
           interaction.message.id !== messageID ||
           !filter(interaction)
-        )
+        ) {
           return
+        }
 
         const timer = setTimeout(() => {
           this.client.off('interactionCreate', listener)

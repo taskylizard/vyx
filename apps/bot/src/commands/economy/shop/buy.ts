@@ -1,15 +1,17 @@
 import { defineSlashCommand } from '#framework'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
 
 export default defineSlashCommand({
   name: 'buy',
   description: 'Buy a shop item.',
-  options: {
-    item: {
+  options: [
+    {
+      name: 'item',
       description: 'Name of the item.',
-      type: 'string',
+      type: ApplicationCommandOptionTypes.STRING,
       required: true
     }
-  },
+  ],
   async run(ctx) {
     const item = ctx.options.getString('item', true)
     const itemObj = await ctx.client.modules.shop.get(
@@ -32,11 +34,10 @@ export default defineSlashCommand({
     }
 
     await ctx.reply(
-      `Successfully bought ${itemObj.name} for ${
-        itemObj.price
-      } ${await ctx.client.modules.economy.getCurrency(
-        ctx.interaction.guildID!
-      )}`
+      `Successfully bought ${itemObj.name} for ${itemObj.price} ${await ctx
+        .client.modules.economy.getCurrency(
+          ctx.interaction.guildID!
+        )}`
     )
 
     if (itemObj.role) {

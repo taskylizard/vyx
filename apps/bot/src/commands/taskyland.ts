@@ -1,5 +1,5 @@
-import { ApplicationCommandOptionTypes, type TextChannel } from 'oceanic.js'
 import { defineSlashCommand } from '#framework'
+import { ApplicationCommandOptionTypes, type TextChannel } from 'oceanic.js'
 
 const VERIFIED_ROLE = '785802803565559818'
 const VERIFIER_ROLE = '1296555754395795506'
@@ -8,13 +8,14 @@ export default defineSlashCommand([
   {
     name: 'verify',
     description: 'Verify a member into the server.',
-    options: {
-      member: {
+    options: [
+      {
+        name: 'member',
         description: 'The member to verify.',
         type: ApplicationCommandOptionTypes.USER,
         required: true
       }
-    },
+    ],
     check(ctx) {
       if (ctx.member!.roles.includes(VERIFIER_ROLE)) {
         return true

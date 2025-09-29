@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
     "./prisma/*": "./src/generated/*",
@@ -10,27 +13,25 @@
   },
   "scripts": {
     "build": "tsdown",
-    "with-env": "dotenv -e ../../.env --",
-    "db:migrate:deploy": "pnpm with-env prisma migrate deploy",
-    "db:migrate:dev": "pnpm with-env prisma migrate dev",
-    "db:push": "pnpm with-env prisma db push",
+    "prisma": "prisma",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:push": "prisma db push",
     "db:format": "prisma format",
-    "db:generate": "prisma generate",
-    "db:studio": "pnpm with-env prisma studio"
+    "db:generate": "prisma generate && bun run build",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@packages/typescript-config": "workspace:*",
+    "@prisma/adapter-pg": "catalog:prod",
     "@prisma/client": "catalog:prod",
-    "drizzle-orm": "catalog:backend",
-    "@packages/typescript-config": "workspace:*"
+    "drizzle-orm": "^0.44.5"
   },
   "devDependencies": {
     "tsdown": "catalog:build",
-    "drizzle-prisma-generator": "catalog:backend",
+    "@types/bun": "catalog:types",
+    "drizzle-prisma-generator": "^0.1.7",
     "prisma": "catalog:dev",
-    "tsx": "catalog:script",
     "typescript": "catalog:dev"
-  },
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+  }
 }

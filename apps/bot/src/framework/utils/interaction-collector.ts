@@ -26,8 +26,7 @@ export declare interface InteractionCollectorInterface {
   emit(event: 'collect', interaction: ComponentInteraction): boolean
 }
 
-export class InteractionCollector
-  extends EventEmitter
+export class InteractionCollector extends EventEmitter
   implements InteractionCollectorInterface
 {
   public readonly client: Client
@@ -56,8 +55,9 @@ export class InteractionCollector
       interaction.type !== 3 ||
       interaction.message.id !== this.message.id ||
       !this.filter(interaction)
-    )
+    ) {
       return
+    }
 
     this.emit('collect', interaction)
   }

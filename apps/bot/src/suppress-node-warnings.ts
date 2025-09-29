@@ -4,7 +4,7 @@ const originalEmitWarning = process.emitWarning
 process.emitWarning = (warning, type, code: string, ...args) => {
   // List of warning codes to suppress
   const suppressedWarnings = [
-    'DEP0040' /* punycode warning */,
+    'DEP0040', /* punycode warning */
     'ExperimentalWarning'
   ]
 

@@ -1,4 +1,4 @@
-import { Embed, defineInteraction } from '#framework'
+import { defineInteraction, Embed } from '#framework'
 
 export default defineInteraction({
   id: 'action.report.resolve',
@@ -96,10 +96,9 @@ export default defineInteraction({
       })
 
     try {
-      const dm =
-        client.privateChannels.find(
-          (channel) => channel.recipient.id === String(report.createdMember)
-        ) ?? (await client.rest.users.createDM(String(report.createdMember)))
+      const dm = client.privateChannels.find(
+        (channel) => channel.recipient.id === String(report.createdMember)
+      ) ?? (await client.rest.users.createDM(String(report.createdMember)))
 
       return await dm.createMessage({ embeds: [embed] })
     } catch (error) {

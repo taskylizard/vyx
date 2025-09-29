@@ -16,11 +16,13 @@ import AvatarUserCommand from '../../user/avatar'
 import ReportUserCommand from '../../user/report'
 import {
   type Client,
-  type CommandOptions,
+  type ComponentInteractionHandler,
   createGuard,
-  type InteractionUnion,
+  error,
+  modules,
+  ok,
+  type Result,
   type SlashCommand,
-  type SubCommandOptions,
   type UserCommand
 } from '../index'
 import { logger } from '../utils/logger'
@@ -30,30 +32,36 @@ const userCommands = {
   report: ReportUserCommand
 } as const
 
+import { capitalize } from '@antfu/utils'
+import type { Module } from '@packages/database'
 import { slashCommands } from '../../commands'
 import ReminderResolveInteraction from '../../interactions/reminder/resolve'
 import ReminderSubmitInteraction from '../../interactions/reminder/submit'
 import ReportCreateInteraction from '../../interactions/report/create'
 import ReportResolveInteraction from '../../interactions/report/resolve'
+import SupportResolveInteraction from '../../interactions/support/resolved'
 
 const interactions = {
   'reminder.resolve': ReminderResolveInteraction,
   'reminder.submit': ReminderSubmitInteraction,
   'report.create': ReportCreateInteraction,
-  'report.resolve': ReportResolveInteraction
+  'report.resolve': ReportResolveInteraction,
+  'support.resolved': SupportResolveInteraction
 } as const
 
 export class InteractionsManager {
   public handlers: {
     commands: Collection<string, SlashCommand>
     userCommands: Collection<string, UserCommand>
-    components: Collection<string, InteractionUnion>
+    components: Collection<string, ComponentInteractionHandler>
   }
   public readonly client: Client
   public cooldowns: Map<string, Map<string, number>>
 
   private interactionsLogger = logger.withTag('InteractionsManager')
-  private testingGuild = '962733982296997978'
+  private get testingGuild(): string {
+    return this.client.env.TESTING_GUILD_ID || '962733982296997978'
+  }
 
   public constructor(client: Client) {
     this.client = client
@@ -69,12 +77,15 @@ export class InteractionsManager {
   public load(): void {
     this.interactionsLogger.debug('Started loading interactions...')
 
-    for (const command of Object.keys(slashCommands))
+    for (const command of Object.keys(slashCommands)) {
       this.loadSlashCommand(command as keyof typeof slashCommands)
-    for (const command of Object.keys(userCommands))
+    }
+    for (const command of Object.keys(userCommands)) {
       this.loadUserCommand(command as keyof typeof userCommands)
-    for (const interaction of Object.keys(interactions))
+    }
+    for (const interaction of Object.keys(interactions)) {
       this.loadComponentInteraction(interaction as keyof typeof interactions)
+    }
 
     this.interactionsLogger.info(
       `Loaded: ${this.handlers.commands.size} slash commands • ${this.handlers.userCommands.size} user commands • ${this.handlers.components.size} components`
@@ -145,7 +156,7 @@ export class InteractionsManager {
       }
     } catch (error) {
       this.interactionsLogger.error(
-        `Failed to load slash-command ${command}.`,
+        `Failed to load slash-command ${command.toString()}.`,
         error
       )
       throw error
@@ -159,16 +170,18 @@ export class InteractionsManager {
    */
   public loadComponentInteraction(
     command: keyof typeof interactions
-  ): InteractionUnion {
-    let component: InteractionUnion
+  ): ComponentInteractionHandler {
+    let component: ComponentInteractionHandler
 
     try {
-      component = interactions[command]
+      component = interactions[command] as ComponentInteractionHandler
       if (this.handlers.components.has(component.id)) {
         this.interactionsLogger.warn(
           `Attempted to load already existing component interaction ${component.id}`
         )
-        throw new Error(`Component interaction ${component.id} already exists.`)
+        throw new Error(
+          `Component interaction ${component.id} already exists.`
+        )
       }
 
       this.handlers.components.set(component.id, component)
@@ -185,51 +198,26 @@ export class InteractionsManager {
     }
   }
 
-  public async syncModules() {
-    const guilds = [...this.client.guilds.values()]
-
-    for (const guild of guilds) {
-      const config = await this.client.prisma.config.findUnique({
-        where: { guildId: BigInt(guild.id) },
-        select: { modules: true }
-      })
-
-      if (!config || config.modules.length === 0) return
-
-      for await (const mod of config.modules) {
-        const command = [...this.handlers.commands.values()].find(
-          (command) => command.moduleId === mod
-        )
-
-        if (!command) return
-        await this.client.application.createGuildCommand(
-          guild.id,
-          this.toSlashJson(command) as CreateGuildApplicationCommandOptions
-        )
-      }
-    }
-
-    this.interactionsLogger.info('Synced server modules configuration.')
-  }
-
   /**
-   * Updates all application commands.
+   * Updates all application commands with Result type error handling.
    * @param forceRegister Whether to force register commands, bypassing the cache check
    */
-  public async updateCommands(forceRegister = false): Promise<void> {
-    const slashCommands: CreateApplicationCommandOptions[] = []
-    const guildSlashCommands = new Collection<
-      string,
-      CreateApplicationCommandOptions[]
-    >()
-    const userCommandList = [...this.handlers.userCommands.values()].map(
-      (command) => this.toUserJson(command)
-    )
-
+  public async updateCommands(forceRegister = false): Promise<Result<string>> {
     try {
+      const slashCommands: CreateApplicationCommandOptions[] = []
+      const guildSlashCommands = new Collection<
+        string,
+        CreateApplicationCommandOptions[]
+      >()
+      const userCommandList = [...this.handlers.userCommands.values()].map(
+        (command) => this.toUserJson(command)
+      )
+
       if (this.client.env.NODE_ENV !== 'production') {
         this.interactionsLogger.info(
-          `Running in ${colorize('red', 'development')} mode, syncing to guild...`
+          `Running in ${
+            colorize('red', 'development')
+          } mode, syncing to guild...`
         )
 
         const commandData = this.handlers.commands
@@ -244,16 +232,18 @@ export class InteractionsManager {
           ] as CreateGuildApplicationCommandOptions[])
           .catch(this.interactionsLogger.error)
       } else {
-        // Production
+        // Production logic...
         this.interactionsLogger.info(
           `Running in ${colorize('greenBright', 'production')} mode.`
         )
 
         // Map over them for Global and Guild commands.
-        for (const command of this.handlers.commands
-          .filter((command) => !command.moduleId)
-          .filter((command) => !command.disabled)
-          .values()) {
+        for (
+          const command of this.handlers.commands
+            .filter((command) => !command.moduleId)
+            .filter((command) => !command.disabled)
+            .values()
+        ) {
           if (!command.guilds || command.guilds.length === 0) {
             // Global commands
             slashCommands.push(this.toSlashJson(command))
@@ -271,7 +261,7 @@ export class InteractionsManager {
           }
         }
 
-        // Register all commands, since we're either forcing it or not using the cache
+        // Register all commands
         this.interactionsLogger.info(
           forceRegister
             ? 'Force registration enabled, registering all commands.'
@@ -286,8 +276,7 @@ export class InteractionsManager {
 
         // Bulk setting Guild commands.
         for (const [id, guildCommandData] of guildSlashCommands.entries()) {
-          const guild =
-            this.client.guilds.get(id) ??
+          const guild = this.client.guilds.get(id) ??
             (await this.client.rest.guilds.get(id))
 
           if (guild) {
@@ -304,18 +293,30 @@ export class InteractionsManager {
           }
         }
       }
-    } catch (error) {
+
+      this.interactionsLogger.info(
+        `Updated all ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands.`
+      )
+
+      const syncResult = await this.syncModules()
+      if (!syncResult.ok) {
+        return error(
+          `Command update succeeded but module sync failed: ${syncResult.error}`
+        )
+      }
+
+      return ok(
+        `Successfully updated ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands`
+      )
+    } catch (err) {
       this.interactionsLogger.error(
         'Failed to update application commands:',
-        error
+        err
+      )
+      return error(
+        `Failed to update application commands: ${(err as Error).message}`
       )
     }
-
-    this.interactionsLogger.info(
-      `Updated all ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands.`
-    )
-
-    return await this.syncModules()
   }
 
   /**
@@ -375,7 +376,8 @@ export class InteractionsManager {
               name: subsubcommand.name,
               description: subsubcommand.description,
               type: ApplicationCommandOptionTypes.SUB_COMMAND,
-              options: this.normalizeSubcommandOptions(subsubcommand.options)
+              options: subsubcommand
+                .options as ApplicationCommandOptionsWithValue[]
             })
           }
           options.push({
@@ -389,12 +391,12 @@ export class InteractionsManager {
             name: subcommand.name,
             description: subcommand.description,
             type: ApplicationCommandOptionTypes.SUB_COMMAND,
-            options: this.normalizeSubcommandOptions(subcommand.options)
+            options: subcommand.options as ApplicationCommandOptionsWithValue[]
           })
         }
       }
     } else if (command.options) {
-      options = this.normalizeCommandOptions(command.options)
+      options = command.options
     }
 
     return {
@@ -407,68 +409,6 @@ export class InteractionsManager {
       contexts: command.contexts,
       defaultMemberPermissions: command.defaultMemberPermissions
     }
-  }
-
-  /**
-   * Normalize command options by converting string types to their numeric equivalents
-   */
-  private normalizeCommandOptions(
-    options?: CommandOptions
-  ): ApplicationCommandOptions[] {
-    if (!options) return []
-
-    return Object.entries(options).map(([optionName, optionData]) => {
-      // Create a new object that always has a name property from the object key
-      const opt: Record<string, any> = { ...optionData, name: optionName }
-
-      if (typeof opt.type === 'string') {
-        const typeMap: Record<string, ApplicationCommandOptionTypes> = {
-          string: ApplicationCommandOptionTypes.STRING,
-          integer: ApplicationCommandOptionTypes.INTEGER,
-          boolean: ApplicationCommandOptionTypes.BOOLEAN,
-          user: ApplicationCommandOptionTypes.USER,
-          channel: ApplicationCommandOptionTypes.CHANNEL,
-          role: ApplicationCommandOptionTypes.ROLE,
-          mentionable: ApplicationCommandOptionTypes.MENTIONABLE,
-          number: ApplicationCommandOptionTypes.NUMBER,
-          attachment: ApplicationCommandOptionTypes.ATTACHMENT,
-          sub_command: ApplicationCommandOptionTypes.SUB_COMMAND,
-          sub_command_group: ApplicationCommandOptionTypes.SUB_COMMAND_GROUP
-        }
-        opt.type = typeMap[opt.type] ?? ApplicationCommandOptionTypes.STRING
-      }
-      return opt as ApplicationCommandOptions
-    })
-  }
-
-  /**
-   * Normalize subcommand options by converting string types to their numeric equivalents
-   */
-  private normalizeSubcommandOptions(
-    options?: SubCommandOptions
-  ): ApplicationCommandOptionsWithValue[] {
-    if (!options) return []
-
-    return Object.entries(options).map(([optionName, optionData]) => {
-      // Create a new object that always has a name property from the object key
-      const opt: Record<string, any> = { ...optionData, name: optionName }
-
-      if (typeof opt.type === 'string') {
-        const typeMap: Record<string, ApplicationCommandOptionTypes> = {
-          string: ApplicationCommandOptionTypes.STRING,
-          integer: ApplicationCommandOptionTypes.INTEGER,
-          boolean: ApplicationCommandOptionTypes.BOOLEAN,
-          user: ApplicationCommandOptionTypes.USER,
-          channel: ApplicationCommandOptionTypes.CHANNEL,
-          role: ApplicationCommandOptionTypes.ROLE,
-          mentionable: ApplicationCommandOptionTypes.MENTIONABLE,
-          number: ApplicationCommandOptionTypes.NUMBER,
-          attachment: ApplicationCommandOptionTypes.ATTACHMENT
-        }
-        opt.type = typeMap[opt.type] ?? ApplicationCommandOptionTypes.STRING
-      }
-      return opt as ApplicationCommandOptionsWithValue
-    })
   }
 
   private toUserJson(
@@ -484,5 +424,159 @@ export class InteractionsManager {
       contexts: command.contexts,
       nameLocalizations: command.nameLocalizations
     }
+  }
+
+  private async ensureConfig(guildId: string) {
+    let config = await this.client.prisma.config.findUnique({
+      where: { guildId: BigInt(guildId) }
+    })
+    if (!config) {
+      config = await this.client.prisma.config.create({
+        data: { guildId: BigInt(guildId), modules: [] }
+      })
+    }
+    return config
+  }
+
+  public async toggleModule(
+    guildId: string,
+    module: string,
+    action: 'enable' | 'disable'
+  ): Promise<Result<string>> {
+    const mod = module as Module
+    const command = [...this.handlers.commands.values()].find(c =>
+      c.moduleId === mod
+    )
+    if (!command) return error(`No commands for ${mod}.`)
+
+    const config = await this.ensureConfig(guildId)
+    const enabled = config.modules.includes(mod)
+
+    if (action === 'enable') {
+      if (enabled) return ok('Already enabled!')
+      await this.client.prisma.config.update({
+        where: { guildId: BigInt(guildId) },
+        data: { modules: { push: mod } }
+      })
+      await this.client.application.createGuildCommand(
+        guildId,
+        this.toSlashJson(command) as CreateGuildApplicationCommandOptions
+      )
+    } else {
+      if (!enabled) return ok('Already disabled.')
+      await this.client.prisma.config.update({
+        where: { guildId: BigInt(guildId) },
+        data: {
+          modules: { set: config.modules.filter((m: Module) => m !== mod) }
+        }
+      })
+      const guildCommands = await this.client.application.getGuildCommands(
+        guildId
+      )
+      const found = guildCommands.find(cmd => cmd.name === command.name)
+      if (found) {
+        await this.client.application.deleteGuildCommand(guildId, found.id)
+      }
+    }
+
+    const name = modules.find(m => m.value === mod)?.name ?? mod
+    return ok(`${capitalize(action)}d ${name}`)
+  }
+
+  public async listModules(guildId: string): Promise<Result<string>> {
+    const config = await this.ensureConfig(guildId)
+
+    if (config.modules.length === 0) {
+      return ok('No modules enabled.')
+    }
+
+    const names = config.modules
+      .map((m: Module) => modules.find(_m => _m.value === m)?.name ?? m)
+      .join(', ')
+
+    return ok(`Enabled modules: ${names}`)
+  }
+
+  public async syncModules(): Promise<Result<string>> {
+    const guilds = [...this.client.guilds.values()]
+
+    // Process guilds in parallel for better performance
+    const syncPromises = guilds.map(async (guild) => {
+      try {
+        const config = await this.client.prisma.config.findUnique({
+          where: { guildId: BigInt(guild.id) },
+          select: { modules: true }
+        })
+
+        // skip if no config
+        if (!config) return { guildId: guild.id, success: true, error: null }
+
+        // find all commands that belong to enabled modules
+        const wanted = [...this.handlers.commands.values()].filter(
+          c => c.moduleId && config.modules.includes(c.moduleId)
+        )
+
+        // always include non-modular commands
+        const baseline = [...this.handlers.commands.values()].filter(
+          c => !c.moduleId && !c.disabled
+        )
+
+        const target = [...baseline, ...wanted].map(c =>
+          this.toSlashJson(c) as CreateGuildApplicationCommandOptions
+        )
+
+        // also include user commands
+        const userCmds = [...this.handlers.userCommands.values()].map(c =>
+          this.toUserJson(c)
+        )
+
+        // bulk replace in one go
+        await this.client.application.bulkEditGuildCommands(guild.id, [
+          ...target,
+          ...userCmds
+        ])
+
+        return { guildId: guild.id, success: true, error: null }
+      } catch (err) {
+        const errorMsg = `Failed to sync guild ${guild.id}: ${
+          (err as Error).message
+        }`
+        this.interactionsLogger.error(errorMsg, err)
+        return { guildId: guild.id, success: false, error: errorMsg }
+      }
+    })
+
+    // Wait for all guild syncs to complete
+    const results = await Promise.allSettled(syncPromises)
+    const errors: string[] = []
+    let successCount = 0
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        if (result.value.success) {
+          successCount++
+        } else if (result.value.error) {
+          errors.push(result.value.error)
+        }
+      } else {
+        errors.push(`Unexpected error: ${result.reason}`)
+      }
+    }
+
+    if (errors.length > 0) {
+      this.interactionsLogger.warn(
+        `Module sync completed with ${errors.length} errors out of ${guilds.length} guilds`
+      )
+      return error(
+        `Module sync completed with ${errors.length} errors: ${
+          errors.slice(0, 3).join(', ')
+        }${errors.length > 3 ? '...' : ''}`
+      )
+    }
+
+    this.interactionsLogger.info(
+      `Successfully synced modules for ${successCount} guilds`
+    )
+    return ok(`Successfully synced modules for ${successCount} guilds`)
   }
 }

@@ -2,7 +2,7 @@ import { definePlugin } from '#framework'
 
 const SUBMIT_CHANNEL_ID = '1143161987291947178'
 const LINK_RE =
-  /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi
+  /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi
 
 export default definePlugin({
   name: 'wotaku',

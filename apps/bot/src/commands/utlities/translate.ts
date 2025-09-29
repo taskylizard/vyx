@@ -1,26 +1,29 @@
+import { defineSlashCommand, Embed } from '#framework'
 import { translate } from '@vitalets/google-translate-api'
 import {
+  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js'
-import { Embed, defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'translate',
   description: 'Translate text using Google Translate API.',
-  options: {
-    language: {
+  options: [
+    {
+      name: 'language',
       description:
         'The language code to translate to. https://cloud.google.com/translate/docs/languages',
-      type: 'string',
+      type: ApplicationCommandOptionTypes.STRING,
       required: true
     },
-    text: {
+    {
+      name: 'text',
       description: 'The text to translate.',
-      type: 'string',
+      type: ApplicationCommandOptionTypes.STRING,
       required: true
     }
-  },
+  ],
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,

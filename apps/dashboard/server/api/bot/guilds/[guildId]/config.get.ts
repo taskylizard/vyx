@@ -1,32 +1,32 @@
 export default defineEventHandler(async (event) => {
-  const session = await requireAuthenticatedUser(event);
-  const userAdminGuilds = await fetchUserAdminGuilds(session, event);
-  const logger = event.context.logger;
-  const guildId = getRouterParam(event, "guildId");
+  const session = await requireAuthenticatedUser(event)
+  const userAdminGuilds = await fetchUserAdminGuilds(session, event)
+  const logger = event.context.logger
+  const guildId = getRouterParam(event, 'guildId')
 
   if (!guildId) {
     throw createError({
       statusCode: 400,
-      statusMessage: "Guild ID is required",
-    });
+      statusMessage: 'Guild ID is required'
+    })
   }
 
   // Validate user has admin permissions for this guild
-  validateGuildAccess(guildId, userAdminGuilds);
+  validateGuildAccess(guildId, userAdminGuilds)
 
   try {
     // Get bot instance and database connection
-    const bot = event.context.bot;
+    const bot = event.context.bot
     if (!bot) {
       throw createError({
         statusCode: 503,
-        statusMessage: "Bot is not available",
-      });
+        statusMessage: 'Bot is not available'
+      })
     }
 
     const config = await bot.prisma.config.findUnique({
-      where: { guildId: BigInt(guildId) },
-    });
+      where: { guildId: BigInt(guildId) }
+    })
 
     return {
       data: config
@@ -34,15 +34,20 @@ export default defineEventHandler(async (event) => {
           guildId: config.guildId.toString(),
           modules: config.modules,
           reportsChannel: config.reportsChannel?.toString() || null,
-          currency: config.currency || "🍣",
+          currency: config.currency || '🍣',
+          logsEnabled: config.logsEnabled,
+          logsChannel: config.logsChannel?.toString() || null,
+          logModerationActions: config.logModerationActions || false,
+          logMessageEdits: config.logMessageEdits || false,
+          logMessageDeletes: config.logMessageDeletes || false
         }
-        : null,
-    };
+        : null
+    }
   } catch (error) {
-    logger.error("Error fetching guild config:", error);
+    logger.error('Error fetching guild config:', error)
     throw createError({
       statusCode: 500,
-      statusMessage: "Failed to fetch guild configuration",
-    });
+      statusMessage: 'Failed to fetch guild configuration'
+    })
   }
-});
+})

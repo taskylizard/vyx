@@ -1,0 +1,48 @@
+{
+  "name": "@packages/components-jsx",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./jsx-runtime": {
+      "import": "./dist/jsx-runtime.mjs",
+      "types": "./dist/jsx-runtime.d.ts"
+    },
+    "./jsx-dev-runtime": {
+      "import": "./dist/jsx-runtime.mjs",
+      "types": "./dist/jsx-runtime.d.ts"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "jsx-runtime": [
+        "./dist/jsx-runtime.d.ts"
+      ],
+      "jsx-dev-runtime": [
+        "./dist/jsx-runtime.d.ts"
+      ]
+    }
+  },
+  "private": true,
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:build",
+    "@types/bun": "latest",
+    "@packages/typescript-config": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "oceanic.js": "catalog:prod"
+  }
+}

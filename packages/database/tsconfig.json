@@ -1,7 +1,16 @@
 {
-  "extends": "@packages/typescript-config/base.json",
+  "compilerOptions": {
+    "strict": true,
+    "esModuleInterop": true,
+    "typeRoots": [
+      "./node_modules/@types"
+    ],
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
   "include": [
-    "**/*.ts"
+    "**/*.ts",
+    "src/generated"
   ],
   "exclude": [
     "node_modules"

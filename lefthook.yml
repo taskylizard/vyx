@@ -1,9 +1,7 @@
 pre-commit:
   parallel: true
-  commands:
-    check:
-      glob: '*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}'
-      run: nrr x biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files} && git update-index --again
-    typos:
-      glob: '*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}'
-      run: typos -w && git update-index --again
+  jobs:
+    - run: nrr format {staged_files}
+      glob: '*.{js,ts,jsx,tsx,json,md,mdx,css,html,vue,yaml,toml,astro}'
+      exclude: 'bun.lock'
+      stage_fixed: true

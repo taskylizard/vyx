@@ -1,19 +1,21 @@
+import { defineSlashCommand, Embed } from '#framework'
 import {
+  ApplicationCommandOptionTypes,
   ApplicationIntegrationTypes,
   InteractionContextTypes
 } from 'oceanic.js'
-import { Embed, defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'npm',
   description: 'Searches by provided package name in NPM registry.',
-  options: {
-    package: {
-      type: 'string',
+  options: [
+    {
+      name: 'package',
+      type: ApplicationCommandOptionTypes.STRING,
       description: 'Package name.',
       required: true
     }
-  },
+  ],
   contexts: [
     InteractionContextTypes.BOT_DM,
     InteractionContextTypes.GUILD,

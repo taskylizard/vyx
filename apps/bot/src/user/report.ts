@@ -1,9 +1,9 @@
+import { defineUserCommand } from '#framework'
 import {
   ComponentTypes,
   InteractionContextTypes,
   TextInputStyles
 } from 'oceanic.js'
-import { defineUserCommand } from '#framework'
 
 export default defineUserCommand({
   name: 'Report this member',

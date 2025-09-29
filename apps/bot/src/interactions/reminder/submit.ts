@@ -1,5 +1,5 @@
-import { ComponentTypes, TextInputStyles } from 'oceanic.js'
 import { defineInteraction } from '#framework'
+import { ComponentTypes, TextInputStyles } from 'oceanic.js'
 
 export default defineInteraction({
   id: 'action.snooze.submit',

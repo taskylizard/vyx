@@ -1,19 +1,21 @@
-import { ApplicationCommandOptionTypes } from 'oceanic.js'
 import { defineSlashCommand } from '#framework'
+import { ApplicationCommandOptionTypes } from 'oceanic.js'
 
 export default defineSlashCommand({
   moduleId: 'REPORT',
   guildOnly: true,
   requiredPermissions: ['VIEW_AUDIT_LOG', 'MANAGE_GUILD'],
-  name: 'reports',
+  name: 'reporting',
   description: 'Set or remove the server reports channel.',
-  options: {
-    channel: {
+  options: [
+    {
+      name: 'channel',
       description:
         "The report channel, don't pass anything to disable reporting.",
-      type: ApplicationCommandOptionTypes.CHANNEL
+      type: ApplicationCommandOptionTypes.CHANNEL,
+      required: false
     }
-  },
+  ],
   async run(ctx) {
     const reportsChannel = ctx.options.getChannel('channel')
       ? BigInt(ctx.options.getChannel('channel', true).id)

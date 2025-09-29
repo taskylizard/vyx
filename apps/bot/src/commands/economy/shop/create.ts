@@ -1,35 +1,39 @@
+import { defineSlashCommand, Embed, type ShopItemConstructor } from '#framework'
 import { ApplicationCommandOptionTypes } from 'oceanic.js'
-import { Embed, type ShopItemConstructor, defineSlashCommand } from '#framework'
 
 export default defineSlashCommand({
   name: 'create',
   description: 'Create a new shop item.',
-  options: {
-    name: {
+  options: [
+    {
+      name: 'name',
       description: 'Name of the item.',
       required: true,
       type: ApplicationCommandOptionTypes.STRING,
       minLength: 5,
       maxLength: 20
     },
-    description: {
+    {
+      name: 'description',
       description: 'Description of the item.',
       required: true,
       type: ApplicationCommandOptionTypes.STRING,
       maxLength: 50,
       minLength: 5
     },
-    price: {
+    {
+      name: 'price',
       description: 'Price of the item.',
       required: true,
       type: ApplicationCommandOptionTypes.INTEGER,
       minValue: 1
     },
-    role: {
+    {
+      name: 'role',
       description: 'A role reward on purchase.',
       type: ApplicationCommandOptionTypes.ROLE
     }
-  },
+  ],
   async run(ctx) {
     const name = ctx.options.getString('name', true)
     const description = ctx.options.getString('description', true)
