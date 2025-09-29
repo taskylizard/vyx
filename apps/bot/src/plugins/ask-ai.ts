@@ -18,17 +18,17 @@ export default definePlugin({
       }
 
       // Reply answers
-      if (message.referencedMessage?.id) {
+      if (
+        message.referencedMessage?.id &&
+        message.content.includes(`<@${client.user?.id}>`)
+      ) {
         const referencedMessage = await fetchMessageCached(
           client,
           message.channel,
           message.referencedMessage.id
         ).catch(() => null)
-        if (
-          referencedMessage &&
-          referencedMessage.author.id === client.user?.id
-        ) {
-          await handleReply(client, message)
+        if (referencedMessage) {
+          await handleReply(client, message, referencedMessage)
         }
       }
     })

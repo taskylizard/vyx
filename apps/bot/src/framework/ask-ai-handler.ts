@@ -144,7 +144,11 @@ export async function handleMention(client: Client, message: Message) {
   await reply.edit(editOptions)
 }
 
-export async function handleReply(client: Client, message: Message) {
+export async function handleReply(
+  client: Client,
+  message: Message,
+  referencedMessage?: Message
+) {
   if (!message.channel || !isTextableGuildChannel(message.channel)) return
   const guildId = message.guild?.id
   if (
@@ -158,6 +162,9 @@ export async function handleReply(client: Client, message: Message) {
     allowedMentions: { repliedUser: false }
   })
   let history: Message[] = []
+  if (referencedMessage) {
+    history.unshift(referencedMessage)
+  }
   await followReplyChain(history, client, message)
 
   const userId = message.author.id
