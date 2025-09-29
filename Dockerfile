@@ -28,7 +28,8 @@ RUN bun run --filter="@packages/database" db:generate
 RUN bun --filter="@packages/*" run build
 RUN cd apps/dashboard && bun run nuxt build
 
-ENV RUN_SEED_AND_MIGRATE=false
+ENV RUN_MIGRATE=false
+ENV RUN_SEED=false
 
 EXPOSE 3000/tcp
-CMD infisical run --projectId=647ebfac-cb50-4d2d-9461-f821f4175d5c --recursive --env=prod -- bash -c "if [ \"$RUN_SEED_AND_MIGRATE\" = \"true\" ]; then bun run --filter='@packages/database' db:migrate:deploy && bun run --filter='@packages/inference-engine' seed; fi && bun /app/apps/dashboard/.output/server/index.mjs"
+CMD infisical run --projectId=647ebfac-cb50-4d2d-9461-f821f4175d5c --recursive --env=prod -- bash -c "if [ \"$RUN_MIGRATE\" = \"true\" ]; then bun run --filter='@packages/database' db:migrate:deploy; fi && if [ \"$RUN_SEED\" = \"true\" ]; then bun run --filter='@packages/inference-engine' seed; fi && bun /app/apps/dashboard/.output/server/index.mjs"

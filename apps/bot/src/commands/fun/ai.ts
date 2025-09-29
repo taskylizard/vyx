@@ -1,4 +1,5 @@
 import { defineSlashCommand, Embed } from '#framework'
+import { Prisma, prisma } from '@packages/database'
 import { getMessages, smugshroom } from '@packages/inference-engine'
 
 import { buildPromptContext, requestAskAI } from '#framework'
@@ -130,6 +131,76 @@ export default defineSlashCommand({
         return await ctx.interaction.editFollowup(message.id, {
           content: summary
         })
+      }
+    },
+    {
+      name: 'whitelist',
+      description: 'Manage AI whitelisted channels for this server.',
+      options: [
+        {
+          name: 'channel',
+          type: ApplicationCommandOptionTypes.CHANNEL,
+          description: 'The channel to add or remove from whitelist.',
+          required: true
+        },
+        {
+          name: 'action',
+          type: ApplicationCommandOptionTypes.STRING,
+          description: 'Add or remove the channel.',
+          required: true,
+          choices: [
+            { name: 'Add', value: 'add' },
+            { name: 'Remove', value: 'remove' }
+          ]
+        }
+      ],
+      guildOnly: true,
+      requiredPermissions: ['MANAGE_CHANNELS'],
+      async run(ctx) {
+        if (!ctx.guild) {
+          return ctx.reply('This command can only be used in a server.')
+        }
+        if (!ctx.member?.permissions.has('MANAGE_CHANNELS')) {
+          return ctx.reply(
+            'You need Manage Channels permission to use this command.'
+          )
+        }
+        const channel = ctx.options.getChannel('channel', true)
+        const action = ctx.options.getString('action', true)
+        const guildId = BigInt(ctx.guild.id)
+        const channelId = BigInt(channel.id)
+        const config = await prisma.config.findUnique({ where: { guildId } })
+        let whitelistedChannels = config?.aiWhitelistedChannels || []
+        if (action === 'add') {
+          if (!whitelistedChannels.includes(channelId)) {
+            whitelistedChannels.push(channelId)
+          }
+        } else if (action === 'remove') {
+          whitelistedChannels = whitelistedChannels.filter((id: bigint) =>
+            id !== channelId
+          )
+        }
+        await prisma.config.upsert({
+          where: { guildId },
+          update: {
+            aiWhitelistedChannels: whitelistedChannels
+          } as Prisma.ConfigUncheckedUpdateInput,
+          create: {
+            guildId,
+            aiWhitelistedChannels: whitelistedChannels
+          } as Prisma.ConfigUncheckedCreateInput
+        })
+        const updatedConfig = await prisma.config.findUnique({
+          where: { guildId }
+        })
+        const list = (updatedConfig?.aiWhitelistedChannels as bigint[])?.map((
+          id: bigint
+        ) => `<#${String(id)}>`).join(', ') || 'None'
+        await ctx.reply(
+          `Channel ${channel.name} ${
+            action === 'add' ? 'added to' : 'removed from'
+          }  whitelist.\n\nCurrent whitelisted channels: ${list}`
+        )
       }
     }
   ]

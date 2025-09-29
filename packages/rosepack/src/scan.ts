@@ -12,7 +12,6 @@ export const scanEvents = async (rosepack: Rosepack) => {
 
 export const scanCommands = async (rosepack: Rosepack) => {
   const files = await scanFiles(rosepack, rosepack.options.dirs.commands)
-
   return files.map((f: any) => f.fullPath)
 }
 

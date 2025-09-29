@@ -15,8 +15,8 @@ export const useRuntimeEnv = (): Record<string, string | undefined> => {
   const rosepack = useRosepack()
   const env = Object.entries(process.env).reduce(
     (acc, [key, value]) => {
-      if (/^(HMX_)/.test(key) && value) {
-        const _key = kebabCase(key.replace('HMX_', ''))
+      if (/^(ROSE_)/.test(key) && value) {
+        const _key = kebabCase(key.replace('ROSE_', ''))
 
         acc[camelCase(_key)] = value
       }

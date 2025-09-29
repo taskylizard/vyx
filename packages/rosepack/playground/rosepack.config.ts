@@ -3,7 +3,7 @@ import { defineRosepackConfig } from '../src'
 export default defineRosepackConfig({
   client: {
     gateway: {
-      intents: ['GUILDS']
+      intents: ['GUILDS', 'ALL']
     }
   }
 })

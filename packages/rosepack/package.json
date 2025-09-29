@@ -1,20 +1,48 @@
 {
   "name": "rosepack",
   "version": "1.0.0",
-  "module": "src/index.ts",
+  "description": "rosepack",
+  "sideEffects": false,
   "type": "module",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
+  },
+  "bin": {
+    "rosepack": "./dist/cli.js"
+  },
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "rosepack": "bun ./dist/cli.js",
+    "build": "tsdown",
     "typecheck": "tsc --build"
   },
   "devDependencies": {
+    "tsdown": "catalog:build",
     "@packages/typescript-config": "workspace:*",
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/fs-extra": "^11.0.4"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
     "@oceanicjs/builders": "^1.1.11",
+    "citty": "^0.1.6",
+    "dotenv": "^16.4.5",
+    "fs-extra": "^11.2.0",
+    "giget": "^1.2.3",
+    "gzip-size": "^7.0.0",
+    "nypm": "^0.6.0",
+    "ofetch": "^1.3.4",
+    "open": "^10.1.0",
+    "pretty-bytes": "^6.1.1",
+    "std-env": "^3.9.0",
+    "tinyexec": "^1.0.1",
     "c12": "^3.2.0",
     "chokidar": "3",
     "consola": "^3.4.2",

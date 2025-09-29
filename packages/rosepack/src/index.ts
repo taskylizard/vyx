@@ -1,3 +1,5 @@
+export { main } from './cli/main'
+export { runCommand, runMain } from './cli/run'
 export * from './define'
 export { createError, createRosepack, useRosepack } from './rosepack'
 export * from './uses'

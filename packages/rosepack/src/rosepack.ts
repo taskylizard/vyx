@@ -126,7 +126,7 @@ export const createRosepack = async (
   }
   const rosepack = await initRosepack(config, opts)
 
-  consola.log(colors.blue(`Rosepack ${colors.bold(version)}\n`))
+  consola.log(colors.blue(`Rosepack ${colors.bold(version)}`))
   await loadRosepack(rosepack, config, opts)
   if (process.env.NODE_ENV === 'development') {
     watchReload(rosepack, config, opts)
