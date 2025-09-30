@@ -1,3 +1,4 @@
+// oxlint-disable no-unused-vars
 import { defineSlashCommand, Embed, logger, splitMessage } from '#framework'
 import { bold, code as inlineCode, codeblock, italic } from 'discord-md-tags'
 import assert from 'node:assert'
@@ -114,7 +115,7 @@ export default defineSlashCommand({
 
     if (!code) {
       const description =
-        // biome-ignore lint/complexity/noUselessStringConcat: what's the point of this, they said
+        // oxc-ignore lint/complexity/noUselessStringConcat: what's the point of this, they said
         'JavaScript code to evaluate.\n' +
         bold`Scoped variables:` +
         '\n' +
@@ -164,9 +165,7 @@ export default defineSlashCommand({
     }
 
     const _ctx = ctx
-    // biome-ignore lint/correctness/noUnusedVariables: scoping
     const { prisma, prisma: db, prisma: database } = _ctx.client
-    // biome-ignore lint/correctness/noUnusedVariables: scoping
     const doReply = (value: Error | string): void => {
       if (value instanceof Error) {
         _ctx
@@ -194,7 +193,7 @@ export default defineSlashCommand({
     }
     times.start = process.hrtime.bigint()
     try {
-      // biome-ignore lint/security/noGlobalEval:dont care
+      // oxlint-disable-next-line no-eval
       lastResult = eval(code)
     } catch (error: unknown) {
       return await ctx.reply(

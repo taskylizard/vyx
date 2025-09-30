@@ -244,11 +244,8 @@ export class InteractionsManager {
             .filter((command) => !command.disabled)
             .values()
         ) {
-          if (!command.guilds || command.guilds.length === 0) {
-            // Global commands
-            slashCommands.push(this.toSlashJson(command))
-          } else {
-            // Guild commands
+          if (command.guilds && command.guilds.length > 0) {
+            // Guild commands - register only to specified guilds
             for (const id of command.guilds) {
               if (!guildSlashCommands.has(id)) {
                 guildSlashCommands.set(id, [])
@@ -258,6 +255,9 @@ export class InteractionsManager {
                 commands.push(this.toSlashJson(command))
               }
             }
+          } else {
+            // Global commands - only if no guilds specified
+            slashCommands.push(this.toSlashJson(command))
           }
         }
 
