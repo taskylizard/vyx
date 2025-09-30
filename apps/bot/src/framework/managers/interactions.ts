@@ -217,81 +217,38 @@ export class InteractionsManager {
         this.interactionsLogger.info(
           `Running in ${
             colorize('red', 'development')
-          } mode, syncing to guild...`
+          } mode, guild commands will be synced via syncModules()...`
         )
-
-        const commandData = this.handlers.commands
-          .filter((command) => !command.moduleId)
-          .filter((command) => !command.disabled)
-          .map((command) => this.toSlashJson(command))
-
-        await this.client.application
-          .bulkEditGuildCommands(this.testingGuild, [
-            ...commandData,
-            ...userCommandList
-          ] as CreateGuildApplicationCommandOptions[])
-          .catch(this.interactionsLogger.error)
+        // In development, we don't register commands here - syncModules() handles it
+        // This prevents double registration and respects module configuration
       } else {
         // Production logic...
         this.interactionsLogger.info(
           `Running in ${colorize('greenBright', 'production')} mode.`
         )
 
-        // Map over them for Global and Guild commands.
+        // Only register global commands here - guild commands are handled by syncModules()
         for (
           const command of this.handlers.commands
             .filter((command) => !command.moduleId)
             .filter((command) => !command.disabled)
+            .filter((command) => !command.guilds || command.guilds.length === 0)
             .values()
         ) {
-          if (command.guilds && command.guilds.length > 0) {
-            // Guild commands - register only to specified guilds
-            for (const id of command.guilds) {
-              if (!guildSlashCommands.has(id)) {
-                guildSlashCommands.set(id, [])
-              }
-              const commands = guildSlashCommands.get(id)
-              if (commands) {
-                commands.push(this.toSlashJson(command))
-              }
-            }
-          } else {
-            // Global commands - only if no guilds specified
-            slashCommands.push(this.toSlashJson(command))
-          }
+          slashCommands.push(this.toSlashJson(command))
         }
 
-        // Register all commands
+        // Register global commands only
         this.interactionsLogger.info(
           forceRegister
-            ? 'Force registration enabled, registering all commands.'
-            : 'Registering all commands.'
+            ? 'Force registration enabled, registering global commands.'
+            : 'Registering global commands.'
         )
 
-        // Then bulk set every one.
         await this.client.application.bulkEditGlobalCommands([
           ...slashCommands,
           ...userCommandList
         ])
-
-        // Bulk setting Guild commands.
-        for (const [id, guildCommandData] of guildSlashCommands.entries()) {
-          const guild = this.client.guilds.get(id) ??
-            (await this.client.rest.guilds.get(id))
-
-          if (guild) {
-            await this.client.application
-              .bulkEditGuildCommands(
-                guild.id,
-                guildCommandData as CreateGuildApplicationCommandOptions[]
-              )
-              .catch(this.interactionsLogger.error)
-          } else {
-            this.interactionsLogger.warn(
-              `No guild was found by the ID of ${id}. Slash commands will not be set for this guild.`
-            )
-          }
-        }
       }
 
       this.interactionsLogger.info(
