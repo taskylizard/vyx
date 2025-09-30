@@ -2,15 +2,17 @@ import { Gemini, GEMINI_MODEL } from '@llamaindex/google'
 import { HuggingFaceEmbedding } from '@llamaindex/huggingface'
 import { QdrantVectorStore } from '@llamaindex/qdrant'
 import env from '@packages/env'
+import { EmbeddingModel } from 'fastembed'
 import { Settings, storageContextFromDefaults } from 'llamaindex'
+import { FastEmbedEmbedding } from '../embedding'
 
 export function initSettings() {
   Settings.llm = new Gemini({
     apiKey: env.GOOGLE_GENERATIVE_AI_API_KEY,
     model: GEMINI_MODEL.GEMINI_2_0_FLASH
   })
-  Settings.embedModel = new HuggingFaceEmbedding({
-    modelType: 'BAAI/bge-small-en-v1.5'
+  Settings.embedModel = new FastEmbedEmbedding({
+    model: EmbeddingModel.BGEBaseENV15
   })
 }
 

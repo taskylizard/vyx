@@ -27,6 +27,7 @@
     "@packages/database": "workspace:*",
     "@packages/env": "workspace:^",
     "@qdrant/js-client-rest": "~1.15.1",
+    "fastembed": "^2.0.0",
     "llamaindex": "0.11.29",
     "oceanic.js": "catalog:prod",
     "openapi-fetch": "^0.14.0",
