@@ -113,11 +113,15 @@ export interface operations {
           /** @enum {string} */
           mode: 'auto' | 'pro' | 'reasoning' | 'deep research'
           model?: string
-          sources: ('web' | 'scholar' | 'social')[]
+          sources:
+            | ('web' | 'scholar' | 'social')[]
+            | ('web' | 'scholar' | 'social')
           userId?: string
           guildId?: string
           username?: string
           guildName?: string
+          /** @default Files */
+          files?: string[]
         }
         'application/x-www-form-urlencoded': {
           app: string
@@ -125,11 +129,15 @@ export interface operations {
           /** @enum {string} */
           mode: 'auto' | 'pro' | 'reasoning' | 'deep research'
           model?: string
-          sources: ('web' | 'scholar' | 'social')[]
+          sources:
+            | ('web' | 'scholar' | 'social')[]
+            | ('web' | 'scholar' | 'social')
           userId?: string
           guildId?: string
           username?: string
           guildName?: string
+          /** @default Files */
+          files?: string[]
         }
         'multipart/form-data': {
           app: string
@@ -137,11 +145,15 @@ export interface operations {
           /** @enum {string} */
           mode: 'auto' | 'pro' | 'reasoning' | 'deep research'
           model?: string
-          sources: ('web' | 'scholar' | 'social')[]
+          sources:
+            | ('web' | 'scholar' | 'social')[]
+            | ('web' | 'scholar' | 'social')
           userId?: string
           guildId?: string
           username?: string
           guildName?: string
+          /** @default Files */
+          files?: string[]
         }
       }
     }
