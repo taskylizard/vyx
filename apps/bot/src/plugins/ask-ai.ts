@@ -12,24 +12,22 @@ export default definePlugin({
       if (message.author.bot) return
       if (!message.channel || !isTextableGuildChannel(message.channel)) return
 
-      // Mention answers
-      if (message.content.startsWith(`<@${client.user?.id}>`)) {
-        await handleMention(client, message)
-      }
-
-      // Reply answers
-      if (
-        message.referencedMessage?.id &&
-        message.content.includes(`<@${client.user?.id}>`)
-      ) {
+      // Reply to bot's messages (continuing conversation)
+      if (message.referencedMessage?.id) {
         const referencedMessage = await fetchMessageCached(
           client,
           message.channel,
           message.referencedMessage.id
         ).catch(() => null)
-        if (referencedMessage) {
+        if (referencedMessage?.author.id === client.user?.id) {
           await handleReply(client, message, referencedMessage)
+          return
         }
+      }
+
+      // Mention answers (starting new conversation)
+      if (message.content.includes(`<@${client.user?.id}>`)) {
+        await handleMention(client, message)
       }
     })
   }

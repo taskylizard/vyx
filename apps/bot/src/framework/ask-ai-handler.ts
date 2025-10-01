@@ -154,8 +154,12 @@ export async function handleReply(
   if (
     !guildId || !await isChannelWhitelisted(client, guildId, message.channel.id)
   ) return
-  const prompt = message.content.replace(`<@${client.user.id}>`, '').trim()
-  if (!prompt) return
+  let prompt = message.content.replace(`<@${client.user.id}>`, '').trim()
+  // If no prompt after removing mention, use the whole message content
+  if (!prompt) {
+    prompt = message.content.trim()
+    if (!prompt) return
+  }
   const reply = await message.channel.createMessage({
     messageReference: { messageID: message.id },
     content: '*thinking...*',
