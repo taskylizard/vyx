@@ -32,6 +32,7 @@ export type GenerateAskAIResponseParams = {
   guildId?: string
   username?: string
   guildName?: string
+  files?: File[]
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -125,11 +126,40 @@ export async function generateAskAIResponse({
   userId,
   guildId,
   username,
-  guildName
+  guildName,
+  files
 }: GenerateAskAIResponseParams) {
   const prompt = formattedPrompt ??
     formatAskAIPrompt({ systemPrompt, context, interactionType })
 
+  // if files are present, use FormData
+  if (files && files.length > 0) {
+    const formData = new FormData()
+    formData.append('app', 'kanikou')
+    formData.append('mode', 'auto')
+    formData.append('prompt', prompt)
+    formData.append('sources', 'web')
+    if (userId) formData.append('userId', userId)
+    if (guildId) formData.append('guildId', guildId)
+    if (username) formData.append('username', username)
+    if (guildName) formData.append('guildName', guildName)
+
+    for (const file of files) {
+      formData.append('files', file)
+    }
+
+    return await velvet.POST('/generate', {
+      params: {
+        header: {
+          authorization: `Bearer ${env.INFERENCE_TOKEN}`
+        }
+      },
+      body: formData as any,
+      bodySerializer: (body) => body as any
+    })
+  }
+
+  // otherwise use JSON
   return await velvet.POST('/generate', {
     params: {
       header: {

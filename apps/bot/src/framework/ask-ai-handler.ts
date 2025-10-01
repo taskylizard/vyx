@@ -55,7 +55,8 @@ export const requestAskAI = async (
   userId?: string,
   guildId?: string,
   username?: string,
-  guildName?: string
+  guildName?: string,
+  files?: File[]
 ) => {
   const params = {
     systemPrompt: ASK_AI_SYSTEM_PROMPT,
@@ -64,7 +65,8 @@ export const requestAskAI = async (
     userId,
     guildId,
     username,
-    guildName
+    guildName,
+    files
   }
   const formattedPrompt = formatAskAIPrompt(params)
 
@@ -108,6 +110,21 @@ export async function handleMention(client: Client, message: Message) {
   const username = message.author.username
   const guildName = message.guild?.name
 
+  // process attachments
+  const files: File[] = []
+  for (const [, attachment] of message.attachments) {
+    try {
+      const response = await fetch(attachment.url)
+      const buffer = await response.arrayBuffer()
+      const file = new File([buffer], attachment.filename, {
+        type: attachment.contentType ?? 'application/octet-stream'
+      })
+      files.push(file)
+    } catch (error) {
+      client.logger.error('failed to fetch attachment', error)
+    }
+  }
+
   const res = await requestAskAI(
     client,
     buildPromptContext(client, [], prompt),
@@ -115,7 +132,8 @@ export async function handleMention(client: Client, message: Message) {
     userId,
     guildId,
     username,
-    guildName
+    guildName,
+    files.length > 0 ? files : undefined
   )
 
   if (!res.ok) {
@@ -175,6 +193,21 @@ export async function handleReply(
   const username = message.author.username
   const guildName = message.guild?.name
 
+  // process attachments
+  const files: File[] = []
+  for (const [, attachment] of message.attachments) {
+    try {
+      const response = await fetch(attachment.url)
+      const buffer = await response.arrayBuffer()
+      const file = new File([buffer], attachment.filename, {
+        type: attachment.contentType ?? 'application/octet-stream'
+      })
+      files.push(file)
+    } catch (error) {
+      client.logger.error('failed to fetch attachment', error)
+    }
+  }
+
   const res = await requestAskAI(
     client,
     buildPromptContext(client, history, prompt),
@@ -182,7 +215,8 @@ export async function handleReply(
     userId,
     guildId,
     username,
-    guildName
+    guildName,
+    files.length > 0 ? files : undefined
   )
 
   if (!res.ok) {
