@@ -3,7 +3,7 @@
  * Required by AGENTS.md: "MUST: Warn on unsaved changes before navigation"
  */
 export function useUnsavedChanges(hasChanges: Ref<boolean>) {
-  const { $router } = useNuxtApp()
+  const { $router: _router } = useNuxtApp()
   let isNavigatingAway = false
 
   const warnBeforeUnload = (event: BeforeUnloadEvent) => {

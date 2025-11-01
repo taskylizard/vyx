@@ -75,13 +75,6 @@ provide('serversError', serversError)
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                class="cursor-pointer"
-                @click="navigateTo('/app/user')"
-              >
-                <Icon name="lucide:sparkle" class="h-4 w-4" />
-                <span>Your dashboard</span>
-              </DropdownMenuItem>
               <DropdownMenuItem class="cursor-pointer" @click="toggleColorMode">
                 <Icon :name="colorModeIcon" class="h-4 w-4" />
                 <span>{{ colorModeLabel }}</span>

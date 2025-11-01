@@ -2,7 +2,6 @@
  * Form error handling composable
  * Implements focus management for form validation errors
  */
-import type { Ref } from 'vue'
 
 interface FormError {
   field: string

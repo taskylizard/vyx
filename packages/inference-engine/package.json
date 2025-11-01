@@ -3,34 +3,42 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --noEmit",
     "seed": "bun src/query-engine/seed.ts",
     "queryengine:eval": "infisical run --env=dev -- bun src/query-engine/evals.ts",
-    "askai:eval": "bun src/ask-ai-engine/evals.ts",
-    "personality:eval": "infisical run --env=dev -- bun src/personality-engine/evals.ts"
+    "askai:eval": "infisical run --env=dev -- bun src/ask-ai-engine/evals.ts",
+    "personality:eval": "infisical run --env=dev -- bun src/personality-engine/evals.ts",
+    "aitasks:eval": "infisical run --env=dev -- bun src/ai-tasks/evals.ts",
+    "imagegen:eval": "infisical run --env=dev -- bun src/image-generation/evals.ts"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
     "@types/bun": "catalog:types",
-    "openapi-typescript": "^7.9.1",
-    "typescript": "^5.9.2"
+    "openapi-typescript": "catalog:tsc",
+    "typescript": "catalog:tsc",
+    "tsdown": "catalog:build"
   },
   "dependencies": {
     "@apps/bot": "workspace:^",
-    "@llamaindex/google": "0.3.21",
-    "@llamaindex/huggingface": "0.1.29",
-    "@llamaindex/qdrant": "^0.1.31",
-    "@llamaindex/readers": "3.1.20",
+    "@llamaindex/google": "catalog:prod",
+    "@llamaindex/huggingface": "catalog:prod",
+    "@llamaindex/qdrant": "catalog:prod",
+    "@llamaindex/readers": "catalog:prod",
     "@packages/database": "workspace:*",
     "@packages/env": "workspace:^",
-    "@qdrant/js-client-rest": "~1.15.1",
-    "fastembed": "^2.0.0",
-    "llamaindex": "0.11.29",
+    "@qdrant/js-client-rest": "catalog:prod",
+    "fastembed": "catalog:prod",
+    "llamaindex": "catalog:prod",
     "oceanic.js": "catalog:prod",
-    "openapi-fetch": "^0.14.0",
-    "zod": "4.1.8"
-  }
+    "openapi-fetch": "catalog:network",
+    "zod": "catalog:utils"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts"
 }

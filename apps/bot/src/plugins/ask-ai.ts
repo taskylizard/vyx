@@ -3,6 +3,7 @@ import {
   fetchMessageCached,
   isTextableGuildChannel
 } from '#framework'
+import { ChannelTypes } from 'oceanic.js'
 import { handleMention, handleReply } from '../framework/ask-ai-handler'
 
 export default definePlugin({
@@ -10,7 +11,13 @@ export default definePlugin({
   onLoad: (client) => {
     client.on('messageCreate', async (message) => {
       if (message.author.bot) return
-      if (!message.channel || !isTextableGuildChannel(message.channel)) return
+      if (!message.channel) return
+
+      // handle DMs
+      const isDM = message.channel.type === ChannelTypes.DM
+
+      // skip non-DM guild channels that aren't textable
+      if (!isDM && !isTextableGuildChannel(message.channel)) return
 
       // Reply to bot's messages (continuing conversation)
       if (message.referencedMessage?.id) {
@@ -26,7 +33,11 @@ export default definePlugin({
       }
 
       // Mention answers (starting new conversation)
-      if (message.content.includes(`<@${client.user?.id}>`)) {
+      // Check for both <@ID> and <@!ID> formats
+      if (
+        message.content.startsWith(`<@${client.user?.id}>`) ||
+        message.content.startsWith(`<@!${client.user?.id}>`)
+      ) {
         await handleMention(client, message)
       }
     })

@@ -8,6 +8,7 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
+    "./prisma": "./src/generated/index.js",
     "./prisma/*": "./src/generated/*",
     "./package.json": "./package.json"
   },
@@ -23,15 +24,17 @@
   },
   "dependencies": {
     "@packages/typescript-config": "workspace:*",
-    "@prisma/adapter-pg": "catalog:prod",
-    "@prisma/client": "catalog:prod",
-    "drizzle-orm": "^0.44.5"
+    "drizzle-orm": "catalog:database",
+    "pg": "catalog:prod",
+    "@prisma/adapter-pg": "catalog:database",
+    "@prisma/client": "catalog:database",
+    "prisma": "catalog:database"
   },
   "devDependencies": {
     "tsdown": "catalog:build",
     "@types/bun": "catalog:types",
-    "drizzle-prisma-generator": "^0.1.7",
-    "prisma": "catalog:dev",
-    "typescript": "catalog:dev"
+    "drizzle-prisma-generator": "catalog:database",
+    "typescript": "catalog:tsc",
+    "@types/pg": "catalog:types"
   }
 }

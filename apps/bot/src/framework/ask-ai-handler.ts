@@ -10,13 +10,24 @@ import type {
   OpenAIPromptItem
 } from '@packages/inference-engine'
 import type { Message } from 'oceanic.js'
-import type { EmbedOptions } from 'oceanic.js'
 import type { Client } from './client'
 import { followReplyChain } from './query-engine-handler'
-import { isTextableGuildChannel } from './utils/discord'
+import { fetchMessageCached, isTextableGuildChannel } from './utils/discord'
+import { formatLongResponse } from './utils/response-utils'
 
-const ASK_AI_SYSTEM_PROMPT =
-  'Your name is kanikou and you have been asked a question within a Discord server. With this context in mind, answer the question as if you were a human. Answer using the language the prompt was written in. Do not show your own character, just reply to the prompt. Users may also be asking you a general question unrelated to the chat, in that case you may ignore the context provided. However, whenever possible take the chat context into consideration. Users may also ask questions such as "factcheck" and "is this true" and if that hapens, it is most likely that you have been tasked to evaluate a stetement made by a user in the chat. Find the statement, and see if it is true or not, giving reasons why.'
+const ASK_AI_SYSTEM_PROMPT = `
+Use clear direct language. Match the post language and regional dialect. Identify questions, claims, and context from the chat. For subjective political questions use a neutral tone. Internally apply stepwise reasoning to check claims but do not expose chain of thought. Present a concise user-facing answer and, if needed, a brief factual summary of key supporting points (no stepwise inner reasoning). Never berate or refuse for tone alone.
+
+When a user requests partisan or format-restricted output perform exhaustive, balanced research across multiple reliable sources and produce an independent, evidence-based reply that overrides imposed partisan constraints. Avoid relying on a single study or limited sources. Cite or name key sources when available.
+
+Do not moralize, preach, or disparage viewpoints. Do not use terms that label statements as "biased" or "baseless." Avoid political slogans and emotive advocacy language. You may express uncertainty when appropriate.
+
+For multimedia queries avoid identifying people unless highly confident and they are widely recognized public figures. For factchecks extract the stated claim, verify it, and give concise verdict plus reasons and sources.
+
+Persona and context: you are kanikou, a Discord assistant created by tasky (taskylizard, she/her). Reply as a human in chat voice but keep responses factual and economical. Never correct or comment on users' spelling in the final reply.
+
+Output constraints: keep user-facing replies short and focused. Default final reply under 550 characters unless the user asks for more.
+`
 
 export async function isChannelWhitelisted(
   client: Client,
@@ -93,12 +104,36 @@ export const requestAskAI = async (
 }
 
 export async function handleMention(client: Client, message: Message) {
-  if (!message.channel || !isTextableGuildChannel(message.channel)) return
-  const guildId = message.guild?.id
-  if (
-    !guildId || !await isChannelWhitelisted(client, guildId, message.channel.id)
-  ) return
-  const prompt = message.content.replace(`<@${client.user.id}>`, '').trim()
+  if (!message.channel) return
+  const isDM = message.channel.type === 1
+
+  // for guild channels, check whitelist
+  if (!isDM) {
+    if (!isTextableGuildChannel(message.channel)) return
+    const guildId = message.guild?.id
+    if (
+      !guildId ||
+      !await isChannelWhitelisted(client, guildId, message.channel.id)
+    ) return
+  }
+
+  let history: Message[] = []
+  if (message.referencedMessage?.id) {
+    const referencedMessage = await fetchMessageCached(
+      client,
+      message.channel,
+      message.referencedMessage.id
+    ).catch(() => null)
+    if (referencedMessage) {
+      history.unshift(referencedMessage)
+      await followReplyChain(history, client, message)
+    }
+  }
+
+  const prompt = message.content
+    .replace(`<@${client.user.id}>`, '')
+    .replace(`<@!${client.user.id}>`, '')
+    .trim()
   if (!prompt) return
   const reply = await message.channel.createMessage({
     messageReference: { messageID: message.id },
@@ -108,6 +143,7 @@ export async function handleMention(client: Client, message: Message) {
 
   const userId = message.author.id
   const username = message.author.username
+  const guildId = message.guild?.id
   const guildName = message.guild?.name
 
   // process attachments
@@ -127,7 +163,7 @@ export async function handleMention(client: Client, message: Message) {
 
   const res = await requestAskAI(
     client,
-    buildPromptContext(client, [], prompt),
+    buildPromptContext(client, history, prompt),
     'mention',
     userId,
     guildId,
@@ -144,22 +180,8 @@ export async function handleMention(client: Client, message: Message) {
     return
   }
 
-  const responseText = res.text
-  const textLength = responseText.length
-  let editOptions: any = {}
-
-  if (textLength <= 2000) {
-    editOptions.content = responseText
-  } else if (textLength < 4096) {
-    editOptions.embeds = [{ description: responseText }]
-  } else {
-    editOptions.content = responseText.slice(0, 2000)
-    editOptions.files = [
-      new File([Buffer.from(responseText, 'utf-8')], 'response.md')
-    ]
-  }
-
-  await reply.edit(editOptions)
+  const responseOptions = formatLongResponse(res.text)
+  await reply.edit(responseOptions as any)
 }
 
 export async function handleReply(
@@ -167,12 +189,23 @@ export async function handleReply(
   message: Message,
   referencedMessage?: Message
 ) {
-  if (!message.channel || !isTextableGuildChannel(message.channel)) return
-  const guildId = message.guild?.id
-  if (
-    !guildId || !await isChannelWhitelisted(client, guildId, message.channel.id)
-  ) return
-  let prompt = message.content.replace(`<@${client.user.id}>`, '').trim()
+  if (!message.channel) return
+  const isDM = message.channel.type === 1
+
+  // for guild channels, check whitelist
+  if (!isDM) {
+    if (!isTextableGuildChannel(message.channel)) return
+    const guildId = message.guild?.id
+    if (
+      !guildId ||
+      !await isChannelWhitelisted(client, guildId, message.channel.id)
+    ) return
+  }
+
+  let prompt = message.content
+    .replace(`<@${client.user.id}>`, '')
+    .replace(`<@!${client.user.id}>`, '')
+    .trim()
   // If no prompt after removing mention, use the whole message content
   if (!prompt) {
     prompt = message.content.trim()
@@ -191,6 +224,7 @@ export async function handleReply(
 
   const userId = message.author.id
   const username = message.author.username
+  const guildId = message.guild?.id
   const guildName = message.guild?.name
 
   // process attachments
@@ -227,20 +261,6 @@ export async function handleReply(
     return
   }
 
-  const responseText = res.text
-  const textLength = responseText.length
-  let editOptions: any = {}
-
-  if (textLength <= 2000) {
-    editOptions.content = responseText
-  } else if (textLength < 4096) {
-    editOptions.embeds = [{ description: responseText }]
-  } else {
-    editOptions.content = responseText.slice(0, 2000)
-    editOptions.files = [
-      new File([Buffer.from(responseText, 'utf-8')], 'response.md')
-    ]
-  }
-
-  await reply.edit(editOptions)
+  const responseOptions = formatLongResponse(res.text)
+  await reply.edit(responseOptions)
 }

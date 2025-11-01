@@ -7,10 +7,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "typed-env": "catalog:prod",
+    "typed-env": "catalog:node",
     "@packages/typescript-config": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "catalog:dev"
+    "typescript": "catalog:tsc"
   }
 }

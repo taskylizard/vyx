@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
 import { reactiveOmit } from '@vueuse/core'
-import { TabsContent, type TabsContentProps } from 'reka-ui'
+import type { TabsContentProps } from 'reka-ui'
+import { TabsContent } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
 
 const props = defineProps<

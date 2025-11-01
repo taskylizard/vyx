@@ -1,6 +1,10 @@
 import type { Client, Context } from '#framework'
 import { colors, Embed } from '#framework'
-import type { Message, TextChannel } from 'oceanic.js'
+import type { Message, TextChannel, User } from 'oceanic.js'
+
+export function formatUserMention(user: User): string {
+  return `@${user.username} (${user.mention})`
+}
 
 interface ModerationLogOptions {
   action: 'BAN' | 'UNBAN' | 'KICK' | 'TIMEOUT'
@@ -35,15 +39,23 @@ export async function logModerationAction(
     if (
       !config?.logsEnabled ||
       !config?.logModerationActions ||
-      !config?.logsChannel
+      (!config?.moderationActionsChannel && !config?.logsChannel)
     ) {
       return // Logging not configured or disabled
     }
 
+    // Use dedicated moderation channel if set, otherwise fall back to main logs channel
+    const channelId = config.moderationActionsChannel?.toString() ||
+      config.logsChannel?.toString()
+
+    if (!channelId) {
+      return
+    }
+
     // Get the logs channel
-    const logsChannel = ctx.guild?.channels.get(
-      config.logsChannel.toString()
-    ) as TextChannel | undefined
+    const logsChannel = ctx.guild?.channels.get(channelId) as
+      | TextChannel
+      | undefined
 
     if (!logsChannel) {
       console.warn(`Moderation logs channel not found: ${config.logsChannel}`)
@@ -76,7 +88,9 @@ export async function logModerationAction(
 
     // Create log embed
     const embed = new Embed()
-      .setTitle(`${getActionEmoji(options.action)} ${options.action}`)
+      .setTitle(
+        `${getActionEmoji(options.action)} ${humanizeAction(options.action)}`
+      )
       .setColor(getActionColor(options.action))
       .addField('Target', `${options.target} (${options.targetId})`, true)
       .addField(
@@ -120,7 +134,7 @@ export async function logMessageAction(
       }
     })
 
-    if (!config?.logsEnabled || !config?.logsChannel) {
+    if (!config?.logsEnabled) {
       return // Logging not configured
     }
 
@@ -137,9 +151,25 @@ export async function logMessageAction(
       return
     }
 
+    // Determine which channel to use
+    let channelId: string | undefined
+    if (options.action === 'MESSAGE_EDIT') {
+      channelId = config.messageEditChannel?.toString() ||
+        config.logsChannel?.toString()
+    } else if (options.action === 'MESSAGE_DELETE') {
+      channelId = config.messageDeleteChannel?.toString() ||
+        config.logsChannel?.toString()
+    } else {
+      channelId = config.logsChannel?.toString()
+    }
+
+    if (!channelId) {
+      return
+    }
+
     // Get the logs channel
     const guild = client.guilds.get(guildId)
-    const logsChannel = guild?.channels.get(config.logsChannel.toString()) as
+    const logsChannel = guild?.channels.get(channelId) as
       | TextChannel
       | undefined
 
@@ -151,17 +181,21 @@ export async function logMessageAction(
     // Create log embed
     const embed = new Embed()
       .setTitle(
-        `${getActionEmoji(options.action)} ${options.action.replace('_', ' ')}`
+        `${getActionEmoji(options.action)} ${humanizeAction(options.action)}`
       )
       .setColor(getActionColor(options.action))
-      .addField(
-        'Author',
-        `${options.message.author?.username} (${options.message.author?.id})`,
+      .addField('Author', formatUserMention(options.message.author), true)
+      .addField('Channel', `<#${options.message.channelID}>`, true)
+
+    if (options.action === 'MESSAGE_EDIT') {
+      embed.addField(
+        'Message',
+        `[jump to message](https://discord.com/channels/${guildId}/${options.message.channelID}/${options.message.id})`,
         true
       )
-      .addField('Channel', `<#${options.message.channelID}>`, true)
-      .addField('Message ID', options.message.id, true)
-      .setTimestamp()
+    }
+
+    embed.setTimestamp()
 
     if (options.action === 'MESSAGE_EDIT') {
       if (options.oldContent) {
@@ -239,4 +273,12 @@ function getActionColor(action: string): number {
     default:
       return colors.BLUE
   }
+}
+
+function humanizeAction(action: string): string {
+  return action
+    .toLowerCase()
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ')
 }

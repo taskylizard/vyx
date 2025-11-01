@@ -35,7 +35,12 @@ export async function generateVelvetText(
   })
 }
 
+export * from './ai-tasks'
 export * from './ask-ai-engine'
+export * from './fact-check'
+export * from './image-generation'
+export * from './jsonrepair'
 export * from './personality-engine'
 export * from './query-engine'
 export * from './smugshroom'
+export * from './utils'

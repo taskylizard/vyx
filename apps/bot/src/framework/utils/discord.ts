@@ -26,7 +26,7 @@ import { createGuard } from './common'
 
 export async function fetchMessageCached(
   client: Client,
-  channel: AnyTextableGuildChannel,
+  channel: AnyTextableGuildChannel | PrivateChannel,
   messageID: string
 ): Promise<Message> {
   return (

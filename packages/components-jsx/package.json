@@ -36,11 +36,11 @@
   },
   "devDependencies": {
     "tsdown": "catalog:build",
-    "@types/bun": "latest",
+    "@types/bun": "catalog:types",
     "@packages/typescript-config": "workspace:*"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "catalog:tsc"
   },
   "dependencies": {
     "oceanic.js": "catalog:prod"

@@ -31,7 +31,7 @@ export async function storeDocumentsInIndex(
 
 export async function clearQdrantCollection(guildId: string): Promise<void> {
   try {
-    const storageContext = await createStorageContext(guildId)
+    const _storageContext = await createStorageContext(guildId)
     // The QdrantVectorStore will handle collection deletion when we clear the cache
     clearChatEngineCache(guildId)
     logger.log(`Cleared collection and cache for guild ${guildId}`)

@@ -27,5 +27,5 @@ export function jsx(type: any, props: any) {
   return createElement(type, rest)
 }
 export const jsxs = jsx
-
+export const jsxDEV = jsx
 export const h = createElement

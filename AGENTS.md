@@ -1,5 +1,7 @@
 # AGENTS.md - Developer Guidelines
 
+- Be extremely concise. Sacrifice grammar for the sake of concision.
+
 ## Build/Test Commands
 
 - `bun lint` - Lint with oxlint (run after changes) (required)

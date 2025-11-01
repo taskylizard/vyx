@@ -159,7 +159,7 @@ function getBaseURL() {
       } else {
         baseURL = getRequestURL(useEvent()).origin
       }
-    } catch (e) {}
+    } catch {}
   }
 
   return baseURL

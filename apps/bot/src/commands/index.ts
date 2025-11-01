@@ -1,35 +1,23 @@
 import EconomyCommand from './economy'
-import EvalCommand from './eval'
-import EightBallCommand from './fun/8ball'
-import AICommand from './fun/ai'
-import AnilistCommand from './fun/anilist'
-import SayhiCommand from './fun/sayhi'
-import TicTacToeCommand from './fun/tictactoe'
+import FunCommand from './fun'
 import ModerationCommand from './moderation'
 import ModulesCommand from './modules'
 import QueryEngineCommand from './query-engine'
 import TaskylandCommand from './taskyland'
-import GithubCommand from './utlities/github'
-import NpmCommand from './utlities/npm'
-import ReminderCommand from './utlities/reminder'
-import TranslateCommand from './utlities/translate'
-import WikipediaCommand from './utlities/wikipedia'
+import AiCommand from './utilities/ai'
+import ReminderCommand from './utilities/reminder'
+import TranslateCommand from './utilities/translate'
+import WikipediaCommand from './utilities/wikipedia'
 
 export const slashCommands = {
-  '8ball': EightBallCommand,
-  anilist: AnilistCommand,
   economy: EconomyCommand,
-  eval: EvalCommand,
-  github: GithubCommand,
+  fun: FunCommand,
   moderation: ModerationCommand,
   modules: ModulesCommand,
-  npm: NpmCommand,
   'query-engine': QueryEngineCommand,
   reminder: ReminderCommand,
-  sayhi: SayhiCommand,
   translate: TranslateCommand,
   wikipedia: WikipediaCommand,
   taskyland: TaskylandCommand,
-  tictactoe: TicTacToeCommand,
-  ai: AICommand
+  ai: AiCommand
 } as const

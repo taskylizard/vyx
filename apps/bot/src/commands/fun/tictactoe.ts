@@ -30,7 +30,7 @@ export default defineSlashCommand({
     }
   ],
   async run(ctx) {
-    const board: (string | null)[] = new Array(9).fill(EMPTY)
+    const board: (string | null)[] = Array.from({ length: 9 }, () => EMPTY)
     const mode = ctx.options.getString('mode') ?? 'ai'
     const opponent = ctx.options.getUser('opponent')
 

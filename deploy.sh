@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 WITH_SEED=false
 WITH_MIGRATE=false
@@ -30,4 +31,4 @@ if [ "$WITH_SEED" = "true" ]; then
    export RUN_SEED=true
 fi
 
-docker compose up -d --build --remove-orphans
+docker compose -f docker-compose.yml up -d --build --remove-orphans

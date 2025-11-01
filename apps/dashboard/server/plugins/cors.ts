@@ -11,6 +11,7 @@ export default defineNitroPlugin((plugin) => {
       const url = new URL(env.BETTER_AUTH_URL)
       allowedOrigins.push(url.origin)
     } catch (e) {
+      logger.error('Error', e)
       logger.warn('Invalid BETTER_AUTH_URL:', env.BETTER_AUTH_URL)
     }
   }

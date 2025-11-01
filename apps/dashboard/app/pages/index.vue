@@ -15,14 +15,11 @@ async function signIn() {
 
     const { error, data } = await auth.signIn.social({
       provider: 'discord',
-      callbackURL: '/app/user'
+      callbackURL: '/app'
     })
 
     if (data) {
-      toast('Success', {
-        description: 'Successfully signed in.'
-      })
-      await navigateTo('/app/user')
+      await navigateTo('/app')
     } else {
       toast('Error', {
         description: `Error: ${error.message}`

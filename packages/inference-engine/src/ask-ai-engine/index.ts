@@ -18,11 +18,6 @@ export type AskAIResponse = {
   }
 }
 
-type ParsedAskAIAnswerPayload = {
-  answer: string
-  webResults: (string | undefined)[]
-}
-
 export type GenerateAskAIResponseParams = {
   systemPrompt: string
   context: OpenAIPromptItem[]
@@ -33,10 +28,6 @@ export type GenerateAskAIResponseParams = {
   username?: string
   guildName?: string
   files?: File[]
-}
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 type FormatAskAIPromptParams = Omit<
@@ -77,45 +68,6 @@ export const formatAskAIPrompt = ({
   }
 
   return sections.join('\n\n')
-}
-
-const parseAskAIAnswerPayload = (
-  payload?: string
-): ParsedAskAIAnswerPayload | undefined => {
-  if (!payload) return
-  try {
-    const parsed = JSON.parse(payload) as unknown
-    if (!isRecord(parsed)) return
-    const answerValue = parsed.answer
-    const answer = typeof answerValue === 'string' ? answerValue.trim() : ''
-    if (!answer) return
-    const webResultsValue = parsed.web_results
-    const rawResults = Array.isArray(webResultsValue) ? webResultsValue : []
-    const webResults = rawResults.map((entry) => {
-      if (!isRecord(entry)) return undefined
-      const url = entry.url
-      return typeof url === 'string' && url.length > 0 ? url : undefined
-    })
-    return { answer, webResults }
-  } catch {
-    return
-  }
-}
-
-export const formatAskAIAnswer = (data: AskAIResponse) => {
-  const steps = data.dict?.text
-  if (!Array.isArray(steps)) return data.text?.trim()
-  const finalStep = steps.find((step) => step?.step_type === 'FINAL')
-  const answerPayload = parseAskAIAnswerPayload(finalStep?.content?.answer)
-  if (!answerPayload) return data.text?.trim()
-  const { answer, webResults } = answerPayload
-  const formatted = answer.replace(/\[(\d+)\]/g, (match, group) => {
-    const index = Number.parseInt(group, 10) - 1
-    if (Number.isNaN(index)) return match
-    const url = webResults[index]
-    return url ? `[[${group}]](${url})` : match
-  })
-  return formatted.trim()
 }
 
 export async function generateAskAIResponse({

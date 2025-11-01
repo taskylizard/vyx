@@ -5,13 +5,16 @@ import type {
   ApplicationCommandOptionsWithValue,
   CreateApplicationCommandOptions,
   CreateGuildApplicationCommandOptions,
+  CreateMessageApplicationCommandOptions,
   CreateUserApplicationCommandOptions
 } from 'oceanic.js'
 import {
   ApplicationCommandOptionTypes,
   ApplicationCommandTypes,
-  Collection
+  Collection,
+  Permissions
 } from 'oceanic.js'
+import FactCheckMessageCommand from '../../message/fact-check'
 import AvatarUserCommand from '../../user/avatar'
 import ReportUserCommand from '../../user/report'
 import {
@@ -19,6 +22,7 @@ import {
   type ComponentInteractionHandler,
   createGuard,
   error,
+  type MessageCommand,
   modules,
   ok,
   type Result,
@@ -32,9 +36,22 @@ const userCommands = {
   report: ReportUserCommand
 } as const
 
+const messageCommands = {
+  factCheck: FactCheckMessageCommand
+} as const
+
 import { capitalize } from '@antfu/utils'
 import type { Module } from '@packages/database'
 import { slashCommands } from '../../commands'
+import { prefixCommands } from '../../commands/prefix'
+import AiTasksActionInteraction from '../../interactions/ai/tasks-action.tsx'
+import AiTasksCreateSubmitInteraction from '../../interactions/ai/tasks-create-submit'
+import AiTasksCreateInteraction from '../../interactions/ai/tasks-create.tsx'
+import AiTasksDeleteInteraction from '../../interactions/ai/tasks-delete'
+import AiTasksEditSubmitInteraction from '../../interactions/ai/tasks-edit-submit'
+import AiTasksEditInteraction from '../../interactions/ai/tasks-edit.tsx'
+import AiTasksToggleInteraction from '../../interactions/ai/tasks-toggle'
+import AiTaskTaskTriggerInteraction from '../../interactions/ai/trigger-task'
 import ReminderResolveInteraction from '../../interactions/reminder/resolve'
 import ReminderSubmitInteraction from '../../interactions/reminder/submit'
 import ReportCreateInteraction from '../../interactions/report/create'
@@ -46,13 +63,22 @@ const interactions = {
   'reminder.submit': ReminderSubmitInteraction,
   'report.create': ReportCreateInteraction,
   'report.resolve': ReportResolveInteraction,
-  'support.resolved': SupportResolveInteraction
+  'support.resolved': SupportResolveInteraction,
+  'ai-task-trigger': AiTaskTaskTriggerInteraction,
+  'ai.tasks.action': AiTasksActionInteraction,
+  'ai.tasks.toggle.select': AiTasksToggleInteraction,
+  'ai.tasks.delete.select': AiTasksDeleteInteraction,
+  'ai.tasks.edit.select': AiTasksEditInteraction,
+  'ai.tasks.edit.submit': AiTasksEditSubmitInteraction,
+  'ai.tasks.create': AiTasksCreateInteraction,
+  'ai.tasks.create.submit': AiTasksCreateSubmitInteraction
 } as const
 
 export class InteractionsManager {
   public handlers: {
     commands: Collection<string, SlashCommand>
     userCommands: Collection<string, UserCommand>
+    messageCommands: Collection<string, MessageCommand>
     components: Collection<string, ComponentInteractionHandler>
   }
   public readonly client: Client
@@ -68,6 +94,7 @@ export class InteractionsManager {
     this.handlers = {
       commands: new Collection(),
       userCommands: new Collection(),
+      messageCommands: new Collection(),
       components: new Collection()
     }
     this.cooldowns = new Map()
@@ -83,12 +110,19 @@ export class InteractionsManager {
     for (const command of Object.keys(userCommands)) {
       this.loadUserCommand(command as keyof typeof userCommands)
     }
+    for (const command of Object.keys(messageCommands)) {
+      this.loadMessageCommand(command as keyof typeof messageCommands)
+    }
     for (const interaction of Object.keys(interactions)) {
       this.loadComponentInteraction(interaction as keyof typeof interactions)
     }
 
+    for (const command of Object.values(prefixCommands)) {
+      this.client.managers.prefixCommands.register(command as any)
+    }
+
     this.interactionsLogger.info(
-      `Loaded: ${this.handlers.commands.size} slash commands • ${this.handlers.userCommands.size} user commands • ${this.handlers.components.size} components`
+      `Loaded: ${this.handlers.commands.size} slash commands • ${this.handlers.userCommands.size} user commands • ${this.handlers.messageCommands.size} message commands • ${this.handlers.components.size} components • ${this.client.managers.prefixCommands.commands.size} prefix commands`
     )
   }
 
@@ -109,6 +143,29 @@ export class InteractionsManager {
     } catch (error) {
       this.interactionsLogger.error(
         `Failed to load user-command ${path}.`,
+        error
+      )
+      throw error
+    }
+  }
+
+  private loadMessageCommand(path: keyof typeof messageCommands) {
+    let cmd: MessageCommand
+    try {
+      cmd = messageCommands[path]
+      if (this.handlers.messageCommands.has(cmd.name)) {
+        this.interactionsLogger.warn(
+          `Attempted to load already existing message-command ${cmd.name}`
+        )
+        throw new Error(`Message command ${cmd.name} already exists.`)
+      }
+
+      this.handlers.messageCommands.set(cmd.name, cmd)
+      this.interactionsLogger.debug(`Loaded message-command ${cmd.name}.`)
+      return cmd
+    } catch (error) {
+      this.interactionsLogger.error(
+        `Failed to load message-command ${path}.`,
         error
       )
       throw error
@@ -205,13 +262,24 @@ export class InteractionsManager {
   public async updateCommands(forceRegister = false): Promise<Result<string>> {
     try {
       const slashCommands: CreateApplicationCommandOptions[] = []
-      const guildSlashCommands = new Collection<
+      const _guildSlashCommands = new Collection<
         string,
         CreateApplicationCommandOptions[]
       >()
-      const userCommandList = [...this.handlers.userCommands.values()].map(
-        (command) => this.toUserJson(command)
-      )
+
+      // only include user commands without moduleId or guilds for global registration
+      const userCommandList = [...this.handlers.userCommands.values()]
+        .filter(cmd =>
+          !cmd.moduleId && (!cmd.guilds || cmd.guilds.length === 0)
+        )
+        .map((command) => this.toUserJson(command))
+
+      // only include message commands without moduleId or guilds for global registration
+      const messageCommandList = [...this.handlers.messageCommands.values()]
+        .filter(cmd =>
+          !cmd.moduleId && (!cmd.guilds || cmd.guilds.length === 0)
+        )
+        .map((command) => this.toMessageJson(command))
 
       if (this.client.env.NODE_ENV !== 'production') {
         this.interactionsLogger.info(
@@ -219,20 +287,21 @@ export class InteractionsManager {
             colorize('red', 'development')
           } mode, guild commands will be synced via syncModules()...`
         )
-        // In development, we don't register commands here - syncModules() handles it
-        // This prevents double registration and respects module configuration
+        // In development, we don't register global commands
+        // syncModules() handles all command registration for guilds
       } else {
         // Production logic...
         this.interactionsLogger.info(
           `Running in ${colorize('greenBright', 'production')} mode.`
         )
 
-        // Only register global commands here - guild commands are handled by syncModules()
+        // only register truly global commands (no moduleId, no guilds restriction, not guildOnly)
         for (
           const command of this.handlers.commands
             .filter((command) => !command.moduleId)
             .filter((command) => !command.disabled)
             .filter((command) => !command.guilds || command.guilds.length === 0)
+            .filter((command) => !command.guildOnly)
             .values()
         ) {
           slashCommands.push(this.toSlashJson(command))
@@ -247,12 +316,13 @@ export class InteractionsManager {
 
         await this.client.application.bulkEditGlobalCommands([
           ...slashCommands,
-          ...userCommandList
+          ...userCommandList,
+          ...messageCommandList
         ])
       }
 
       this.interactionsLogger.info(
-        `Updated all ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands.`
+        `Updated all ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands and ${this.handlers.messageCommands.size} message commands.`
       )
 
       const syncResult = await this.syncModules()
@@ -263,7 +333,7 @@ export class InteractionsManager {
       }
 
       return ok(
-        `Successfully updated ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands`
+        `Successfully updated ${this.handlers.commands.size} slash commands and ${this.handlers.userCommands.size} user commands and ${this.handlers.messageCommands.size} message commands`
       )
     } catch (err) {
       this.interactionsLogger.error(
@@ -356,6 +426,16 @@ export class InteractionsManager {
       options = command.options
     }
 
+    let defaultMemberPermissions = command.defaultMemberPermissions
+    if (command.requiredPermissions && command.requiredPermissions.length > 0) {
+      // Convert required permissions to bitfield
+      let bitfield = 0n
+      for (const perm of command.requiredPermissions) {
+        bitfield |= Permissions[perm as keyof typeof Permissions]
+      }
+      defaultMemberPermissions = bitfield.toString()
+    }
+
     return {
       type: ApplicationCommandTypes.CHAT_INPUT,
       name: command.name,
@@ -364,7 +444,7 @@ export class InteractionsManager {
       integrationTypes: command.integrationTypes,
       nsfw: command.nsfw,
       contexts: command.contexts,
-      defaultMemberPermissions: command.defaultMemberPermissions
+      defaultMemberPermissions: defaultMemberPermissions
     }
   }
 
@@ -373,6 +453,21 @@ export class InteractionsManager {
   ): CreateUserApplicationCommandOptions {
     return {
       type: ApplicationCommandTypes.USER,
+      name: command.name,
+      integrationTypes: command.integrationTypes,
+      nsfw: command.nsfw,
+      defaultMemberPermissions: command.defaultMemberPermissions,
+      id: command.id,
+      contexts: command.contexts,
+      nameLocalizations: command.nameLocalizations
+    }
+  }
+
+  private toMessageJson(
+    command: MessageCommand
+  ): CreateMessageApplicationCommandOptions {
+    return {
+      type: ApplicationCommandTypes.MESSAGE,
       name: command.name,
       integrationTypes: command.integrationTypes,
       nsfw: command.nsfw,
@@ -456,6 +551,7 @@ export class InteractionsManager {
 
   public async syncModules(): Promise<Result<string>> {
     const guilds = [...this.client.guilds.values()]
+    const isProduction = this.client.env.NODE_ENV === 'production'
 
     // Process guilds in parallel for better performance
     const syncPromises = guilds.map(async (guild) => {
@@ -473,24 +569,87 @@ export class InteractionsManager {
           c => c.moduleId && config.modules.includes(c.moduleId)
         )
 
-        // always include non-modular commands
-        const baseline = [...this.handlers.commands.values()].filter(
-          c => !c.moduleId && !c.disabled
+        // include non-modular commands but exclude those registered globally in production
+        const baseline = [...this.handlers.commands.values()].filter(c => {
+          if (c.moduleId || c.disabled) return false
+
+          // if production, exclude commands already registered globally
+          if (isProduction) {
+            const isGloballyRegistered = !c.guildOnly &&
+              (!c.guilds || c.guilds.length === 0)
+            if (isGloballyRegistered) return false
+          }
+
+          return true
+        })
+
+        // include guild-specific commands for this guild
+        const guildSpecific = [...this.handlers.commands.values()].filter(
+          c => !c.disabled && c.guilds && c.guilds.includes(guild.id)
         )
 
-        const target = [...baseline, ...wanted].map(c =>
+        const target = [...baseline, ...wanted, ...guildSpecific].map(c =>
           this.toSlashJson(c) as CreateGuildApplicationCommandOptions
         )
 
-        // also include user commands
-        const userCmds = [...this.handlers.userCommands.values()].map(c =>
-          this.toUserJson(c)
+        // user commands: include based on module and guild restrictions
+        const wantedUserCmds = [...this.handlers.userCommands.values()].filter(
+          c => c.moduleId && config.modules.includes(c.moduleId)
         )
+        const baselineUserCmds = [...this.handlers.userCommands.values()]
+          .filter(c => {
+            if (c.moduleId) return false
+            // in production, exclude commands already registered globally
+            if (isProduction) {
+              const isGloballyRegistered = !c.guilds || c.guilds.length === 0
+              if (isGloballyRegistered) return false
+            }
+            return true
+          })
+        const guildSpecificUserCmds = [...this.handlers.userCommands.values()]
+          .filter(
+            c => c.guilds && c.guilds.includes(guild.id)
+          )
+
+        const userCmds = [
+          ...baselineUserCmds,
+          ...wantedUserCmds,
+          ...guildSpecificUserCmds
+        ].map(c => this.toUserJson(c))
+
+        // message commands: include based on module and guild restrictions
+        const wantedMessageCmds = [...this.handlers.messageCommands.values()]
+          .filter(
+            c => c.moduleId && config.modules.includes(c.moduleId)
+          )
+        const baselineMessageCmds = [...this.handlers.messageCommands.values()]
+          .filter(c => {
+            if (c.moduleId) return false
+            // in production, exclude commands already registered globally
+            if (isProduction) {
+              const isGloballyRegistered = !c.guilds || c.guilds.length === 0
+              if (isGloballyRegistered) return false
+            }
+            return true
+          })
+        const guildSpecificMessageCmds = [
+          ...this.handlers.messageCommands.values()
+        ]
+          .filter(
+            c => c.guilds && c.guilds.includes(guild.id)
+          )
+
+        const messageCmds = [
+          ...baselineMessageCmds,
+          ...wantedMessageCmds,
+          ...guildSpecificMessageCmds
+        ].map(c => this.toMessageJson(c))
 
         // bulk replace in one go
         await this.client.application.bulkEditGuildCommands(guild.id, [
           ...target,
-          ...userCmds
+          ...userCmds,
+          ...messageCmds
         ])
 
         return { guildId: guild.id, success: true, error: null }

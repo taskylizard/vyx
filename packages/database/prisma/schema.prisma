@@ -37,6 +37,19 @@ model Config {
   logModerationActions Boolean? @map("log_moderation_actions")
   logMessageEdits      Boolean? @map("log_message_edits")
   logMessageDeletes    Boolean? @map("log_message_deletes")
+  logMemberJoins       Boolean? @map("log_member_joins")
+  logMemberLeaves      Boolean? @map("log_member_leaves")
+
+  memberJoinChannel        BigInt? @map("member_join_channel")
+  memberLeaveChannel       BigInt? @map("member_leave_channel")
+  messageDeleteChannel     BigInt? @map("message_delete_channel")
+  messageEditChannel       BigInt? @map("message_edit_channel")
+  moderationActionsChannel BigInt? @map("moderation_actions_channel")
+
+  newAccountThresholdDays Int?    @default(7) @map("new_account_threshold_days")
+  trapChannel             BigInt? @map("trap_channel")
+  trapAction              String? @default("SOFTBAN") @map("trap_action")
+  trapDuration            String? @map("trap_duration")
 
   currency String?
   modules  Module[]
@@ -211,6 +224,36 @@ model QueryEngineSettings {
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
   @@map("query_engine_settings")
+}
+
+model AITask {
+  id           Int      @id @default(autoincrement())
+  userId       String   @map("user_id")
+  instructions String   @db.Text
+  intervalDays Int      @map("interval_days") // 1-7 days
+  timeOfDay    String   @map("time_of_day") // HH:MM format
+  timezone     String?  // Optional timezone (e.g., "America/New_York")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("ai_tasks")
+}
+
+model UserAIConfig {
+  userId           String   @id @map("user_id")
+  tone             String   @default("balanced") // casual, professional, friendly, sarcastic, balanced
+  verbosity        String   @default("normal") // concise, normal, detailed, comprehensive
+  personalityTags  String[] @default([]) // humorous, technical, creative, empathetic, witty, etc.
+  customPrompt     String?  @db.Text // Custom instructions
+  languageStyle    String   @default("standard") // standard, informal, internet-speak, formal
+  excludedTopics   String[] @default([]) // Topics to avoid
+  responseFormat   String   @default("mixed") // mixed, code-first, text-first, markdown-heavy
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("user_ai_config")
 }
 
 model Personality {

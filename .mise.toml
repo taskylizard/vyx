@@ -1,5 +1,5 @@
 [tools]
-node = "latest"
+node = "24"
 "npm:@infisical/cli" = "latest"
 typos = "latest"
 "ubi:trufflesecurity/trufflehog" = "latest"
@@ -11,7 +11,9 @@ _.file = '.env.deployer'
 [tasks.start-dev]
 description = "start docker-compose for dev environment and bot"
 run = """
-infisical run --env=dev -- docker compose -f docker-compose.dev.yml up -d && wait 20 && bun --filter="@packages/database" run db:push
+infisical run --env=dev -- docker compose -f docker-compose.dev.yml up -d && \
+sleep 20 && \
+infisical run --env=dev -- bun --filter="@packages/database" run db:push
 """
 
 [tasks.dev]

@@ -1,3 +1,4 @@
+import type { Module } from '@packages/database'
 import type {
   CommandInteraction,
   CreateUserApplicationCommandOptions
@@ -8,6 +9,8 @@ import type {
  */
 export type UserCommand = {
   run: (interaction: CommandInteraction) => Promise<unknown>
+  guilds?: string[]
+  moduleId?: Module
 } & Omit<CreateUserApplicationCommandOptions, 'type'>
 
 /**

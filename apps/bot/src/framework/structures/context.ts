@@ -1,6 +1,7 @@
 import type {
   AnyInteractionChannel,
   AnyInteractionGateway,
+  ApplicationCommandTypes,
   CommandInteraction,
   ComponentInteraction,
   EmbedOptions,
@@ -160,7 +161,15 @@ export class Context {
    * @param options Message content
    * @returns A followup message object
    */
-  public async followUp(options: InteractionContent) {
+  public async followUp(options: InteractionContent): Promise<
+    ReturnType<
+      CommandInteraction<
+        | AnyInteractionChannel
+        | Uncached,
+        ApplicationCommandTypes
+      >['createFollowup']
+    >
+  > {
     return await this.interaction.createFollowup(options)
   }
 

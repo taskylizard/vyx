@@ -8,6 +8,7 @@ import {
 export default defineUserCommand({
   name: 'Report this member',
   contexts: [InteractionContextTypes.GUILD],
+  moduleId: 'MODERATION',
   async run(interaction) {
     if (!interaction.guildID || !interaction.member) {
       return await interaction.reply({

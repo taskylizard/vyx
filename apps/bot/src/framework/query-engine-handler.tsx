@@ -7,7 +7,7 @@ import {
   Separator,
   TextDisplay
 } from '@packages/components-jsx'
-import { Fragment, h } from '@packages/components-jsx/jsx-runtime'
+import { h } from '@packages/components-jsx/jsx-runtime'
 import {
   generateQueryResponse,
   generateServerSystemPrompt,

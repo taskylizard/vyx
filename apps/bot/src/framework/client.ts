@@ -9,13 +9,19 @@ import {
   type ComponentInteraction,
   ComponentTypes,
   type Member,
+  type Message,
   type ModalSubmitInteraction,
   type PermissionName,
   type RESTApplication,
   type User
 } from 'oceanic.js'
 import { type $Fetch, createFetch } from 'ofetch'
-import { InteractionsManager, type Managers, PluginsManager } from './managers'
+import {
+  InteractionsManager,
+  type Managers,
+  PluginsManager,
+  PrefixCommandsManager
+} from './managers'
 import {
   AnalyticsModule,
   EconomyModule,
@@ -112,7 +118,8 @@ export class Client extends BaseClient {
 
     this.managers = {
       interactions: new InteractionsManager(this),
-      plugins: new PluginsManager(this)
+      plugins: new PluginsManager(this),
+      prefixCommands: new PrefixCommandsManager(this, '!')
     }
 
     this.owners = []
@@ -136,6 +143,30 @@ export class Client extends BaseClient {
       } else {
         this.logger.info(updateResult.value)
       }
+
+      // Load and schedule all active AI tasks on startup
+      try {
+        const activeTasks = await this.prisma.aITask.findMany({
+          where: { isActive: true }
+        })
+
+        if (activeTasks.length > 0) {
+          this.logger.info(`Loading ${activeTasks.length} active AI tasks...`)
+
+          for (const task of activeTasks) {
+            await this.modules.scheduler.scheduleAITask(task.id)
+          }
+
+          this.logger.info('Successfully scheduled all active AI tasks')
+        } else {
+          this.logger.info('No active AI tasks to schedule')
+        }
+      } catch (error) {
+        this.logger.error(
+          'Failed to load and schedule AI tasks on startup:',
+          error
+        )
+      }
     })
 
     this.on('commandError', (ctx, error) =>
@@ -149,8 +180,13 @@ export class Client extends BaseClient {
         (err, id) => this.oceanicLogger.error(`Error on shard ${id}:`, err)
       )
       .on('interactionCreate', this.onInteraction)
+      .on('messageCreate', this.onMessage)
 
     this.logger.info('Initialized Client.')
+  }
+
+  private async onMessage(_message: Message): Promise<void> {
+    // await this.managers.prefixCommands.handleMessage(message)
   }
 
   private async onInteraction(
@@ -207,6 +243,32 @@ export class Client extends BaseClient {
             return
           }
           this.logger.trace(`Found user-command ${cmd.name}`)
+
+          await cmd.run(interaction)
+          return
+        }
+
+        if (interaction.isMessageCommand()) {
+          span.setAttributes({
+            'interaction.message_command.name': interaction.data.name,
+            'interaction.message_command.target_id': interaction.data.targetID
+          })
+
+          this.logger.debug(
+            `Received message-command interaction /${interaction.data.name} from ${interaction.user.tag} (${interaction.user.id})`
+          )
+
+          const cmd = this.managers.interactions.handlers.messageCommands.get(
+            interaction.data.name
+          )
+
+          if (!cmd) {
+            this.logger.trace(
+              `Message-command ${interaction.data.name} not found`
+            )
+            return
+          }
+          this.logger.trace(`Found message-command ${cmd.name}`)
 
           await cmd.run(interaction)
           return

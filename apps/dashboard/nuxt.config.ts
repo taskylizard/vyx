@@ -34,7 +34,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       auth: {
-        redirectUserTo: '/app/user',
+        redirectUserTo: '/app',
         redirectGuestTo: '/'
       },
       links: {

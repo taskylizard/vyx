@@ -11,6 +11,6 @@ export default defineNuxtRouteMiddleware(() => {
     toast('Error', {
       description: 'You are not authorized to access this page'
     })
-    return navigateTo('/app/user')
+    return navigateTo('/app')
   }
 })

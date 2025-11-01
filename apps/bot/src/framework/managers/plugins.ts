@@ -21,7 +21,7 @@ export class PluginsManager {
       this.pluginsLogger.info('Calling all onExit() methods of plugins...')
       for (const plugin of this.plugins.values()) {
         this.pluginsLogger.debug(`Called ${plugin.name}.onExit()`)
-        plugin.onExit && (await plugin.onExit(this.client))
+        if (plugin.onExit) await plugin.onExit(this.client)
       }
     })
   }
@@ -54,13 +54,14 @@ export class PluginsManager {
 
     await plugin.onLoad(this.client)
     this.plugins.set(plugin.name, plugin)
-    plugin.middlewares && this.middlewares.push(...plugin.middlewares)
-    plugin.events &&
+    if (plugin.middlewares) this.middlewares.push(...plugin.middlewares)
+    if (plugin.events) {
       Object.entries(plugin.events).forEach(([event, listener]) => {
         // @ts-expect-error: "Expression produces a union type that is too complex to represent." don't care lmao
         this.client.on(event as keyof ClientEvents, listener)
         this.pluginsLogger.trace(`Registered event listener for ${event}`)
       })
+    }
     this.pluginsLogger.debug(`Loaded plugin ${plugin.name}`)
 
     return plugin

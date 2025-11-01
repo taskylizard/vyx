@@ -1,4 +1,8 @@
-import { ComponentTypes, type StringSelectMenu } from 'oceanic.js'
+import {
+  ComponentTypes,
+  type SelectOption,
+  type StringSelectMenu
+} from 'oceanic.js'
 
 import { childrenToArray } from './utils'
 
@@ -14,4 +18,8 @@ export function StringSelect(
     options: childrenToArray(children),
     ...props
   }
+}
+
+export function StringOption({ key, ...props }: SelectOption & { key?: any }) {
+  return props
 }

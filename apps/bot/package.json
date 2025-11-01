@@ -3,10 +3,8 @@
   "type": "module",
   "private": true,
   "exports": {
-    ".": {
-      "types": "./src/framework/index.ts",
-      "default": "./src/framework/index.ts"
-    }
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "imports": {
     "#framework": {
@@ -15,6 +13,7 @@
     }
   },
   "scripts": {
+    "build": "tsdown",
     "typecheck": "tsc --build",
     "start": "infisical run --env=prod -- bun src/main.ts",
     "dev": "DEBUG=true infisical run --env=dev -- bun --watch src/main.ts",
@@ -23,44 +22,48 @@
   "devDependencies": {
     "@packages/typescript-config": "workspace:*",
     "@packages/components-jsx": "workspace:*",
-    "@total-typescript/ts-reset": "catalog:dev",
-    "@types/ms": "catalog:types",
     "@types/bun": "catalog:types",
     "@types/pg": "catalog:types",
-    "@types/pidusage": "catalog:types",
-    "typescript": "catalog:dev"
+    "typescript": "catalog:tsc",
+    "@types/ms": "catalog:types",
+    "@types/pidusage": "catalog:types"
   },
   "dependencies": {
-    "@antfu/utils": "catalog:prod",
-    "@axiomhq/js": "^1.3.1",
-    "@oceanicjs/builders": "^1.1.11",
+    "@axiomhq/js": "catalog:prod",
+    "@oceanicjs/builders": "catalog:build",
     "@packages/database": "workspace:*",
     "@packages/env": "workspace:*",
     "@packages/inference-engine": "workspace:*",
-    "@vitalets/google-translate-api": "catalog:prod",
-    "anilist": "catalog:prod",
-    "aocjs": "catalog:prod",
-    "bidc": "^0.0.3",
-    "bullmq": "catalog:prod",
+    "bidc": "catalog:prod",
     "consola": "catalog:node",
     "date-fns": "catalog:prod",
-    "denque": "catalog:prod",
-    "discord-md-tags": "catalog:prod",
-    "ioredis": "catalog:prod",
-    "ms": "catalog:prod",
     "oceanic.js": "catalog:prod",
-    "ofetch": "catalog:prod",
-    "ordana": "catalog:prod",
-    "p-limit": "catalog:prod",
-    "p-retry": "catalog:prod",
-    "parse-duration": "catalog:prod",
+    "ofetch": "catalog:network",
     "pathe": "catalog:node",
     "pg": "catalog:prod",
-    "pidusage": "catalog:prod",
-    "pretty-ms": "catalog:prod",
-    "pyodide": "catalog:prod",
+    "zod": "catalog:utils",
+    "@total-typescript/ts-reset": "catalog:tsc",
     "tracix": "catalog:prod",
+    "typed-env": "catalog:node",
+    "pyodide": "catalog:prod",
+    "pretty-ms": "catalog:prod",
+    "pidusage": "catalog:prod",
     "ts-pattern": "catalog:prod",
-    "zod": "catalog:utils"
-  }
+    "@vitalets/google-translate-api": "catalog:prod",
+    "aocjs": "catalog:prod",
+    "ordana": "catalog:prod",
+    "p-limit": "catalog:utils",
+    "p-retry": "catalog:prod",
+    "parse-duration": "catalog:prod",
+    "ms": "catalog:prod",
+    "ioredis": "catalog:prod",
+    "discord-md-tags": "catalog:prod",
+    "denque": "catalog:prod",
+    "bullmq": "catalog:prod",
+    "anilist": "catalog:prod",
+    "@antfu/utils": "catalog:utils"
+  },
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts"
 }

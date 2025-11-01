@@ -23,7 +23,7 @@ export class QueryEngineModule {
         }
       })
       return data
-    } catch (_error) {
+    } catch {
       // If duplicate, just return existing
       const existing = await this.prisma.queryEngineData.findFirst({
         where: {

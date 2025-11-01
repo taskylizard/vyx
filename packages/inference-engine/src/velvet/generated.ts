@@ -44,6 +44,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/generate-image': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Generate image
+     * @description Generate an image from a text prompt using AI image generation models
+     */
+    post: operations['postGenerate-image']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/health': {
     parameters: {
       query?: never
@@ -169,6 +189,13 @@ export interface operations {
             backend_uuid?: string
             /** @default [] */
             web_results: unknown[]
+            citations?: {
+              index: number
+              url: string
+              name: string
+              snippet: string
+              domain: string
+            }[]
             dict?: unknown
           }
         }
@@ -243,6 +270,75 @@ export interface operations {
       }
     }
   }
+  'postGenerate-image': {
+    parameters: {
+      query?: never
+      header: {
+        authorization: string
+      }
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': {
+          app: string
+          /** @description Text prompt for image generation */
+          prompt: string
+          /** @description Model to use for image generation */
+          model: string
+          /** @description Style preset for dream.ai (optional, default: 100) */
+          style?: number
+          userId?: string
+          guildId?: string
+          username?: string
+          guildName?: string
+        }
+        'application/x-www-form-urlencoded': {
+          app: string
+          /** @description Text prompt for image generation */
+          prompt: string
+          /** @description Model to use for image generation */
+          model: string
+          /** @description Style preset for dream.ai (optional, default: 100) */
+          style?: number
+          userId?: string
+          guildId?: string
+          username?: string
+          guildName?: string
+        }
+        'multipart/form-data': {
+          app: string
+          /** @description Text prompt for image generation */
+          prompt: string
+          /** @description Model to use for image generation */
+          model: string
+          /** @description Style preset for dream.ai (optional, default: 100) */
+          style?: number
+          userId?: string
+          guildId?: string
+          username?: string
+          guildName?: string
+        }
+      }
+    }
+    responses: {
+      /** @description Response for status 200 */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': {
+            ok: boolean
+            image?: string
+            error?: string
+            message?: string
+          }
+        }
+      }
+    }
+  }
   getHealth: {
     parameters: {
       query?: never
@@ -286,6 +382,10 @@ export interface operations {
               pro: ((string | null) | null)[]
               reasoning: ((string | null) | null)[]
               'deep research': ((string | null) | null)[]
+              image: {
+                provider: string
+                models: string[]
+              }[]
             }
           }
         }

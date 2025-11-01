@@ -1,9 +1,5 @@
-import type { OpenAIPromptItem } from '../index'
-import {
-  formatAskAIAnswer,
-  formatAskAIPrompt,
-  generateAskAIResponse
-} from './index'
+import { formatAskAIAnswer, type OpenAIPromptItem } from '../index'
+import { formatAskAIPrompt, generateAskAIResponse } from './index'
 import type { AskAIInteractionType, AskAIResponse } from './index'
 
 const ASK_AI_SYSTEM_PROMPT =

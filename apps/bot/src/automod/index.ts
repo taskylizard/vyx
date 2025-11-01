@@ -7,6 +7,7 @@ import {
 import type { Client } from '#framework'
 import type { AutomodRuleType } from '@packages/database'
 import type { Message } from 'oceanic.js'
+import { formatUserMention } from '../commands/moderation/utils'
 
 export interface AutomodRuleEntry {
   id: number
@@ -154,11 +155,7 @@ export async function logAutomodViolation(
     const embed = new Embed()
       .setTitle('🚫 Automod Triggered')
       .setColor(colors.RED)
-      .addField(
-        'Member',
-        `${message.author.username} (${message.author.id})`,
-        true
-      )
+      .addField('Member', formatUserMention(message.author), true)
       .addField('Channel', `<#${message.channelID}>`, true)
       .addField(
         'Message',
