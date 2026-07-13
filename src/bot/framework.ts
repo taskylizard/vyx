@@ -85,7 +85,8 @@ export const FRAMEWORK_TYPE_MESSAGES = {
   nestedGroup:
     'Discord supports only command -> group -> subcommand. Nested subcommand groups are invalid.',
   rootExecute:
-    'A command with subcommands cannot define root execute(). Put execute() on a subcommand leaf.'
+    'A command with subcommands cannot define root execute(). Put execute() on a subcommand leaf.',
+  tooManySubcommands: 'Discord allows at most 25 subcommands.'
 } as const
 
 export interface FrameworkTypeError<TMessage extends string> {
@@ -174,13 +175,40 @@ type ValidateNestedLeaf<TNode> = TNode extends SlashSubcommandDefinitionBase
 type CollectValidationErrors<TResults> =
   Exclude<TResults, true> extends never ? true : Exclude<TResults, true>
 
+type UnionToIntersection<TUnion> = (
+  TUnion extends unknown ? (value: TUnion) => void : never
+) extends (value: infer TIntersection) => void
+  ? TIntersection
+  : never
+
+type LastUnionMember<TUnion> =
+  UnionToIntersection<TUnion extends unknown ? () => TUnion : never> extends () => infer TLast
+    ? TLast
+    : never
+
+type HasMoreThan25Members<TUnion, TCount extends unknown[] = []> = TCount['length'] extends 26
+  ? true
+  : [TUnion] extends [never]
+    ? false
+    : HasMoreThan25Members<Exclude<TUnion, LastUnionMember<TUnion>>, [...TCount, unknown]>
+
+type HasMoreThan25Keys<TRecord> = string extends keyof TRecord
+  ? false
+  : number extends keyof TRecord
+    ? false
+    : symbol extends keyof TRecord
+      ? false
+      : HasMoreThan25Members<keyof TRecord>
+
 type ValidateNestedLeaves<TNodes> =
   TNodes extends Record<PropertyKey, unknown>
     ? keyof TNodes extends never
       ? FrameworkTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['emptySubcommands']>
-      : CollectValidationErrors<
-          { [Name in keyof TNodes]: ValidateNestedLeaf<TNodes[Name]> }[keyof TNodes]
-        >
+      : HasMoreThan25Keys<TNodes> extends true
+        ? FrameworkTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['tooManySubcommands']>
+        : CollectValidationErrors<
+            { [Name in keyof TNodes]: ValidateNestedLeaf<TNodes[Name]> }[keyof TNodes]
+          >
     : FrameworkTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['invalidNode']>
 
 type ValidateRootNode<TNode> = TNode extends SlashSubcommandDefinitionBase
@@ -199,9 +227,11 @@ type ValidateRootNodes<TNodes> =
   TNodes extends Record<PropertyKey, unknown>
     ? keyof TNodes extends never
       ? FrameworkTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['emptySubcommands']>
-      : CollectValidationErrors<
-          { [Name in keyof TNodes]: ValidateRootNode<TNodes[Name]> }[keyof TNodes]
-        >
+      : HasMoreThan25Keys<TNodes> extends true
+        ? FrameworkTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['tooManySubcommands']>
+        : CollectValidationErrors<
+            { [Name in keyof TNodes]: ValidateRootNode<TNodes[Name]> }[keyof TNodes]
+          >
     : FrameworkTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['invalidNode']>
 
 export type ValidateSlashCommandDefinition<TDefinition> = TDefinition extends {
@@ -636,7 +666,7 @@ function validateRootSubcommands(
     addIssue(issues, parentPath, 'empty-subcommands', FRAMEWORK_TYPE_MESSAGES.emptySubcommands)
   }
   if (entries.length > 25) {
-    addIssue(issues, parentPath, 'too-many-subcommands', 'Discord allows at most 25 subcommands.')
+    addIssue(issues, parentPath, 'too-many-subcommands', FRAMEWORK_TYPE_MESSAGES.tooManySubcommands)
   }
   for (const [name, definition] of entries) {
     const path = [...parentPath, name]
@@ -672,7 +702,7 @@ function validateNestedSubcommands(
     addIssue(issues, parentPath, 'empty-subcommands', FRAMEWORK_TYPE_MESSAGES.emptySubcommands)
   }
   if (entries.length > 25) {
-    addIssue(issues, parentPath, 'too-many-subcommands', 'Discord allows at most 25 subcommands.')
+    addIssue(issues, parentPath, 'too-many-subcommands', FRAMEWORK_TYPE_MESSAGES.tooManySubcommands)
   }
   for (const [name, definition] of entries) {
     const path = [...parentPath, name]

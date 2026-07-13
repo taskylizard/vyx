@@ -307,6 +307,16 @@ test('aggregates runtime lint failures before registration', () => {
       }
     },
     { description: 'Empty', name: 'empty', subcommands: {} },
+    {
+      description: 'Too many subcommands',
+      name: 'too-many-subcommands',
+      subcommands: Object.fromEntries(
+        Array.from({ length: 26 }, (_, index) => [
+          `leaf-${index + 1}`,
+          { description: `Leaf ${index + 1}`, async execute() {} }
+        ])
+      )
+    },
     { description: 'Duplicate', name: 'Invalid Name', async execute() {} }
   ] as unknown as readonly SlashRootCommandDefinitionBase[]
 
@@ -323,6 +333,7 @@ test('aggregates runtime lint failures before registration', () => {
         'helper-free-leaf',
         'duplicate-command',
         'empty-subcommands',
+        'too-many-subcommands',
         'missing-execute'
       ])
     )

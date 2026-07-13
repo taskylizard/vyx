@@ -193,6 +193,67 @@ test('returns exact agent-friendly validation messages', () => {
   expectTypeOf<ValidateSlashCommandDefinition<EmptySubcommands>>().toEqualTypeOf<
     FrameworkTypeError<'A command or subcommand group must contain at least one subcommand.'>
   >()
+
+  type TwentySixSubcommandNames = `leaf-${
+    | 1
+    | 2
+    | 3
+    | 4
+    | 5
+    | 6
+    | 7
+    | 8
+    | 9
+    | 10
+    | 11
+    | 12
+    | 13
+    | 14
+    | 15
+    | 16
+    | 17
+    | 18
+    | 19
+    | 20
+    | 21
+    | 22
+    | 23
+    | 24
+    | 25
+    | 26}`
+  type TwentySixLeaves = {
+    [Name in TwentySixSubcommandNames]: Leaf
+  }
+  type TwentyFiveLeaves = Omit<TwentySixLeaves, 'leaf-26'>
+  type MaximumRootSubcommands = {
+    description: 'Maximum root subcommands'
+    name: 'maximum-root-subcommands'
+    subcommands: TwentyFiveLeaves
+  }
+  expectTypeOf<ValidateSlashCommandDefinition<MaximumRootSubcommands>>().toEqualTypeOf<true>()
+
+  type TooManyRootSubcommands = {
+    description: 'Too many root subcommands'
+    name: 'too-many-root-subcommands'
+    subcommands: TwentySixLeaves
+  }
+  expectTypeOf<ValidateSlashCommandDefinition<TooManyRootSubcommands>>().toEqualTypeOf<
+    FrameworkTypeError<'Discord allows at most 25 subcommands.'>
+  >()
+
+  type TooManyNestedSubcommands = {
+    description: 'Too many nested subcommands'
+    name: 'too-many-nested-subcommands'
+    subcommands: {
+      server: {
+        description: 'Server'
+        subcommands: TwentySixLeaves
+      }
+    }
+  }
+  expectTypeOf<ValidateSlashCommandDefinition<TooManyNestedSubcommands>>().toEqualTypeOf<
+    FrameworkTypeError<'Discord allows at most 25 subcommands.'>
+  >()
 })
 
 test('rejects invalid command definitions at their call sites', () => {
