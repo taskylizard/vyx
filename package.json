@@ -1,0 +1,61 @@
+{
+  "name": "kanikou",
+  "version": "0.0.0",
+  "description": "Kanikou Discord bot library.",
+  "license": "MIT",
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "exports": {
+    ".": "./dist/run.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "start": "vp node --experimental-strip-types src/run.ts",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "2.0.10",
+    "@ai-sdk/otel": "1.0.22",
+    "@openrouter/ai-sdk-provider": "3.0.0",
+    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "0.220.0",
+    "@opentelemetry/resources": "2.9.0",
+    "@opentelemetry/sdk-trace-node": "2.9.0",
+    "@opentelemetry/semantic-conventions": "1.43.0",
+    "@parallel-web/ai-sdk-tools": "1.0.0",
+    "@supadata/js": "1.4.0",
+    "ai": "7.0.19",
+    "axiom": "0.52.2",
+    "cheerio": "1.2.0",
+    "dotenv": "17.4.2",
+    "oceanic.js": "1.14.0",
+    "tracix": "1.0.0",
+    "ts-pattern": "5.9.0",
+    "typed-env": "2.0.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "bumpp": "11.1.0",
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.11.0",
+      "onFail": "download"
+    }
+  }
+}
