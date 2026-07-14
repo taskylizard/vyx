@@ -1,5 +1,4 @@
-import { ApplicationIntegrationTypes, InteractionContextTypes } from 'oceanic.js'
-import { defineSlashCommand, subcommand } from '../bot/framework.ts'
+import { defineSlashCommand, subcommand } from '../bot/rosepack.ts'
 import {
   MEMORY_ENTRY_LIMIT,
   MEMORY_ENTRY_MAX_LENGTH,
@@ -13,15 +12,8 @@ const MEMORY_PREVIEW_MAX_LENGTH = 180
 export default defineSlashCommand({
   name: 'memory',
   description: "Manage Kanikou's saved memory",
-  contexts: [
-    InteractionContextTypes.GUILD,
-    InteractionContextTypes.BOT_DM,
-    InteractionContextTypes.PRIVATE_CHANNEL
-  ],
-  integrationTypes: [
-    ApplicationIntegrationTypes.GUILD_INSTALL,
-    ApplicationIntegrationTypes.USER_INSTALL
-  ],
+  contexts: ['guild', 'botDm', 'privateChannel'],
+  installations: ['guild', 'user'],
   async beforeExecute(context) {
     await context.defer({ ephemeral: true })
   },
@@ -31,14 +23,14 @@ export default defineSlashCommand({
       return
     }
 
-    context.bot.logger.error('memory command failed', error)
+    context.app.logger.error('memory command failed', error)
     await context.editResponse('The memory operation failed. Please try again.')
   },
   subcommands: {
     export: subcommand({
       description: 'Download your personal memory as Markdown',
       async execute(context) {
-        const markdown = await context.bot.memory.exportMarkdown({
+        const markdown = await context.app.memory.exportMarkdown({
           id: context.interaction.user.id,
           kind: 'user'
         })
@@ -67,7 +59,7 @@ export default defineSlashCommand({
           await context.editResponse('Nothing was deleted because confirmation was false.')
           return
         }
-        const count = await context.bot.memory.clear({
+        const count = await context.app.memory.clear({
           id: context.interaction.user.id,
           kind: 'user'
         })
@@ -88,7 +80,7 @@ export default defineSlashCommand({
               await context.editResponse('Server memory can only be used inside a Discord server.')
               return
             }
-            const markdown = await context.bot.memory.exportMarkdown({
+            const markdown = await context.app.memory.exportMarkdown({
               id: context.interaction.guildID,
               kind: 'server'
             })
@@ -127,7 +119,7 @@ export default defineSlashCommand({
               await context.editResponse('Nothing was deleted because confirmation was false.')
               return
             }
-            const count = await context.bot.memory.clear({
+            const count = await context.app.memory.clear({
               id: context.interaction.guildID,
               kind: 'server'
             })
@@ -160,7 +152,7 @@ export default defineSlashCommand({
               )
               return
             }
-            const result = await context.bot.memory.forget(
+            const result = await context.app.memory.forget(
               { id: context.interaction.guildID, kind: 'server' },
               context.options.id
             )
@@ -190,7 +182,7 @@ export default defineSlashCommand({
               await context.editResponse('Server memory can only be used inside a Discord server.')
               return
             }
-            const entries = await context.bot.memory.list({
+            const entries = await context.app.memory.list({
               id: context.interaction.guildID,
               kind: 'server'
             })
@@ -218,7 +210,7 @@ export default defineSlashCommand({
               )
               return
             }
-            const entry = await context.bot.memory.remember(
+            const entry = await context.app.memory.remember(
               { id: context.interaction.guildID, kind: 'server' },
               context.options.memory,
               context.interaction.id
@@ -242,7 +234,7 @@ export default defineSlashCommand({
         }
       },
       async execute(context) {
-        const result = await context.bot.memory.forget(
+        const result = await context.app.memory.forget(
           { id: context.interaction.user.id, kind: 'user' },
           context.options.id
         )
@@ -268,7 +260,7 @@ export default defineSlashCommand({
     show: subcommand({
       description: 'Show your saved personal memory',
       async execute(context) {
-        const entries = await context.bot.memory.list({
+        const entries = await context.app.memory.list({
           id: context.interaction.user.id,
           kind: 'user'
         })
@@ -286,7 +278,7 @@ export default defineSlashCommand({
         }
       },
       async execute(context) {
-        const entry = await context.bot.memory.remember(
+        const entry = await context.app.memory.remember(
           { id: context.interaction.user.id, kind: 'user' },
           context.options.memory,
           context.interaction.id

@@ -8,13 +8,14 @@ import type {
   SlashCommandOptionValues,
   SlashCommandValueOptionRecord,
   SlashSubcommandDefinition
-} from '../../src/bot/framework.ts'
-import { buildSlashCommandTree, SlashCommandContext } from '../../src/bot/framework.ts'
+} from 'rosepack'
+import { SlashCommandContext } from 'rosepack'
+import { rosepack } from '../../src/bot/rosepack.ts'
 import memoryCommand from '../../src/commands/memory.ts'
 import { MarkdownMemoryStore } from '../../src/memory/markdown-memory.ts'
 
 const temporaryDirectories: string[] = []
-const memoryCommands = buildSlashCommandTree([memoryCommand])
+const memoryCommands = rosepack.createRegistry([memoryCommand])
 
 afterEach(async () => {
   await Promise.all(
@@ -244,7 +245,6 @@ test('supports server forget, clear, and Markdown export actions', async () => {
 
 function createBot(memory: MarkdownMemoryStore): BotContext {
   return {
-    commands: memoryCommands,
     logger: { error: vi.fn() },
     memory
   } as unknown as BotContext
@@ -258,20 +258,20 @@ async function runMemorySubcommand<TOptions extends SlashCommandValueOptionRecor
 }: {
   bot: BotContext
   interaction: CommandInteraction
-  leaf: SlashSubcommandDefinition<TOptions>
+  leaf: SlashSubcommandDefinition<BotContext, TOptions>
   options: SlashCommandOptionValues<TOptions>
 }): Promise<void> {
-  const root = bot.commands.get('memory')
+  const root = memoryCommands.get('memory')
   if (root === undefined) {
     throw new Error('Expected the memory command in the test registry.')
   }
   const source = new SlashCommandContext({
-    bot,
+    app: bot,
     command: root,
-    commands: bot.commands,
     interaction,
     node: root,
-    options: {}
+    options: {},
+    registry: memoryCommands
   })
   await source.invoke(leaf, options)
 }

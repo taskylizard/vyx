@@ -1,0 +1,50 @@
+{
+  "name": "rosepack",
+  "version": "0.1.0",
+  "description": "A strongly typed Oceanic slash-command framework.",
+  "homepage": "https://github.com/taskylizard/kanikou/tree/x/packages/rosepack#readme",
+  "bugs": {
+    "url": "https://github.com/taskylizard/kanikou/issues"
+  },
+  "license": "MIT",
+  "author": "taskylizard",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taskylizard/kanikou.git",
+    "directory": "packages/rosepack"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "vp pack",
+    "dev": "vp pack --watch",
+    "test": "vp test",
+    "check": "vp check",
+    "prepublishOnly": "vp run build"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "bumpp": "11.1.0",
+    "oceanic.js": "1.14.0",
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "peerDependencies": {
+    "oceanic.js": "1.14.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

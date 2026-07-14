@@ -7,20 +7,81 @@ import {
   MessageFlags
 } from 'oceanic.js'
 import { expect, test, vi } from 'vite-plus/test'
-import type { BotContext } from '../../src/bot/context.ts'
 import {
-  buildSlashCommandTree,
   CommandTreeValidationError,
-  defineSlashCommand,
-  dispatchInteraction,
-  registerSlashCommands,
+  createRosepack,
   SlashCommandContext,
   slashCommandToDiscord,
-  subcommand,
   type SlashRootCommandDefinitionBase
-} from '../../src/bot/framework.ts'
-import askCommand from '../../src/commands/ask.ts'
-import memoryCommand from '../../src/commands/memory.ts'
+} from '../src/index.ts'
+
+interface TestApp {
+  responder: {
+    answerPrompt(app: TestApp, interaction: CommandInteraction, question: string): Promise<void>
+  }
+}
+
+const rosepack = createRosepack<TestApp>()
+const { defineSlashCommand, subcommand } = rosepack
+
+const askCommand = defineSlashCommand({
+  name: 'ask',
+  description: 'Ask the AI',
+  contexts: ['guild', 'botDm', 'privateChannel'],
+  installations: ['guild', 'user'],
+  options: {
+    ephemeral: {
+      description: 'Should only you see the answer?',
+      kind: 'boolean'
+    },
+    question: {
+      description: 'What do you want to ask?',
+      kind: 'string',
+      required: true
+    }
+  },
+  async execute(context) {
+    const { ephemeral = false, question } = context.options
+    await context.defer({ ephemeral })
+    await context.app.responder.answerPrompt(context.app, context.interaction, question)
+  }
+})
+
+const memoryCommand = defineSlashCommand({
+  name: 'memory',
+  description: 'Manage saved memory',
+  subcommands: {
+    remember: subcommand({
+      description: 'Save a personal memory',
+      options: {
+        memory: {
+          description: 'The information to remember',
+          kind: 'string',
+          maxLength: 1_000,
+          required: true
+        }
+      },
+      async execute() {}
+    }),
+    server: {
+      description: 'View or manage server memory',
+      subcommands: {
+        remember: subcommand({
+          description: 'Save server memory',
+          options: {
+            memory: {
+              description: 'The server information to remember',
+              kind: 'string',
+              maxLength: 1_000,
+              required: true
+            }
+          },
+          async execute() {}
+        })
+      }
+    }
+  }
+})
 
 test('converts slash command records to Oceanic command payloads', () => {
   expect(slashCommandToDiscord(askCommand)).toEqual({
@@ -64,7 +125,7 @@ test('converts typed subcommands and plain object groups', () => {
     name: 'remember',
     options: [
       {
-        description: 'The information Kanikou should remember',
+        description: 'The information to remember',
         maxLength: 1_000,
         name: 'memory',
         required: true,
@@ -75,7 +136,7 @@ test('converts typed subcommands and plain object groups', () => {
   })
   expect(payload.options).toContainEqual(
     expect.objectContaining({
-      description: "View or manage this server's shared memory",
+      description: 'View or manage server memory',
       name: 'server',
       type: ApplicationCommandOptionTypes.SUB_COMMAND_GROUP
     })
@@ -83,7 +144,7 @@ test('converts typed subcommands and plain object groups', () => {
 })
 
 test('builds a frozen, searchable command registry', () => {
-  const registry = buildSlashCommandTree([askCommand, memoryCommand])
+  const registry = rosepack.createRegistry([askCommand, memoryCommand])
   const memory = registry.get('memory')
   const remember = registry.resolve('/memory server remember')
 
@@ -122,7 +183,7 @@ test('dispatches with the current root, leaf, path, registry, and inferred optio
       })
     }
   })
-  const commands = buildSlashCommandTree([command])
+  const commands = rosepack.createRegistry([command])
   const interaction = createCommandInteraction('subcommand-test', [
     {
       name: 'remember',
@@ -136,22 +197,22 @@ test('dispatches with the current root, leaf, path, registry, and inferred optio
       type: ApplicationCommandOptionTypes.SUB_COMMAND
     }
   ])
-  const bot = createBot(commands)
+  const app = createApp()
 
-  await dispatchInteraction(bot, interaction)
+  await commands.dispatch({ app, interaction })
 
   const beforeContext = beforeExecute.mock.calls[0]?.[0]
   const executeContext = execute.mock.calls[0]?.[0]
   expect(beforeContext).toBe(executeContext)
   expect(executeContext).toBeInstanceOf(SlashCommandContext)
   expect(executeContext).toMatchObject({
-    bot,
+    app,
     command: { name: 'subcommand-test', path: ['subcommand-test'] },
-    commands,
     interaction,
     node: { name: 'remember', path: ['subcommand-test', 'remember'] },
     options: { memory: 'Uses TypeScript' },
-    path: ['subcommand-test', 'remember']
+    path: ['subcommand-test', 'remember'],
+    registry: commands
   })
 })
 
@@ -176,7 +237,7 @@ test('routes nested leaves and failures through root hooks', async () => {
       }
     }
   })
-  const commands = buildSlashCommandTree([command])
+  const commands = rosepack.createRegistry([command])
   const interaction = createCommandInteraction('group-test', [
     {
       name: 'server',
@@ -184,9 +245,9 @@ test('routes nested leaves and failures through root hooks', async () => {
       type: ApplicationCommandOptionTypes.SUB_COMMAND_GROUP
     }
   ])
-  const bot = createBot(commands)
+  const app = createApp()
 
-  await dispatchInteraction(bot, interaction)
+  await commands.dispatch({ app, interaction })
 
   expect(onError).toHaveBeenCalledOnce()
   expect(onError.mock.calls[0]?.[0]).toMatchObject({
@@ -198,7 +259,7 @@ test('routes nested leaves and failures through root hooks', async () => {
 })
 
 test('provides acknowledgement-aware response lifecycle methods', async () => {
-  const commands = buildSlashCommandTree([askCommand])
+  const commands = rosepack.createRegistry([askCommand])
   const root = commands.get('ask')!
   let acknowledged = false
   const defer = vi.fn(async () => {
@@ -220,14 +281,14 @@ test('provides acknowledgement-aware response lifecycle methods', async () => {
     deleteOriginal,
     editOriginal
   } as unknown as CommandInteraction
-  const bot = createBot(commands)
+  const app = createApp()
   const context = new SlashCommandContext({
-    bot,
+    app,
     command: root,
-    commands,
     interaction,
     node: root,
-    options: { question: 'Hello' }
+    options: { question: 'Hello' },
+    registry: commands
   })
 
   await context.reply('First')
@@ -266,11 +327,11 @@ test('invokes another registered definition with option validation', async () =>
       await context.invoke(target, { value: 'called' })
     }
   })
-  const commands = buildSlashCommandTree([source, target])
+  const commands = rosepack.createRegistry([source, target])
   const interaction = createCommandInteraction('source', [])
-  const bot = createBot(commands)
+  const app = createApp()
 
-  await commands.dispatch(bot, interaction)
+  await commands.dispatch({ app, interaction })
 
   expect(targetExecute).toHaveBeenCalledOnce()
   expect(targetExecute.mock.calls[0]?.[0]).toMatchObject({
@@ -289,12 +350,12 @@ test('rejects recursive programmatic invocation', async () => {
       await context.invoke(recursive, {})
     }
   })
-  const commands = buildSlashCommandTree([recursive])
-  const bot = createBot(commands)
+  const commands = rosepack.createRegistry([recursive])
+  const app = createApp()
 
-  await expect(commands.dispatch(bot, createCommandInteraction('recursive', []))).rejects.toThrow(
-    'Recursive command invocation detected at "recursive".'
-  )
+  await expect(
+    commands.dispatch({ app, interaction: createCommandInteraction('recursive', []) })
+  ).rejects.toThrow('Recursive command invocation detected at "recursive".')
 })
 
 test('aggregates runtime lint failures before registration', () => {
@@ -318,11 +379,11 @@ test('aggregates runtime lint failures before registration', () => {
       )
     },
     { description: 'Duplicate', name: 'Invalid Name', async execute() {} }
-  ] as unknown as readonly SlashRootCommandDefinitionBase[]
+  ] as unknown as readonly SlashRootCommandDefinitionBase<TestApp>[]
 
-  expect(() => buildSlashCommandTree(invalid)).toThrow(CommandTreeValidationError)
+  expect(() => rosepack.createRegistry(invalid)).toThrow(CommandTreeValidationError)
   try {
-    buildSlashCommandTree(invalid)
+    rosepack.createRegistry(invalid)
   } catch (error) {
     expect(error).toBeInstanceOf(CommandTreeValidationError)
     expect((error as CommandTreeValidationError).issues.map((issue) => issue.code)).toEqual(
@@ -342,20 +403,16 @@ test('aggregates runtime lint failures before registration', () => {
 })
 
 test("registers the registry's validated cached payload", async () => {
-  const commands = buildSlashCommandTree([askCommand])
+  const commands = rosepack.createRegistry([askCommand])
   const bulkEditGlobalCommands = vi.fn(async () => [{ id: 'registered' }])
-  const info = vi.fn()
-  const bot = {
-    applicationID: 'application',
-    client: { rest: { applications: { bulkEditGlobalCommands } } },
-    commands,
-    logger: { info }
-  } as unknown as BotContext
+  const client = {
+    rest: { applications: { bulkEditGlobalCommands } }
+  } as unknown as CommandInteraction['client']
 
-  await registerSlashCommands(bot)
+  const registered = await commands.registerGlobal({ applicationID: 'application', client })
 
   expect(bulkEditGlobalCommands).toHaveBeenCalledWith('application', [...commands.payload])
-  expect(info).toHaveBeenCalledWith('registered 1 global slash command(s)')
+  expect(registered).toEqual([{ id: 'registered' }])
 })
 
 test('the ask command defers through context and answers', async () => {
@@ -364,7 +421,7 @@ test('the ask command defers through context and answers', async () => {
   const defer = vi.fn(async () => {
     acknowledged = true
   })
-  const commands = buildSlashCommandTree([askCommand])
+  const commands = rosepack.createRegistry([askCommand])
   const interaction = createCommandInteraction('ask', [
     {
       name: 'question',
@@ -377,22 +434,18 @@ test('the ask command defers through context and answers', async () => {
     acknowledged: { get: () => acknowledged },
     defer: { value: defer }
   })
-  const bot = {
-    ...createBot(commands),
-    responder: { answerPrompt }
-  } as unknown as BotContext
+  const app = createApp(answerPrompt)
 
-  await commands.dispatch(bot, interaction)
+  await commands.dispatch({ app, interaction })
 
   expect(defer).toHaveBeenCalledWith(MessageFlags.EPHEMERAL)
-  expect(answerPrompt).toHaveBeenCalledWith(bot, interaction, 'What is Vite+?')
+  expect(answerPrompt).toHaveBeenCalledWith(app, interaction, 'What is Vite+?')
 })
 
-function createBot(commands: ReturnType<typeof buildSlashCommandTree>): BotContext {
+function createApp(answerPrompt = vi.fn(async () => undefined)): TestApp {
   return {
-    commands,
-    logger: { debug: vi.fn() }
-  } as unknown as BotContext
+    responder: { answerPrompt }
+  }
 }
 
 function createCommandInteraction(name: string, raw: unknown[]): CommandInteraction {

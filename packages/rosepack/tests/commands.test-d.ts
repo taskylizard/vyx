@@ -1,13 +1,36 @@
 import { expectTypeOf, test } from 'vite-plus/test'
 import {
-  defineSlashCommand,
-  type FrameworkTypeError,
+  createRosepack,
+  type RosepackTypeError,
   type SlashCommandContext,
   type SlashSubcommandDefinition,
-  subcommand,
   type ValidateSlashCommandDefinition
-} from '../../src/bot/framework.ts'
-import askCommand from '../../src/commands/ask.ts'
+} from '../src/index.ts'
+
+interface TestApp {
+  service: 'test'
+}
+
+const { defineSlashCommand, subcommand } = createRosepack<TestApp>()
+
+const askCommand = defineSlashCommand({
+  name: 'ask',
+  description: 'Ask a question',
+  options: {
+    ephemeral: {
+      description: 'Should the response be private?',
+      kind: 'boolean'
+    },
+    question: {
+      description: 'What do you want to ask?',
+      kind: 'string',
+      required: true
+    }
+  },
+  async execute(context) {
+    expectTypeOf(context.app).toEqualTypeOf<TestApp>()
+  }
+})
 
 test('types flat command options and context', () => {
   type AskContext = Parameters<typeof askCommand.execute>[0]
@@ -16,9 +39,9 @@ test('types flat command options and context', () => {
     ephemeral?: boolean
     question: string
   }>()
-  expectTypeOf<AskContext>().toExtend<SlashCommandContext>()
+  expectTypeOf<AskContext>().toExtend<SlashCommandContext<TestApp>>()
   expectTypeOf<AskContext['command']['name']>().toEqualTypeOf<string>()
-  expectTypeOf<AskContext['commands']['resolve']>().toBeFunction()
+  expectTypeOf<AskContext['registry']['resolve']>().toBeFunction()
   expectTypeOf<AskContext['invoke']>().toBeFunction()
 })
 
@@ -116,7 +139,7 @@ test('infers options beside each executable subcommand leaf', () => {
 })
 
 test('returns exact agent-friendly validation messages', () => {
-  type Leaf = SlashSubcommandDefinition<{}>
+  type Leaf = SlashSubcommandDefinition<TestApp, {}>
 
   type HelperFreeLeaf = {
     description: 'Invalid leaf'
@@ -126,7 +149,7 @@ test('returns exact agent-friendly validation messages', () => {
     }
   }
   expectTypeOf<ValidateSlashCommandDefinition<HelperFreeLeaf>>().toEqualTypeOf<
-    FrameworkTypeError<'Executable subcommand leaves must use subcommand({ ... }) so their options can be inferred.'>
+    RosepackTypeError<'Executable subcommand leaves must use subcommand({ ... }) so their options can be inferred.'>
   >()
 
   type ExecutableGroup = {
@@ -141,7 +164,7 @@ test('returns exact agent-friendly validation messages', () => {
     }
   }
   expectTypeOf<ValidateSlashCommandDefinition<ExecutableGroup>>().toEqualTypeOf<
-    FrameworkTypeError<'A subcommand group cannot define execute(). Put execute() on a child subcommand.'>
+    RosepackTypeError<'A subcommand group cannot define execute(). Put execute() on a child subcommand.'>
   >()
 
   type NestedGroup = {
@@ -157,7 +180,7 @@ test('returns exact agent-friendly validation messages', () => {
     }
   }
   expectTypeOf<ValidateSlashCommandDefinition<NestedGroup>>().toEqualTypeOf<
-    FrameworkTypeError<'Discord supports only command -> group -> subcommand. Nested subcommand groups are invalid.'>
+    RosepackTypeError<'Discord supports only command -> group -> subcommand. Nested subcommand groups are invalid.'>
   >()
 
   type RootExecute = {
@@ -167,7 +190,7 @@ test('returns exact agent-friendly validation messages', () => {
     subcommands: { show: Leaf }
   }
   expectTypeOf<ValidateSlashCommandDefinition<RootExecute>>().toEqualTypeOf<
-    FrameworkTypeError<'A command with subcommands cannot define root execute(). Put execute() on a subcommand leaf.'>
+    RosepackTypeError<'A command with subcommands cannot define root execute(). Put execute() on a subcommand leaf.'>
   >()
 
   type RootOptions = {
@@ -177,12 +200,12 @@ test('returns exact agent-friendly validation messages', () => {
     subcommands: { show: Leaf }
   }
   expectTypeOf<ValidateSlashCommandDefinition<RootOptions>>().toEqualTypeOf<
-    FrameworkTypeError<'A command with subcommands cannot define root options. Put options on executable leaves.'>
+    RosepackTypeError<'A command with subcommands cannot define root options. Put options on executable leaves.'>
   >()
 
   type MissingExecute = { description: 'Missing'; name: 'missing' }
   expectTypeOf<ValidateSlashCommandDefinition<MissingExecute>>().toEqualTypeOf<
-    FrameworkTypeError<'A flat command must define execute().'>
+    RosepackTypeError<'A flat command must define execute().'>
   >()
 
   type EmptySubcommands = {
@@ -191,7 +214,7 @@ test('returns exact agent-friendly validation messages', () => {
     subcommands: {}
   }
   expectTypeOf<ValidateSlashCommandDefinition<EmptySubcommands>>().toEqualTypeOf<
-    FrameworkTypeError<'A command or subcommand group must contain at least one subcommand.'>
+    RosepackTypeError<'A command or subcommand group must contain at least one subcommand.'>
   >()
 
   type TwentySixSubcommandNames = `leaf-${
@@ -238,7 +261,7 @@ test('returns exact agent-friendly validation messages', () => {
     subcommands: TwentySixLeaves
   }
   expectTypeOf<ValidateSlashCommandDefinition<TooManyRootSubcommands>>().toEqualTypeOf<
-    FrameworkTypeError<'Discord allows at most 25 subcommands.'>
+    RosepackTypeError<'Discord allows at most 25 subcommands.'>
   >()
 
   type TooManyNestedSubcommands = {
@@ -252,7 +275,7 @@ test('returns exact agent-friendly validation messages', () => {
     }
   }
   expectTypeOf<ValidateSlashCommandDefinition<TooManyNestedSubcommands>>().toEqualTypeOf<
-    FrameworkTypeError<'Discord allows at most 25 subcommands.'>
+    RosepackTypeError<'Discord allows at most 25 subcommands.'>
   >()
 })
 

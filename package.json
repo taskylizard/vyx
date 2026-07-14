@@ -15,7 +15,6 @@
     "access": "public"
   },
   "scripts": {
-    "build": "vp pack",
     "dev": "vp pack --watch",
     "start": "vp node --experimental-strip-types src/run.ts",
     "test": "vp test",
@@ -38,6 +37,7 @@
     "cheerio": "1.2.0",
     "dotenv": "17.4.2",
     "oceanic.js": "1.14.0",
+    "rosepack": "workspace:*",
     "tracix": "1.0.0",
     "ts-pattern": "5.9.0",
     "typed-env": "2.0.0",

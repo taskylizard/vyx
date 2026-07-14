@@ -12,8 +12,8 @@ import {
   PROJECT_SELENE_INSTRUCTIONS
 } from '../llm/tools/index.ts'
 import { startAxiomObservability } from '../observability/axiom.ts'
-import { buildSlashCommandTree, dispatchInteraction, registerSlashCommands } from './framework.ts'
 import { handleMessageCreate } from './messages.ts'
+import { rosepack } from './rosepack.ts'
 import type { BotContext } from './context.ts'
 
 export interface KanikouApp {
@@ -23,7 +23,7 @@ export interface KanikouApp {
 }
 
 export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): KanikouApp {
-  const commands = buildSlashCommandTree(slashCommands)
+  const registry = rosepack.createRegistry(slashCommands)
   const logger = createKanikouLogger(config.LOG_LEVEL)
   const observability = startAxiomObservability(config)
   const memory = new MarkdownMemoryStore()
@@ -71,7 +71,6 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
       applicationID: client.application.id,
       botUserID: client.user.id,
       client,
-      commands,
       env: config,
       logger,
       memory,
@@ -81,7 +80,11 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     runTask(logger, async () => {
       const activeContext = context
       if (activeContext !== undefined) {
-        await registerSlashCommands(activeContext)
+        const registered = await registry.registerGlobal({
+          applicationID: activeContext.applicationID,
+          client: activeContext.client
+        })
+        logger.info(`registered ${registered.length} global slash command(s)`)
       }
     })
   })
@@ -90,7 +93,7 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     runTask(logger, async () => {
       const activeContext = context
       if (activeContext !== undefined) {
-        await dispatchInteraction(activeContext, interaction)
+        await registry.dispatch({ app: activeContext, interaction })
       }
     })
   })

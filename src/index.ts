@@ -5,19 +5,16 @@ export {
   type AxiomObservabilityConfig
 } from './observability/axiom.ts'
 export {
-  defineSlashCommand,
   buildSlashCommandTree,
-  dispatchInteraction,
-  FRAMEWORK_TYPE_MESSAGES,
+  createRosepack,
+  ROSEPACK_TYPE_MESSAGES,
   lintSlashCommandTree,
-  registerSlashCommands,
   slashCommandToDiscord,
-  subcommand,
   CommandTreeValidationError,
   SlashCommandContext,
   SlashCommandRegistry,
   type CommandTreeValidationIssue,
-  type FrameworkTypeError,
+  type RosepackTypeError,
   type SlashCommandDefinition,
   type SlashCommandOptionChoice,
   type SlashCommandOptionDefinition,
@@ -38,7 +35,8 @@ export {
   type SlashSubcommandLeafRecord,
   type SlashSubcommandRecord,
   type ValidateSlashCommandDefinition
-} from './bot/framework.ts'
+} from 'rosepack'
+export { defineSlashCommand, rosepack, subcommand } from './bot/rosepack.ts'
 export {
   OPERATIONS_CHANNEL_ID,
   OPERATIONS_GUILD_ID,

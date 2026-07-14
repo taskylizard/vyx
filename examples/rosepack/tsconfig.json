@@ -5,14 +5,10 @@
     "moduleDetection": "force",
     "module": "nodenext",
     "moduleResolution": "nodenext",
-    "paths": {
-      "rosepack": ["./packages/rosepack/src/index.ts"]
-    },
     "resolveJsonModule": true,
     "types": ["node"],
     "strict": true,
     "noUnusedLocals": true,
-    "declaration": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "esModuleInterop": true,
@@ -20,5 +16,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "examples/rosepack/src"]
+  "include": ["src", "tests", "vite.config.ts"]
 }

@@ -261,6 +261,9 @@ importers:
       oceanic.js:
         specifier: 1.14.0
         version: 1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      rosepack:
+        specifier: workspace:*
+        version: link:packages/rosepack
       tracix:
         specifier: 1.0.0
         version: 1.0.0
@@ -283,6 +286,49 @@ importers:
       bumpp:
         specifier: 11.1.0
         version: 11.1.0
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.4
+        version: '@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.4(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
+  examples/rosepack:
+    dependencies:
+      oceanic.js:
+        specifier: 1.14.0
+        version: 1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      rosepack:
+        specifier: workspace:*
+        version: link:../../packages/rosepack
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@0.2.4
+        version: '@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)'
+      vite-plus:
+        specifier: 'catalog:'
+        version: 0.2.4(@opentelemetry/api@1.9.1)(@types/node@26.1.1)(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0))(jiti@2.7.0)(typescript@7.0.2)(yaml@2.9.0)
+
+  packages/rosepack:
+    devDependencies:
+      '@types/node':
+        specifier: 26.1.1
+        version: 26.1.1
+      bumpp:
+        specifier: 11.1.0
+        version: 11.1.0
+      oceanic.js:
+        specifier: 1.14.0
+        version: 1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

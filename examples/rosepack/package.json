@@ -1,0 +1,29 @@
+{
+  "name": "rosepack-example",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A complete example Discord bot built with rosepack and Oceanic.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "build": "vp pack",
+    "check": "vp check",
+    "dev": "node --watch --env-file-if-exists=.env --experimental-strip-types src/index.ts",
+    "start": "node --env-file-if-exists=.env dist/index.mjs",
+    "start:source": "node --env-file-if-exists=.env --experimental-strip-types src/index.ts",
+    "test": "vp test"
+  },
+  "dependencies": {
+    "oceanic.js": "1.14.0",
+    "rosepack": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.1",
+    "typescript": "7.0.2",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

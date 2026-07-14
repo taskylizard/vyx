@@ -2,8 +2,10 @@ import { defineConfig } from 'vite-plus'
 
 export default defineConfig({
   pack: {
-    dts: false,
-    entry: ['src/run.ts']
+    dts: {
+      tsgo: true
+    },
+    exports: true
   },
   lint: {
     options: {
@@ -11,29 +13,17 @@ export default defineConfig({
       typeCheck: true
     }
   },
-  staged: {
-    '*': 'vp check --fix'
-  },
   fmt: {
     quoteProps: 'preserve',
     printWidth: 100,
     singleQuote: true,
     semi: false,
     trailingComma: 'none',
-    tabWidth: 2,
-    jsxSingleQuote: true
+    tabWidth: 2
   },
   test: {
     typecheck: {
       enabled: true
-    }
-  },
-  run: {
-    tasks: {
-      build: {
-        command: 'vp pack',
-        dependsOn: ['rosepack#build']
-      }
     }
   }
 })
