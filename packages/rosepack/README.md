@@ -1,6 +1,6 @@
 # rosepack
 
-rosepack is a strongly typed slash-command framework for [Oceanic](https://oceanic.ws). It keeps command definitions beside their handlers, gives every handler a typed application context and option values, validates the whole command tree before registration, and exposes that tree for lookup and command-to-command invocation.
+rosepack is a strongly typed slash-command framework for [Oceanic](https://oceanic.ws). Definitions stay next to their handlers, context and options are typed, and the whole command tree gets validated before registration. You can also look up and invoke commands from that same tree.
 
 ## Install
 
@@ -8,11 +8,11 @@ rosepack is a strongly typed slash-command framework for [Oceanic](https://ocean
 vp add rosepack oceanic.js
 ```
 
-rosepack requires Node.js 22 or newer and uses `oceanic.js` as a peer dependency.
+Requires Node.js 22 or newer. `oceanic.js` is a peer dependency.
 
 ## Set up rosepack
 
-Bind your application's services once, then import the resulting helpers in command modules:
+Bind your app services once, then use the helpers in your command modules:
 
 ```ts
 import { createRosepack } from 'rosepack'
@@ -25,7 +25,7 @@ export const rosepack = createRosepack<AppContext>()
 export const { defineSlashCommand, subcommand } = rosepack
 ```
 
-`context.app` is the exact `AppContext` supplied to `registry.dispatch`.
+`context.app` is the exact `AppContext` passed to `registry.dispatch`.
 
 ## Define a command
 
@@ -43,7 +43,7 @@ export default defineSlashCommand({
 })
 ```
 
-The string metadata is converted to Discord's numeric context and installation values when the registration payload is built.
+rosepack converts that string metadata to Discord's numeric context and installation values when it builds the registration payload.
 
 ## Options
 
@@ -72,7 +72,7 @@ export default defineSlashCommand({
 
 ## Subcommands and groups
 
-Executable leaves use `subcommand()`. Plain nested objects represent Discord subcommand groups:
+Use `subcommand()` for executable leaves. Plain nested objects are Discord subcommand groups:
 
 ```ts
 export default defineSlashCommand({
@@ -109,11 +109,13 @@ export default defineSlashCommand({
 })
 ```
 
-rosepack's types reject executable groups, root handlers on routed commands, helper-free leaves, empty groups, and nesting beyond Discord's command → group → subcommand limit. The same rules are linted at runtime when a registry is created.
+The types reject executable groups, root handlers on routed commands, helper-free leaves, empty groups, and anything deeper than Discord's command → group → subcommand limit. The registry checks the same rules at runtime too.
 
 ## Hooks and responses
 
-Commands may define `beforeExecute(context)` and `onError(context, error)`. Context response helpers include `defer`, `reply`, `editResponse`, `followUp`, and `deleteResponse`. `reply` edits an acknowledged interaction and creates the initial response otherwise, so handlers do not need to branch on acknowledgement state.
+Commands can define `beforeExecute(context)` and `onError(context, error)`. Response helpers include `defer`, `reply`, `editResponse`, `followUp`, and `deleteResponse`.
+
+`reply` edits an acknowledged interaction or creates the initial response if needed. No acknowledgement-state branching in every handler.
 
 ## Register and dispatch
 
@@ -132,24 +134,28 @@ client.on('interactionCreate', async (interaction) => {
 })
 ```
 
-`dispatch` ignores non-command interactions. An unknown chat-input command calls `onUnknownCommand` when configured.
+`dispatch` ignores non-command interactions. Unknown chat-input commands call `onUnknownCommand` if it is configured.
 
 ## Inspect and invoke commands
 
-The immutable `registry.tree` contains every command node. Use `registry.get('ping')`, `registry.get(commandDefinition)`, or `registry.resolve('/notes admin clear')` to find a node.
+The immutable `registry.tree` has every command node. Find one with `registry.get('ping')`, `registry.get(commandDefinition)`, or `registry.resolve('/notes admin clear')`.
 
-Inside a handler, the same registry is available as `context.registry`; `context.command` is the root node and `context.node` is the current leaf. Invoke another registered executable definition or node with:
+Inside a handler, the registry is on `context.registry`. `context.command` is the root node and `context.node` is the current leaf. Invoke another registered executable definition or node with:
 
 ```ts
 await context.invoke(otherCommand, { requiredOption: 'value' })
 ```
 
-rosepack validates invocation options and rejects recursive invocation.
+rosepack validates the options and rejects recursive invocation.
 
 ## Validation
 
-`createRegistry` throws `CommandTreeValidationError` before any Discord API call if the tree is invalid. Its `issues` property contains stable codes, paths, and human-readable messages. `lintSlashCommandTree(commands)` returns those issues without throwing, while `slashCommandToDiscord(command)` builds one validated Discord payload.
+If the tree is invalid, `createRegistry` throws `CommandTreeValidationError` before any Discord API call. Its `issues` property has stable codes, paths, and readable messages.
+
+`lintSlashCommandTree(commands)` returns the issues without throwing. `slashCommandToDiscord(command)` builds one validated Discord payload.
 
 ## API
 
-The primary exports are `createRosepack`, `SlashCommandContext`, `SlashCommandRegistry`, `CommandTreeValidationError`, `lintSlashCommandTree`, `slashCommandToDiscord`, and the command/option/tree types. See [`examples/rosepack`](../../examples/rosepack/src) for a complete small bot.
+Main exports: `createRosepack`, `SlashCommandContext`, `SlashCommandRegistry`, `CommandTreeValidationError`, `lintSlashCommandTree`, `slashCommandToDiscord`, and the command/option/tree types.
+
+See [`examples/rosepack`](../../examples/rosepack/src) for a complete small bot.
