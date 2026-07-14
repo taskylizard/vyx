@@ -29,10 +29,24 @@ export default defineConfig({
     }
   },
   run: {
+    cache: {
+      scripts: false,
+      tasks: true
+    },
     tasks: {
       build: {
         command: 'vp pack',
-        dependsOn: ['rosepack#build']
+        dependsOn: ['rosepack#build'],
+        input: [{ auto: true }, '!dist/**'],
+        output: ['dist/**']
+      },
+      check: {
+        command: 'vp check',
+        output: []
+      },
+      test: {
+        command: 'vp test',
+        output: []
       }
     }
   }

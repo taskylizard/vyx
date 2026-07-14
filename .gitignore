@@ -2,6 +2,7 @@ node_modules
 dist
 *.log
 .DS_Store
+/.tmp-*
 .env
 .mintlify-mcp-oauth.json
 mintlify-mcp-oauth.js

@@ -25,5 +25,22 @@ export default defineConfig({
     typecheck: {
       enabled: true
     }
+  },
+  run: {
+    tasks: {
+      build: {
+        command: 'vp pack',
+        input: [{ auto: true }, '!dist/**'],
+        output: ['dist/**']
+      },
+      check: {
+        command: 'vp check',
+        output: []
+      },
+      test: {
+        command: 'vp test',
+        output: []
+      }
+    }
   }
 })

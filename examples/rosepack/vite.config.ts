@@ -23,5 +23,25 @@ export default defineConfig({
     typecheck: {
       enabled: true
     }
+  },
+  run: {
+    tasks: {
+      build: {
+        command: 'vp pack',
+        dependsOn: ['rosepack#build'],
+        input: [{ auto: true }, '!dist/**'],
+        output: ['dist/**']
+      },
+      check: {
+        command: 'vp check',
+        dependsOn: ['rosepack#build'],
+        output: []
+      },
+      test: {
+        command: 'vp test',
+        dependsOn: ['rosepack#build'],
+        output: []
+      }
+    }
   }
 })

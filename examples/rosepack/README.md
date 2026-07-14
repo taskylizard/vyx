@@ -40,8 +40,8 @@ The bundled application is written to `dist/index.mjs`.
 ## Validate
 
 ```sh
-vp check
-vp test
+vp run check
+vp run test
 vp run build
 ```
 

@@ -6,12 +6,9 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "build": "vp pack",
-    "check": "vp check",
     "dev": "node --watch --env-file-if-exists=.env --experimental-strip-types src/index.ts",
     "start": "node --env-file-if-exists=.env dist/index.mjs",
-    "start:source": "node --env-file-if-exists=.env --experimental-strip-types src/index.ts",
-    "test": "vp test"
+    "start:source": "node --env-file-if-exists=.env --experimental-strip-types src/index.ts"
   },
   "dependencies": {
     "oceanic.js": "1.14.0",

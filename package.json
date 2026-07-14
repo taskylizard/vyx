@@ -17,8 +17,6 @@
   "scripts": {
     "dev": "vp pack --watch",
     "start": "vp node --experimental-strip-types src/run.ts",
-    "test": "vp test",
-    "check": "vp check",
     "prepublishOnly": "vp run build"
   },
   "dependencies": {
