@@ -36,7 +36,7 @@ export {
   type SlashSubcommandRecord,
   type ValidateSlashCommandDefinition
 } from 'rosepack'
-export { defineSlashCommand, rosepack, subcommand } from './bot/rosepack.ts'
+export { slashCommand, rosepack, subcommand } from './bot/rosepack.ts'
 export {
   OPERATIONS_CHANNEL_ID,
   OPERATIONS_GUILD_ID,

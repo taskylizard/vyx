@@ -1,6 +1,6 @@
-import { defineSlashCommand } from '../framework.ts'
+import { slashCommand } from '../framework.ts'
 
-export default defineSlashCommand({
+export default slashCommand({
   name: 'ping',
   description: 'Check whether the bot is responding',
   contexts: ['guild', 'botDm', 'privateChannel'],

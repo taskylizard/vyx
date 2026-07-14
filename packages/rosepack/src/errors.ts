@@ -16,9 +16,6 @@ export const ROSEPACK_TYPE_MESSAGES = {
   tooManySubcommands: 'Discord allows at most 25 subcommands.'
 } as const
 
-/** @deprecated Use `ROSEPACK_TYPE_MESSAGES`. */
-export const FRAMEWORK_TYPE_MESSAGES = ROSEPACK_TYPE_MESSAGES
-
 /** A readable marker placed at the property responsible for an invalid definition. */
 export interface RosepackTypeError<TMessage extends string> {
   readonly $rosepackError: TMessage

@@ -22,7 +22,7 @@ interface AppContext {
 }
 
 export const rosepack = createRosepack<AppContext>()
-export const { defineSlashCommand, subcommand } = rosepack
+export const { slashCommand, subcommand } = rosepack
 ```
 
 `context.app` is the exact `AppContext` passed to `registry.dispatch`.
@@ -30,9 +30,9 @@ export const { defineSlashCommand, subcommand } = rosepack
 ## Define a command
 
 ```ts
-import { defineSlashCommand } from '../rosepack.ts'
+import { slashCommand } from '../rosepack.ts'
 
-export default defineSlashCommand({
+export default slashCommand({
   name: 'ping',
   description: 'Check whether the bot is responding',
   contexts: ['guild', 'botDm', 'privateChannel'],
@@ -50,7 +50,7 @@ rosepack converts that string metadata to Discord's numeric context and installa
 Options are inferred on `context.options`, including required values and literal choices:
 
 ```ts
-export default defineSlashCommand({
+export default slashCommand({
   name: 'greet',
   description: 'Send a greeting',
   options: {
@@ -75,7 +75,7 @@ export default defineSlashCommand({
 Use `subcommand()` for executable leaves. Plain nested objects are Discord subcommand groups:
 
 ```ts
-export default defineSlashCommand({
+export default slashCommand({
   name: 'notes',
   description: 'Manage notes',
   subcommands: {

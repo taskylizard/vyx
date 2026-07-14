@@ -1,6 +1,6 @@
-import { defineSlashCommand, subcommand } from '../framework.ts'
+import { slashCommand, subcommand } from '../framework.ts'
 
-export default defineSlashCommand({
+export default slashCommand({
   name: 'admin',
   description: 'Inspect server administration information',
   contexts: ['guild'],

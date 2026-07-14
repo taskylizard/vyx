@@ -1,6 +1,6 @@
-import { defineSlashCommand, subcommand } from '../framework.ts'
+import { slashCommand, subcommand } from '../framework.ts'
 
-export default defineSlashCommand({
+export default slashCommand({
   name: 'notes',
   description: 'Save and review personal notes',
   contexts: ['guild', 'botDm', 'privateChannel'],

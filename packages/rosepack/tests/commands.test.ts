@@ -22,9 +22,9 @@ interface TestApp {
 }
 
 const rosepack = createRosepack<TestApp>()
-const { defineSlashCommand, subcommand } = rosepack
+const { slashCommand, subcommand } = rosepack
 
-const askCommand = defineSlashCommand({
+const askCommand = slashCommand({
   name: 'ask',
   description: 'Ask the AI',
   contexts: ['guild', 'botDm', 'privateChannel'],
@@ -47,7 +47,7 @@ const askCommand = defineSlashCommand({
   }
 })
 
-const memoryCommand = defineSlashCommand({
+const memoryCommand = slashCommand({
   name: 'memory',
   description: 'Manage saved memory',
   subcommands: {
@@ -165,7 +165,7 @@ test('builds a frozen, searchable command registry', () => {
 test('dispatches with the current root, leaf, path, registry, and inferred options', async () => {
   const beforeExecute = vi.fn(async (_context: unknown) => undefined)
   const execute = vi.fn(async (_context: unknown) => undefined)
-  const command = defineSlashCommand({
+  const command = slashCommand({
     beforeExecute,
     description: 'Test subcommands',
     name: 'subcommand-test',
@@ -219,7 +219,7 @@ test('dispatches with the current root, leaf, path, registry, and inferred optio
 test('routes nested leaves and failures through root hooks', async () => {
   const failure = new Error('leaf failed')
   const onError = vi.fn(async (_context: unknown, _error: unknown) => undefined)
-  const command = defineSlashCommand({
+  const command = slashCommand({
     description: 'Grouped subcommands',
     name: 'group-test',
     onError,
@@ -312,7 +312,7 @@ test('provides acknowledgement-aware response lifecycle methods', async () => {
 
 test('invokes another registered definition with option validation', async () => {
   const targetExecute = vi.fn(async (_context: unknown) => undefined)
-  const target = defineSlashCommand({
+  const target = slashCommand({
     description: 'Target',
     name: 'target',
     options: {
@@ -320,7 +320,7 @@ test('invokes another registered definition with option validation', async () =>
     },
     execute: targetExecute
   })
-  const source = defineSlashCommand({
+  const source = slashCommand({
     description: 'Source',
     name: 'source',
     async execute(context) {
@@ -343,7 +343,7 @@ test('invokes another registered definition with option validation', async () =>
 })
 
 test('rejects recursive programmatic invocation', async () => {
-  const recursive = defineSlashCommand({
+  const recursive = slashCommand({
     description: 'Recursive',
     name: 'recursive',
     async execute(context) {

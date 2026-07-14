@@ -1,4 +1,4 @@
-import { defineSlashCommand, subcommand } from '../bot/rosepack.ts'
+import { slashCommand, subcommand } from '../bot/rosepack.ts'
 import {
   MEMORY_ENTRY_LIMIT,
   MEMORY_ENTRY_MAX_LENGTH,
@@ -9,7 +9,7 @@ import {
 const RESPONSE_MAX_LENGTH = 1_900
 const MEMORY_PREVIEW_MAX_LENGTH = 180
 
-export default defineSlashCommand({
+export default slashCommand({
   name: 'memory',
   description: "Manage Kanikou's saved memory",
   contexts: ['guild', 'botDm', 'privateChannel'],

@@ -214,7 +214,7 @@ export interface DefineSubcommand<TApp> {
 }
 
 /** A root slash-command definition helper bound to an application's context type. */
-export interface DefineSlashCommand<TApp> {
+export interface SlashCommandBuilder<TApp> {
   <
     const TOptions extends SlashCommandValueOptionRecord = {},
     const TSubcommands extends Record<string, unknown> | undefined = undefined
@@ -230,7 +230,7 @@ export interface RosepackInstance<TApp> {
     commands: readonly SlashRootCommandDefinitionBase<TApp>[]
   ): SlashCommandRegistry<TApp>
   /** Defines a root slash command while preserving local option inference. */
-  defineSlashCommand: DefineSlashCommand<TApp>
+  slashCommand: SlashCommandBuilder<TApp>
   /** Defines an executable subcommand while preserving local option inference. */
   subcommand: DefineSubcommand<TApp>
 }
@@ -244,7 +244,7 @@ export interface RosepackInstance<TApp> {
 export function createRosepack<TApp>(options: RosepackOptions<TApp> = {}): RosepackInstance<TApp> {
   return {
     createRegistry: (commands) => buildSlashCommandTree(commands, options),
-    defineSlashCommand: createSlashCommandDefinition as DefineSlashCommand<TApp>,
+    slashCommand: createSlashCommandDefinition as SlashCommandBuilder<TApp>,
     subcommand: createSubcommandDefinition as DefineSubcommand<TApp>
   }
 }

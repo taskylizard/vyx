@@ -42,10 +42,12 @@ export default defineConfig({
       },
       check: {
         command: 'vp check',
+        dependsOn: ['rosepack#build'],
         output: []
       },
       test: {
         command: 'vp test',
+        dependsOn: ['rosepack#build'],
         output: []
       }
     }

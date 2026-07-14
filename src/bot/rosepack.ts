@@ -8,4 +8,4 @@ export const rosepack = createRosepack<BotContext>({
   }
 })
 
-export const { defineSlashCommand, subcommand } = rosepack
+export const { slashCommand, subcommand } = rosepack

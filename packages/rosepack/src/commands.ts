@@ -1,5 +1,5 @@
 import { SlashCommandContext } from './context.ts'
-import { FRAMEWORK_TYPE_MESSAGES, type RosepackTypeError } from './errors.ts'
+import { ROSEPACK_TYPE_MESSAGES, type RosepackTypeError } from './errors.ts'
 import {
   setSlashCommandExecutor,
   setSlashSubcommandExecutor,
@@ -161,10 +161,10 @@ export interface SlashSubcommandCommandDefinition<
 type ValidateNestedLeaf<TNode> = TNode extends SlashSubcommandDefinitionBase
   ? true
   : TNode extends { subcommands: unknown }
-    ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['nestedGroup']>
+    ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['nestedGroup']>
     : TNode extends { execute: (...arguments_: never[]) => unknown }
-      ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['helperFreeLeaf']>
-      : RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['invalidNode']>
+      ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['helperFreeLeaf']>
+      : RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['invalidNode']>
 
 type CollectValidationErrors<TResults> =
   Exclude<TResults, true> extends never ? true : Exclude<TResults, true>
@@ -197,49 +197,49 @@ type HasMoreThan25Keys<TRecord> = string extends keyof TRecord
 type ValidateNestedLeaves<TNodes> =
   TNodes extends Record<PropertyKey, unknown>
     ? keyof TNodes extends never
-      ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['emptySubcommands']>
+      ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['emptySubcommands']>
       : HasMoreThan25Keys<TNodes> extends true
-        ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['tooManySubcommands']>
+        ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['tooManySubcommands']>
         : CollectValidationErrors<
             { [Name in keyof TNodes]: ValidateNestedLeaf<TNodes[Name]> }[keyof TNodes]
           >
-    : RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['invalidNode']>
+    : RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['invalidNode']>
 
 type ValidateRootNode<TNode> = TNode extends SlashSubcommandDefinitionBase
   ? true
   : TNode extends { subcommands: infer TChildren }
     ? TNode extends { execute: (...arguments_: never[]) => unknown }
-      ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['executableGroup']>
+      ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['executableGroup']>
       : TNode extends { options: unknown }
-        ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['mixedOptions']>
+        ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['mixedOptions']>
         : ValidateNestedLeaves<TChildren>
     : TNode extends { execute: (...arguments_: never[]) => unknown }
-      ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['helperFreeLeaf']>
-      : RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['invalidNode']>
+      ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['helperFreeLeaf']>
+      : RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['invalidNode']>
 
 type ValidateRootNodes<TNodes> =
   TNodes extends Record<PropertyKey, unknown>
     ? keyof TNodes extends never
-      ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['emptySubcommands']>
+      ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['emptySubcommands']>
       : HasMoreThan25Keys<TNodes> extends true
-        ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['tooManySubcommands']>
+        ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['tooManySubcommands']>
         : CollectValidationErrors<
             { [Name in keyof TNodes]: ValidateRootNode<TNodes[Name]> }[keyof TNodes]
           >
-    : RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['invalidNode']>
+    : RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['invalidNode']>
 
 /** Produces the definition or a friendly property-level error for an invalid command shape. */
 export type ValidateSlashCommandDefinition<TDefinition> = TDefinition extends {
   subcommands: infer TSubcommands
 }
   ? TDefinition extends { execute: (...arguments_: never[]) => unknown }
-    ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['rootExecute']>
+    ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['rootExecute']>
     : TDefinition extends { options: unknown }
-      ? RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['mixedOptions']>
+      ? RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['mixedOptions']>
       : ValidateRootNodes<TSubcommands>
   : TDefinition extends { execute: (...arguments_: never[]) => unknown }
     ? true
-    : RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['missingRootExecute']>
+    : RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['missingRootExecute']>
 
 export type SlashCommandInput<
   TApp,
@@ -254,8 +254,8 @@ export type SlashCommandInput<
         subcommands?: undefined
       }
     : {
-        execute?: RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['rootExecute']>
-        options?: RosepackTypeError<(typeof FRAMEWORK_TYPE_MESSAGES)['mixedOptions']>
+        execute?: RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['rootExecute']>
+        options?: RosepackTypeError<(typeof ROSEPACK_TYPE_MESSAGES)['mixedOptions']>
         subcommands: TSubcommands &
           (ValidateRootNodes<TSubcommands> extends true ? unknown : ValidateRootNodes<TSubcommands>)
       })

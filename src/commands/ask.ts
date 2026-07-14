@@ -1,6 +1,6 @@
-import { defineSlashCommand } from '../bot/rosepack.ts'
+import { slashCommand } from '../bot/rosepack.ts'
 
-export default defineSlashCommand({
+export default slashCommand({
   name: 'ask',
   description: 'Ask the AI',
   contexts: ['guild', 'botDm', 'privateChannel'],

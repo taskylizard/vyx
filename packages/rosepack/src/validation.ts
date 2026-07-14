@@ -1,4 +1,4 @@
-import { FRAMEWORK_TYPE_MESSAGES, ROSEPACK_TYPE_MESSAGES } from './errors.ts'
+import { ROSEPACK_TYPE_MESSAGES } from './errors.ts'
 import { hasSlashCommandExecutor, hasSlashSubcommandExecutor } from './executors.ts'
 import type {
   SlashRootCommandDefinitionBase,
@@ -53,14 +53,14 @@ export function lintSlashCommandTree(
         addIssue(issues, path, 'root-execute', ROSEPACK_TYPE_MESSAGES.rootExecute)
       }
       if (command.options !== undefined) {
-        addIssue(issues, path, 'mixed-options', FRAMEWORK_TYPE_MESSAGES.mixedOptions)
+        addIssue(issues, path, 'mixed-options', ROSEPACK_TYPE_MESSAGES.mixedOptions)
       }
       validateRootSubcommands(command.subcommands!, path, issues)
       continue
     }
 
     if (!hasExecutor) {
-      addIssue(issues, path, 'missing-execute', FRAMEWORK_TYPE_MESSAGES.missingRootExecute)
+      addIssue(issues, path, 'missing-execute', ROSEPACK_TYPE_MESSAGES.missingRootExecute)
     }
     validateOptions(command.options, path, issues)
   }
@@ -74,10 +74,10 @@ function validateRootSubcommands(
 ): void {
   const entries = Object.entries(subcommands)
   if (entries.length === 0) {
-    addIssue(issues, parentPath, 'empty-subcommands', FRAMEWORK_TYPE_MESSAGES.emptySubcommands)
+    addIssue(issues, parentPath, 'empty-subcommands', ROSEPACK_TYPE_MESSAGES.emptySubcommands)
   }
   if (entries.length > 25) {
-    addIssue(issues, parentPath, 'too-many-subcommands', FRAMEWORK_TYPE_MESSAGES.tooManySubcommands)
+    addIssue(issues, parentPath, 'too-many-subcommands', ROSEPACK_TYPE_MESSAGES.tooManySubcommands)
   }
   for (const [name, definition] of entries) {
     const path = [...parentPath, name]
@@ -88,16 +88,16 @@ function validateRootSubcommands(
         hasSlashSubcommandExecutor(definition) ||
         typeof (definition as { execute?: unknown }).execute === 'function'
       ) {
-        addIssue(issues, path, 'executable-group', FRAMEWORK_TYPE_MESSAGES.executableGroup)
+        addIssue(issues, path, 'executable-group', ROSEPACK_TYPE_MESSAGES.executableGroup)
       }
       if ((definition as { options?: unknown }).options !== undefined) {
-        addIssue(issues, path, 'group-options', FRAMEWORK_TYPE_MESSAGES.mixedOptions)
+        addIssue(issues, path, 'group-options', ROSEPACK_TYPE_MESSAGES.mixedOptions)
       }
       validateNestedSubcommands(definition.subcommands, path, issues)
       continue
     }
     if (!hasSlashSubcommandExecutor(definition)) {
-      addIssue(issues, path, 'helper-free-leaf', FRAMEWORK_TYPE_MESSAGES.helperFreeLeaf)
+      addIssue(issues, path, 'helper-free-leaf', ROSEPACK_TYPE_MESSAGES.helperFreeLeaf)
     }
     validateOptions(definition.options, path, issues)
   }
@@ -110,21 +110,21 @@ function validateNestedSubcommands(
 ): void {
   const entries = Object.entries(subcommands)
   if (entries.length === 0) {
-    addIssue(issues, parentPath, 'empty-subcommands', FRAMEWORK_TYPE_MESSAGES.emptySubcommands)
+    addIssue(issues, parentPath, 'empty-subcommands', ROSEPACK_TYPE_MESSAGES.emptySubcommands)
   }
   if (entries.length > 25) {
-    addIssue(issues, parentPath, 'too-many-subcommands', FRAMEWORK_TYPE_MESSAGES.tooManySubcommands)
+    addIssue(issues, parentPath, 'too-many-subcommands', ROSEPACK_TYPE_MESSAGES.tooManySubcommands)
   }
   for (const [name, definition] of entries) {
     const path = [...parentPath, name]
     validateCommandName(name, path, issues)
     validateDescription(definition.description, path, issues)
     if ('subcommands' in (definition as object)) {
-      addIssue(issues, path, 'nested-group', FRAMEWORK_TYPE_MESSAGES.nestedGroup)
+      addIssue(issues, path, 'nested-group', ROSEPACK_TYPE_MESSAGES.nestedGroup)
       continue
     }
     if (!hasSlashSubcommandExecutor(definition)) {
-      addIssue(issues, path, 'helper-free-leaf', FRAMEWORK_TYPE_MESSAGES.helperFreeLeaf)
+      addIssue(issues, path, 'helper-free-leaf', ROSEPACK_TYPE_MESSAGES.helperFreeLeaf)
     }
     validateOptions(definition.options, path, issues)
   }

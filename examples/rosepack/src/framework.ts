@@ -11,4 +11,4 @@ export const rosepack = createRosepack<AppContext>({
   }
 })
 
-export const { defineSlashCommand, subcommand } = rosepack
+export const { slashCommand, subcommand } = rosepack

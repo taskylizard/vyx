@@ -11,9 +11,9 @@ interface TestApp {
   service: 'test'
 }
 
-const { defineSlashCommand, subcommand } = createRosepack<TestApp>()
+const { slashCommand, subcommand } = createRosepack<TestApp>()
 
-const askCommand = defineSlashCommand({
+const askCommand = slashCommand({
   name: 'ask',
   description: 'Ask a question',
   options: {
@@ -46,7 +46,7 @@ test('types flat command options and context', () => {
 })
 
 test('maps every option kind and required state', () => {
-  defineSlashCommand({
+  slashCommand({
     description: 'Exercise option inference',
     name: 'typed-options',
     options: {
@@ -81,7 +81,7 @@ test('maps every option kind and required state', () => {
 })
 
 test('infers options beside each executable subcommand leaf', () => {
-  const command = defineSlashCommand({
+  const command = slashCommand({
     description: 'Exercise subcommand inference',
     name: 'typed-subcommands',
     subcommands: {
@@ -280,7 +280,7 @@ test('returns exact agent-friendly validation messages', () => {
 })
 
 test('rejects invalid command definitions at their call sites', () => {
-  defineSlashCommand({
+  slashCommand({
     description: 'Invalid leaf',
     name: 'invalid-leaf',
     // @ts-expect-error Executable leaves must use subcommand() for local inference.
@@ -292,7 +292,7 @@ test('rejects invalid command definitions at their call sites', () => {
     }
   })
 
-  defineSlashCommand({
+  slashCommand({
     description: 'Executable group',
     name: 'executable-group',
     // @ts-expect-error Groups cannot define execute handlers.
@@ -307,7 +307,7 @@ test('rejects invalid command definitions at their call sites', () => {
     }
   })
 
-  defineSlashCommand({
+  slashCommand({
     description: 'Too deep',
     name: 'too-deep',
     // @ts-expect-error Discord groups cannot contain another group.
@@ -324,7 +324,7 @@ test('rejects invalid command definitions at their call sites', () => {
     }
   })
 
-  defineSlashCommand({
+  slashCommand({
     description: 'Root execute',
     // @ts-expect-error Routed commands cannot define a root execute handler.
     async execute() {},
