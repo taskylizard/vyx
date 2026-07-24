@@ -15,6 +15,3 @@ peerDependencyRules:
     - vite
   allowedVersions:
     vite: '*'
-packages:
-  - examples/*
-  - packages/*
