@@ -7,3 +7,6 @@ dist
 .mintlify-mcp-oauth.json
 mintlify-mcp-oauth.js
 /data/memory/
+/data/*.db
+/data/*.db-shm
+/data/*.db-wal

@@ -15,7 +15,7 @@ import memoryCommand from '../../src/commands/memory.ts'
 import { MarkdownMemoryStore } from '../../src/memory/markdown-memory.ts'
 
 const temporaryDirectories: string[] = []
-const memoryCommands = rosepack.createRegistry([memoryCommand])
+const memoryCommands = rosepack.createRegistry({ slashCommands: [memoryCommand] })
 
 afterEach(async () => {
   await Promise.all(

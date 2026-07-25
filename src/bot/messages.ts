@@ -3,11 +3,26 @@ import type { Message } from 'oceanic.js'
 import { handleAutoembeds, isAutoembedMessage } from '../discord/autoembeds.ts'
 import { OWNER_USER_ID, TASKYLAND_GUILD_ID } from '../discord/ids.ts'
 import { isOperationsScope } from '../llm/mintlify-mcp.ts'
+import { handleJumbleMessage } from '../jumble/discord.ts'
+import { componentIds } from '../jumble/components.ts'
 import type { BotContext } from './context.ts'
 
 export async function handleMessageCreate(context: BotContext, message: Message): Promise<void> {
   if (message.author.bot) {
     return
+  }
+
+  try {
+    const handledByJumble = await handleJumbleMessage(
+      context.client,
+      message,
+      context.jumble,
+      context.jumbleRenderer,
+      (state) => componentIds(state.session.id)
+    )
+    if (handledByJumble) return
+  } catch (error) {
+    context.logger.warn('jumble guess handling failed', error)
   }
 
   if (message.guildID === TASKYLAND_GUILD_ID) {

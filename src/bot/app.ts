@@ -12,6 +12,15 @@ import {
   PROJECT_SELENE_INSTRUCTIONS
 } from '../llm/tools/index.ts'
 import { startAxiomObservability } from '../observability/axiom.ts'
+import { componentIds, jumbleComponents } from '../jumble/components.ts'
+import { editJumbleMessage, renderJumble } from '../jumble/discord.ts'
+import { LastFmClient, MissingLastFmProvider } from '../jumble/lastfm.ts'
+import { JumbleMetadataCache } from '../jumble/metadata-cache.ts'
+import { MusicBrainzClient } from '../jumble/musicbrainz.ts'
+import { JumbleImageRenderer } from '../jumble/renderer.ts'
+import { JumbleRepository } from '../jumble/repository.ts'
+import { JumbleService } from '../jumble/service.ts'
+import { createKanikouDatabase } from '../database/database.ts'
 import { handleMessageCreate } from './messages.ts'
 import { rosepack } from './rosepack.ts'
 import type { BotContext } from './context.ts'
@@ -23,7 +32,7 @@ export interface KanikouApp {
 }
 
 export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): KanikouApp {
-  const registry = rosepack.createRegistry(slashCommands)
+  const registry = rosepack.createRegistry({ components: jumbleComponents, slashCommands })
   const logger = createKanikouLogger(config.LOG_LEVEL)
   const observability = startAxiomObservability(config)
   const memory = new MarkdownMemoryStore()
@@ -63,21 +72,61 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
       tools: createProjectSeleneTools({ token: config.GITHUB_TOKEN })
     })
   )
+  const database = createKanikouDatabase({
+    url: config.KANIKOU_DATABASE_URL,
+    authToken: config.LIBSQL_AUTH_TOKEN
+  })
+  const jumbleMetadataCache = new JumbleMetadataCache(database.db, {
+    onError: (error) => logger.warn('jumble metadata cache error', error)
+  })
+  const musicBrainz = new MusicBrainzClient({
+    cache: jumbleMetadataCache,
+    onError: (error) => logger.warn('MusicBrainz enrichment error', error)
+  })
+  const jumbleRenderer = new JumbleImageRenderer()
+  const jumbleProvider =
+    config.LASTFM_API_KEY === undefined
+      ? new MissingLastFmProvider()
+      : new LastFmClient({ apiKey: config.LASTFM_API_KEY, musicBrainz })
+  const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
+    onExpired: async (state) => {
+      if (state.session.messageId === null) return
+      const rendered = await renderJumble(
+        state,
+        jumbleRenderer,
+        componentIds(state.session.id),
+        'expired'
+      )
+      if (rendered.imageError !== undefined) {
+        logger.warn('expired jumble image could not be rendered', rendered.imageError)
+      }
+      try {
+        await editJumbleMessage(client, state.session.channelId, state.session.messageId, rendered)
+      } catch (error) {
+        logger.warn('expired jumble message could not be updated', error)
+      }
+    }
+  })
 
   let context: BotContext | undefined
 
   client.once('ready', () => {
-    context = {
-      applicationID: client.application.id,
-      botUserID: client.user.id,
-      client,
-      env: config,
-      logger,
-      memory,
-      responder
-    }
-    logger.info(`kanikou connected as ${client.user.tag}`)
     runTask(logger, async () => {
+      await database.initialize()
+      await jumbleMetadataCache.prune()
+      await jumble.restoreActive()
+      context = {
+        applicationID: client.application.id,
+        botUserID: client.user.id,
+        client,
+        env: config,
+        logger,
+        memory,
+        responder,
+        jumble,
+        jumbleRenderer
+      }
+      logger.info(`kanikou connected as ${client.user.tag}`)
       const activeContext = context
       if (activeContext !== undefined) {
         const registered = await registry.registerGlobal({
@@ -122,6 +171,8 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     },
     async stop() {
       client.disconnect(false)
+      jumble.stop()
+      database.close()
       const results = await Promise.allSettled([mintlifyMcp?.close(), observability.shutdown()])
       for (const result of results) {
         if (result.status === 'rejected') {

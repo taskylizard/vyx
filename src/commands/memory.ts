@@ -1,4 +1,4 @@
-import { slashCommand, subcommand } from '../bot/rosepack.ts'
+import { slash, slashSub } from '../bot/rosepack.ts'
 import {
   MEMORY_ENTRY_LIMIT,
   MEMORY_ENTRY_MAX_LENGTH,
@@ -9,7 +9,7 @@ import {
 const RESPONSE_MAX_LENGTH = 1_900
 const MEMORY_PREVIEW_MAX_LENGTH = 180
 
-export default slashCommand({
+export default slash({
   name: 'memory',
   description: "Manage Kanikou's saved memory",
   contexts: ['guild', 'botDm', 'privateChannel'],
@@ -27,7 +27,7 @@ export default slashCommand({
     await context.editResponse('The memory operation failed. Please try again.')
   },
   subcommands: {
-    export: subcommand({
+    export: slashSub({
       description: 'Download your personal memory as Markdown',
       async execute(context) {
         const markdown = await context.app.memory.exportMarkdown({
@@ -45,7 +45,7 @@ export default slashCommand({
         })
       }
     }),
-    clear: subcommand({
+    clear: slashSub({
       description: 'Delete all of your personal memory',
       options: {
         confirm: {
@@ -73,7 +73,7 @@ export default slashCommand({
     server: {
       description: "View or manage this server's shared memory",
       subcommands: {
-        export: subcommand({
+        export: slashSub({
           description: "Download this server's memory as Markdown",
           async execute(context) {
             if (context.interaction.guildID === null) {
@@ -95,7 +95,7 @@ export default slashCommand({
             })
           }
         }),
-        clear: subcommand({
+        clear: slashSub({
           description: 'Delete all shared memory for this server',
           options: {
             confirm: {
@@ -130,7 +130,7 @@ export default slashCommand({
             )
           }
         }),
-        forget: subcommand({
+        forget: slashSub({
           description: 'Remove one shared server memory by ID',
           options: {
             id: {
@@ -175,7 +175,7 @@ export default slashCommand({
             }
           }
         }),
-        show: subcommand({
+        show: slashSub({
           description: "Show this server's shared memory",
           async execute(context) {
             if (context.interaction.guildID === null) {
@@ -189,7 +189,7 @@ export default slashCommand({
             await context.editResponse(formatMemoryList("This server's memory", entries))
           }
         }),
-        remember: subcommand({
+        remember: slashSub({
           description: 'Save shared server memory',
           options: {
             memory: {
@@ -222,7 +222,7 @@ export default slashCommand({
         })
       }
     },
-    forget: subcommand({
+    forget: slashSub({
       description: 'Remove one personal memory by ID',
       options: {
         id: {
@@ -257,7 +257,7 @@ export default slashCommand({
         }
       }
     }),
-    show: subcommand({
+    show: slashSub({
       description: 'Show your saved personal memory',
       async execute(context) {
         const entries = await context.app.memory.list({
@@ -267,7 +267,7 @@ export default slashCommand({
         await context.editResponse(formatMemoryList('Your personal memory', entries))
       }
     }),
-    remember: subcommand({
+    remember: slashSub({
       description: 'Save a personal memory',
       options: {
         memory: {

@@ -8,4 +8,4 @@ export const rosepack = createRosepack<BotContext>({
   }
 })
 
-export const { slashCommand, subcommand } = rosepack
+export const { button, component, modal, slash, slashSub } = rosepack

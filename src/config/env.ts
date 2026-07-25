@@ -43,6 +43,18 @@ export function loadKanikouEnv() {
       type: 'string',
       optional: true
     },
+    LASTFM_API_KEY: {
+      type: 'string',
+      optional: true
+    },
+    KANIKOU_DATABASE_URL: {
+      type: 'string',
+      default: 'file:./data/kanikou.db'
+    },
+    LIBSQL_AUTH_TOKEN: {
+      type: 'string',
+      optional: true
+    },
     LOG_LEVEL: {
       type: 'string',
       choices: [
