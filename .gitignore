@@ -10,3 +10,4 @@ mintlify-mcp-oauth.js
 /data/*.db
 /data/*.db-shm
 /data/*.db-wal
+/rosepack/

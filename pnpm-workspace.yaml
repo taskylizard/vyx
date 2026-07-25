@@ -1,3 +1,7 @@
+packages:
+  - '.'
+  - '!rosepack/**'
+
 allowBuilds:
   esbuild: true
   protobufjs: false

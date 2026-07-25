@@ -24,8 +24,10 @@ export default defineConfig({
     jsxSingleQuote: true
   },
   test: {
+    exclude: ['**/node_modules/**', '**/.git/**', 'rosepack/**'],
     typecheck: {
-      enabled: true
+      enabled: true,
+      exclude: ['**/node_modules/**', '**/.git/**', 'rosepack/**']
     }
   },
   run: {
@@ -36,15 +38,17 @@ export default defineConfig({
     tasks: {
       build: {
         command: 'vp pack',
-        input: [{ auto: true }, '!dist/**'],
+        input: [{ auto: true }, '!dist/**', '!rosepack/**'],
         output: ['dist/**']
       },
       check: {
         command: 'vp check',
+        input: [{ auto: true }, '!rosepack/**'],
         output: []
       },
       test: {
         command: 'vp test',
+        input: [{ auto: true }, '!rosepack/**'],
         output: []
       }
     }
