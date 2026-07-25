@@ -1,17 +1,22 @@
 import { Permission, Permissions } from 'oceanic.js'
-import { expect, test } from 'vite-plus/test'
+import { slashCommandToDiscord } from 'rosepack'
+import { expect, test, vi } from 'vite-plus/test'
 import { rosepack } from '../../src/bot/rosepack.ts'
 import { slashCommands } from '../../src/commands/index.ts'
+import jumbleCommand from '../../src/commands/jumble.ts'
 import { componentIds, jumbleComponents } from '../../src/jumble/components.ts'
 import { jumblePermissionError } from '../../src/jumble/discord.ts'
+import { modules } from '../../src/modules.ts'
 
-test('registers the Jumble commands and non-ambiguous component routes', () => {
+test('keeps Jumble out of global registration until its guild module is enabled', () => {
   const registry = rosepack.createRegistry({ components: jumbleComponents, slashCommands })
   const names = registry.payload.map((command) => command.name)
-  expect(names).toContain('jumble')
+  expect(names).not.toContain('jumble')
+  expect(names).toContain('modules')
   expect(names).not.toContain('jumble-profile')
   expect(names).not.toContain('jumble-stats')
-  expect(registry.payload.find((command) => command.name === 'jumble')).toMatchObject({
+  expect(registry.modules.catalog.jumble).toBe(modules.jumble)
+  expect(slashCommandToDiscord(jumbleCommand)).toMatchObject({
     options: [{ name: 'play' }, { name: 'profile' }, { name: 'stats' }]
   })
   expect(registry.components).toHaveLength(5)
@@ -34,6 +39,49 @@ test('reports every channel permission needed before starting a game', () => {
   expect(error).toContain('Add Reactions')
   expect(error).toContain('Attach Files')
   expect(jumblePermissionError({ appPermissions: denied, guildID: null })).toBeNull()
+})
+
+test('enabling the Jumble module reconciles its guild command', async () => {
+  const createGuildCommand = vi.fn(async () => ({}))
+  let enabledModules: readonly string[] = []
+  const moduleStore = {
+    mutate: vi.fn(async () => {
+      enabledModules = ['jumble']
+      return { changed: true, modules: enabledModules }
+    }),
+    read: vi.fn(async () => enabledModules),
+    readOwnedCommandKeys: vi.fn(async () => []),
+    writeOwnedCommandKeys: vi.fn(async () => undefined)
+  }
+  const client = {
+    rest: {
+      applications: {
+        createGuildCommand,
+        getGuildCommands: vi.fn(async () => [])
+      }
+    }
+  }
+  const registry = rosepack.createRegistry({ slashCommands })
+  const result = await registry.modules.enable({
+    app: { moduleStore } as never,
+    applicationID: 'app-1',
+    client: client as never,
+    guildID: 'guild-1',
+    module: modules.jumble
+  })
+
+  expect(result.changed).toBe(true)
+  expect(moduleStore.mutate).toHaveBeenCalledWith({
+    applicationID: 'app-1',
+    enabled: true,
+    guildID: 'guild-1',
+    module: 'jumble'
+  })
+  expect(createGuildCommand).toHaveBeenCalledWith(
+    'app-1',
+    'guild-1',
+    expect.objectContaining({ name: 'jumble' })
+  )
 })
 
 test('builds compact routed IDs for every game control', () => {

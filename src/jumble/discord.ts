@@ -83,11 +83,13 @@ export async function handleJumbleMessage(
   message: Message,
   service: JumbleService,
   renderer: JumbleImageRenderer,
-  idsFor: (state: JumbleState) => JumbleComponentIds
+  idsFor: (state: JumbleState) => JumbleComponentIds,
+  isEnabled?: () => Promise<boolean>
 ): Promise<boolean> {
   if (message.author.bot || message.content.trim().length === 0) return false
   const active = await service.activeForChannel(message.channelID)
   if (active === null) return false
+  if (isEnabled !== undefined && !(await isEnabled())) return false
 
   const result = await service.submitGuess(active.session.id, message.author.id, message.content)
   const renderFinished = async (action: 'won' | 'expired' | 'gave_up'): Promise<void> => {

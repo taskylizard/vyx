@@ -57,3 +57,39 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
   expect(editMessage).not.toHaveBeenCalled()
   expect(replyToMessage).toHaveBeenCalledWith(context, message)
 })
+
+test('only checks for active Jumble guesses when the guild module is enabled', async () => {
+  const activeForChannel = vi.fn(async (): Promise<unknown> => null)
+  const moduleEnabled = vi.fn(async () => true)
+  const context = {
+    applicationID: 'app',
+    botUserID: 'bot',
+    client: {},
+    jumble: { activeForChannel },
+    logger: { warn: vi.fn() },
+    moduleStore: { isEnabled: moduleEnabled },
+    responder: { replyToMessage: vi.fn() }
+  } as unknown as BotContext
+  const message = {
+    author: { bot: false, id: 'user' },
+    channelID: 'channel',
+    content: 'guess',
+    guildID: 'guild',
+    mentions: { users: [] }
+  } as unknown as Message
+
+  await handleMessageCreate(context, message)
+  expect(activeForChannel).toHaveBeenCalledWith('channel')
+  expect(moduleEnabled).not.toHaveBeenCalled()
+
+  activeForChannel.mockResolvedValue({ session: { id: 'session' } })
+  moduleEnabled.mockResolvedValue(false)
+  activeForChannel.mockClear()
+  await handleMessageCreate(context, message)
+  expect(activeForChannel).toHaveBeenCalledWith('channel')
+  expect(moduleEnabled).toHaveBeenCalledWith({
+    applicationID: 'app',
+    guildID: 'guild',
+    module: 'jumble'
+  })
+})

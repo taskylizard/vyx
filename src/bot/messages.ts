@@ -5,6 +5,7 @@ import { OWNER_USER_ID, TASKYLAND_GUILD_ID } from '../discord/ids.ts'
 import { isOperationsScope } from '../llm/mintlify-mcp.ts'
 import { handleJumbleMessage } from '../jumble/discord.ts'
 import { componentIds } from '../jumble/components.ts'
+import { modules } from '../modules.ts'
 import type { BotContext } from './context.ts'
 
 export async function handleMessageCreate(context: BotContext, message: Message): Promise<void> {
@@ -13,14 +14,23 @@ export async function handleMessageCreate(context: BotContext, message: Message)
   }
 
   try {
-    const handledByJumble = await handleJumbleMessage(
-      context.client,
-      message,
-      context.jumble,
-      context.jumbleRenderer,
-      (state) => componentIds(state.session.id)
-    )
-    if (handledByJumble) return
+    const guildID = message.guildID
+    if (guildID !== null && context.moduleStore !== undefined) {
+      const handledByJumble = await handleJumbleMessage(
+        context.client,
+        message,
+        context.jumble,
+        context.jumbleRenderer,
+        (state) => componentIds(state.session.id),
+        () =>
+          context.moduleStore.isEnabled({
+            applicationID: context.applicationID,
+            guildID,
+            module: modules.jumble.id
+          })
+      )
+      if (handledByJumble) return
+    }
   } catch (error) {
     context.logger.warn('jumble guess handling failed', error)
   }

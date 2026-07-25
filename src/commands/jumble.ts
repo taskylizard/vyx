@@ -5,14 +5,16 @@ import { jumblePermissionError, renderJumble } from '../jumble/discord.ts'
 import { JumbleImageError } from '../jumble/renderer.ts'
 import { LastFmError } from '../jumble/lastfm.ts'
 import { componentIds } from '../jumble/components.ts'
+import { modules } from '../modules.ts'
 import jumbleProfileSubcommand from './jumble-profile.ts'
 import jumbleStatsSubcommand from './jumble-stats.ts'
 
 export default slash({
   name: 'jumble',
   description: 'Play a combined text-and-pixel-art music jumble',
-  contexts: ['guild', 'botDm', 'privateChannel'],
-  installations: ['guild', 'user'],
+  module: modules.jumble,
+  contexts: ['guild'],
+  installations: ['guild'],
   async onError(context, error) {
     context.app.logger.warn('jumble command failed', error)
     await context.editResponse(errorMessage(error))

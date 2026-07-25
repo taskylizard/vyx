@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { MessageFlags, type CommandInteraction } from 'oceanic.js'
 import { afterEach, expect, test, vi } from 'vite-plus/test'
 import type { BotContext } from '../../src/bot/context.ts'
+import { modules } from '../../src/modules.ts'
 import type {
   SlashCommandOptionValues,
   SlashCommandValueOptionRecord,
@@ -258,7 +259,7 @@ async function runMemorySubcommand<TOptions extends SlashCommandValueOptionRecor
 }: {
   bot: BotContext
   interaction: CommandInteraction
-  leaf: SlashSubcommandDefinition<BotContext, TOptions>
+  leaf: SlashSubcommandDefinition<BotContext, TOptions, typeof modules>
   options: SlashCommandOptionValues<TOptions>
 }): Promise<void> {
   const root = memoryCommands.get('memory')

@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { createClient, type Client } from '@libsql/client'
 import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql'
 import { migrate } from 'drizzle-orm/libsql/migrator'
+import { guildSettingsSchema } from './schemas/guild-settings.ts'
 import { jumbleSchema } from './schemas/jumble.ts'
 
 export interface KanikouDatabaseOptions {
@@ -12,7 +13,8 @@ export interface KanikouDatabaseOptions {
   migrationsFolder?: string
 }
 
-const kanikouSchema = { ...jumbleSchema }
+export const kanikouSchema = { ...guildSettingsSchema, ...jumbleSchema }
+export type KanikouSchema = typeof kanikouSchema
 
 export interface KanikouDatabase {
   readonly client: Client

@@ -22,6 +22,7 @@ import { JumbleImageRenderer } from '../jumble/renderer.ts'
 import { JumbleRepository } from '../jumble/repository.ts'
 import { JumbleService } from '../jumble/service.ts'
 import { createKanikouDatabase } from '../database/database.ts'
+import { GuildSettingsStore } from '../database/guild-settings.ts'
 import { handleMessageCreate } from './messages.ts'
 import { rosepack } from './rosepack.ts'
 import type { BotContext } from './context.ts'
@@ -77,6 +78,7 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     url: config.KANIKOU_DATABASE_URL,
     authToken: config.LIBSQL_AUTH_TOKEN
   })
+  const moduleStore = new GuildSettingsStore(database.db)
   const jumbleMetadataCache = new JumbleMetadataCache(database.db, {
     onError: (error) => logger.warn('jumble metadata cache error', error)
   })
@@ -122,6 +124,7 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
         env: config,
         logger,
         memory,
+        moduleStore,
         responder,
         jumble,
         jumbleRenderer
@@ -134,6 +137,17 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
           client: activeContext.client
         })
         logger.info(`registered ${registered.length} global slash command(s)`)
+        try {
+          const synchronized = await registry.modules.syncAll({
+            app: activeContext,
+            applicationID: activeContext.applicationID,
+            client: activeContext.client,
+            guildIDs: activeContext.client.guilds.keys()
+          })
+          logger.info(`synchronized modules for ${synchronized.size} guild(s)`)
+        } catch (error) {
+          logger.warn('guild module synchronization failed', error)
+        }
       }
     })
   })
