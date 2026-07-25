@@ -1,4 +1,5 @@
 import { slashSub } from '../bot/rosepack.ts'
+import { match } from 'ts-pattern'
 
 export default slashSub({
   description: 'View your Jumble statistics',
@@ -16,10 +17,10 @@ export default slashSub({
   },
   async execute(context) {
     await context.defer({ ephemeral: true })
-    const kind =
-      context.options.kind === undefined || context.options.kind === 'all'
-        ? undefined
-        : context.options.kind
+    const kind = match(context.options.kind)
+      .with(undefined, 'all', () => undefined)
+      .with('artist', 'album', 'track', (value) => value)
+      .otherwise(() => undefined)
     const stats = await context.app.jumble.stats(context.interaction.user.id, kind)
     const winRate = stats.played === 0 ? 0 : Math.round((stats.won / stats.played) * 100)
     const averageSeconds =

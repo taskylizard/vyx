@@ -1,4 +1,5 @@
 import { Client, Intents } from 'oceanic.js'
+import { match } from 'ts-pattern'
 import { loadKanikouEnv, type KanikouEnv } from '../config/env.ts'
 import { createKanikouLogger } from '../logging.ts'
 import { slashCommands } from '../commands/index.ts'
@@ -84,10 +85,9 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     onError: (error) => logger.warn('MusicBrainz enrichment error', error)
   })
   const jumbleRenderer = new JumbleImageRenderer()
-  const jumbleProvider =
-    config.LASTFM_API_KEY === undefined
-      ? new MissingLastFmProvider()
-      : new LastFmClient({ apiKey: config.LASTFM_API_KEY, musicBrainz })
+  const jumbleProvider = match(config.LASTFM_API_KEY)
+    .with(undefined, () => new MissingLastFmProvider())
+    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz }))
   const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
     onExpired: async (state) => {
       if (state.session.messageId === null) return

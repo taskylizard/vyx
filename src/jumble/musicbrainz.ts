@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern'
 import type { JumbleArtistMetadata, JumbleCandidate } from './types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
 import { readBoundedJson } from './response.ts'
@@ -91,17 +92,27 @@ export class MusicBrainzClient {
 
   async enrich(candidate: JumbleCandidate): Promise<JumbleCandidate> {
     try {
-      const artistName = candidate.kind === 'artist' ? candidate.answer : candidate.artistName
+      const artistName = match(candidate.kind)
+        .with('artist', () => candidate.answer)
+        .with('album', 'track', () => candidate.artistName)
+        .exhaustive()
       const artistPromise =
         artistName === undefined
           ? Promise.resolve(undefined)
-          : this.getArtist(artistName, candidate.kind === 'artist' ? candidate.mbid : undefined)
-      const itemPromise: Promise<ReleaseMetadata | RecordingMetadata | undefined> =
-        candidate.kind === 'artist'
-          ? Promise.resolve(undefined)
-          : candidate.kind === 'album'
-            ? this.getRelease(candidate.answer, artistName, candidate.mbid)
-            : this.getRecording(candidate.answer, artistName, candidate.mbid)
+          : this.getArtist(
+              artistName,
+              match(candidate.kind)
+                .with('artist', () => candidate.mbid)
+                .with('album', 'track', () => undefined)
+                .exhaustive()
+            )
+      const itemPromise: Promise<ReleaseMetadata | RecordingMetadata | undefined> = match(
+        candidate.kind
+      )
+        .with('artist', () => Promise.resolve(undefined))
+        .with('album', () => this.getRelease(candidate.answer, artistName, candidate.mbid))
+        .with('track', () => this.getRecording(candidate.answer, artistName, candidate.mbid))
+        .exhaustive()
       const [artistMetadata, itemMetadata] = await Promise.all([artistPromise, itemPromise])
 
       const next: JumbleCandidate = { ...candidate }

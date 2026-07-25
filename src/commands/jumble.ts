@@ -1,8 +1,8 @@
 import { slash, slashSub } from '../bot/rosepack.ts'
+import { match, P } from 'ts-pattern'
 import { JumbleError } from '../jumble/service.ts'
 import { jumblePermissionError, renderJumble } from '../jumble/discord.ts'
 import { JumbleImageError } from '../jumble/renderer.ts'
-import { JUMBLE_KINDS } from '../jumble/types.ts'
 import { LastFmError } from '../jumble/lastfm.ts'
 import { componentIds } from '../jumble/components.ts'
 import jumbleProfileSubcommand from './jumble-profile.ts'
@@ -39,8 +39,11 @@ export default slash({
       async execute(context) {
         await context.defer()
         const { username } = context.options
-        const kind = context.options.kind ?? 'album'
-        if (!JUMBLE_KINDS.includes(kind)) {
+        const requestedKind = context.options.kind ?? 'album'
+        const kind = match(requestedKind)
+          .with('artist', 'album', 'track', (value) => value)
+          .otherwise(() => undefined)
+        if (kind === undefined) {
           await context.editResponse('That Jumble type is not available.')
           return
         }
@@ -82,12 +85,9 @@ export default slash({
 })
 
 function errorMessage(error: unknown): string {
-  if (
-    error instanceof JumbleError ||
-    error instanceof LastFmError ||
-    error instanceof JumbleImageError
-  ) {
-    return error.message
-  }
-  return 'The Jumble could not be started. Please try again.'
+  return match(error)
+    .with(P.instanceOf(JumbleError), (value) => value.message)
+    .with(P.instanceOf(LastFmError), (value) => value.message)
+    .with(P.instanceOf(JumbleImageError), (value) => value.message)
+    .otherwise(() => 'The Jumble could not be started. Please try again.')
 }

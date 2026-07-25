@@ -18,7 +18,7 @@ export function removeEditionSuffix(value: string): string {
   return result.trim()
 }
 
-/** Normalize a guess using the same forgiving rules users expect from fmbot. */
+/** Normalize a guess using forgiving rules that work well for music titles. */
 export function normalizeAnswer(value: string): string {
   const decomposed = removeEditionSuffix(value)
     .trim()

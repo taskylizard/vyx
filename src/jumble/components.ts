@@ -1,4 +1,5 @@
 import { MessageFlags } from 'oceanic.js'
+import { match, P } from 'ts-pattern'
 import { button } from '../bot/rosepack.ts'
 import { jumblePermissionError, renderJumble } from './discord.ts'
 import type { ComponentContext } from 'rosepack'
@@ -132,10 +133,10 @@ async function handleComponentError<TRoute extends string>(
   error: unknown
 ): Promise<void> {
   context.app.logger.warn('jumble component failed', error)
-  const message = error instanceof Error ? error.message : 'That Jumble action failed.'
-  if (context.acknowledged) {
-    await context.followUp({ content: message, flags: MessageFlags.EPHEMERAL })
-  } else {
-    await context.reply({ content: message, flags: MessageFlags.EPHEMERAL })
-  }
+  const message = match(error)
+    .with(P.instanceOf(Error), (value) => value.message)
+    .otherwise(() => 'That Jumble action failed.')
+  await match(context.acknowledged)
+    .with(true, async () => context.followUp({ content: message, flags: MessageFlags.EPHEMERAL }))
+    .otherwise(async () => context.reply({ content: message, flags: MessageFlags.EPHEMERAL }))
 }

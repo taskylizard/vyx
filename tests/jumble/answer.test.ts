@@ -7,7 +7,7 @@ import {
   shuffleCharacters
 } from '../../src/jumble/answer.ts'
 
-test('normalizes the punctuation, diacritics, and edition variants used by fmbot', () => {
+test('normalizes punctuation, diacritics, and edition variants in music answers', () => {
   expect(normalizeAnswer('Björk')).toBe('bjork')
   expect(normalizeAnswer('Dazey & the Scouts')).toBe('dazeyandthescouts')
   expect(answerMatches("Guns N' Roses", 'Guns and Roses')).toBe(true)

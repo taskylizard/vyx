@@ -1,4 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
+import { match } from 'ts-pattern'
 import { answerMatches, normalizeAnswer, shuffleCharacters } from './answer.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
@@ -175,7 +176,12 @@ export class JumbleService {
         sourceUsername: username,
         answer: candidate.answer,
         artistName: candidate.artistName ?? null,
-        albumName: candidate.albumName ?? (input.kind === 'album' ? candidate.answer : null),
+        albumName:
+          candidate.albumName ??
+          match(input.kind)
+            .with('album', () => candidate.answer)
+            .with('artist', 'track', () => null)
+            .exhaustive(),
         imageUrl: candidate.imageUrl ?? null,
         metadata: {
           candidate,
@@ -191,13 +197,11 @@ export class JumbleService {
       return { action: 'started', state: complete }
     } catch (error) {
       if (error instanceof LastFmError) {
-        if (error.code === 'invalid-username' || error.code === 'empty-results') {
-          throw new JumbleError(
-            error.message,
-            error.code === 'invalid-username' ? 'profile-missing' : 'no-candidates'
-          )
-        }
-        throw new JumbleError(error.message, 'configuration')
+        const code = match(error.code)
+          .with('invalid-username', () => 'profile-missing' as const)
+          .with('empty-results', () => 'no-candidates' as const)
+          .otherwise(() => 'configuration' as const)
+        throw new JumbleError(error.message, code)
       }
       if (
         error instanceof Error &&

@@ -1,7 +1,9 @@
 import { ButtonStyles, ComponentTypes } from 'oceanic.js'
 import type { InteractionContent, MessageActionRow, TextButton } from 'oceanic.js'
+import { match } from 'ts-pattern'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import type { JumbleAction, JumbleState } from './service.ts'
+import type { JumbleKind } from './types.ts'
 
 export interface JumbleComponentIds {
   hint: string
@@ -47,19 +49,17 @@ export function buildJumblePayload(
 function buildContent(state: JumbleState, action: JumbleAction | undefined): string {
   const { session } = state
   const name = kindName(session.kind)
-  if (session.endedAt !== null) {
-    const outcome =
-      session.outcome === 'won'
-        ? '🎉 Solved!'
-        : session.outcome === 'gave_up'
-          ? '🏳️ Game over.'
-          : '⏰ Time is up.'
+  const { endedAt } = session
+  if (endedAt !== null) {
+    const outcome = match(session.outcome)
+      .with('won', () => '🎉 Solved!')
+      .with('gave_up', () => '🏳️ Game over.')
+      .otherwise(() => '⏰ Time is up.')
     const artist =
       session.artistName === null ? '' : `\nArtist: **${safeInline(session.artistName)}**`
-    const elapsed =
-      session.outcome === 'won'
-        ? `\nSolved in **${((session.endedAt - session.startedAt) / 1_000).toFixed(1)}s**.`
-        : ''
+    const elapsed = match(session.outcome)
+      .with('won', () => `\nSolved in **${((endedAt - session.startedAt) / 1_000).toFixed(1)}s**.`)
+      .otherwise(() => '')
     return `${outcome} **${name} Jumble**\nAnswer: **${safeInline(session.answer)}**${artist}${elapsed}`
   }
 
@@ -69,7 +69,10 @@ function buildContent(state: JumbleState, action: JumbleAction | undefined): str
       ? `Unscramble: **${safeInline(session.metadata.shuffledAnswer)}**`
       : `What ${session.kind} is hidden in the pixels and scrambled text?`
   ]
-  if (action === 'incorrect') lines.push('❌ Not quite — keep guessing!')
+  const actionLines = match(action)
+    .with('incorrect', () => ['❌ Not quite — keep guessing!'])
+    .otherwise(() => [])
+  lines.push(...actionLines)
   const shownHints = state.hints.filter((hint) => hint.shown)
   if (shownHints.length > 0) {
     lines.push('', '**Hints**', ...shownHints.map((hint) => `• ${hint.content}`))
@@ -82,14 +85,17 @@ function buildContent(state: JumbleState, action: JumbleAction | undefined): str
 function buildButtons(state: JumbleState, ids: JumbleComponentIds): MessageActionRow {
   const buttons: TextButton[] = []
   const hiddenHints = state.hints.some((hint) => !hint.shown)
-  if (hiddenHints) {
-    buttons.push(button('Add hint', ids.hint, ButtonStyles.PRIMARY))
-  } else if (
-    state.session.imageUrl !== null &&
-    state.session.blurStage < PIXELATION_LEVELS.length - 1
-  ) {
-    buttons.push(button('Unblur', ids.unblur, ButtonStyles.SECONDARY))
-  }
+  const progressionButton = match({
+    hiddenHints,
+    hasImage: state.session.imageUrl !== null,
+    canUnblur: state.session.blurStage < PIXELATION_LEVELS.length - 1
+  })
+    .with({ hiddenHints: true }, () => button('Add hint', ids.hint, ButtonStyles.PRIMARY))
+    .with({ hasImage: true, canUnblur: true }, () =>
+      button('Unblur', ids.unblur, ButtonStyles.SECONDARY)
+    )
+    .otherwise(() => undefined)
+  if (progressionButton !== undefined) buttons.push(progressionButton)
   buttons.push(button('Reshuffle', ids.reshuffle, ButtonStyles.SECONDARY))
   buttons.push(button('Give up', ids.giveUp, ButtonStyles.DANGER))
   return buildButtonRow(buttons)
@@ -115,8 +121,12 @@ function buildButtonRow(buttons: readonly TextButton[]): MessageActionRow {
   }
 }
 
-function kindName(kind: string): string {
-  return kind === 'artist' ? 'Artist' : kind === 'album' ? 'Album' : 'Track'
+function kindName(kind: JumbleKind): string {
+  return match(kind)
+    .with('artist', () => 'Artist')
+    .with('album', () => 'Album')
+    .with('track', () => 'Track')
+    .exhaustive()
 }
 
 function safeInline(value: string): string {

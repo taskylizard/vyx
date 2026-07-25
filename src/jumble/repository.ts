@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+import { match } from 'ts-pattern'
 import {
   jumbleAnswers,
   jumbleHints,
@@ -336,10 +337,9 @@ function toSession(row: JumbleSessionRow): JumbleSession {
     metadata: parseMetadata(row.metadata, row),
     startedAt: row.startedAt,
     endedAt: row.endedAt,
-    outcome:
-      row.outcome === 'won' || row.outcome === 'gave_up' || row.outcome === 'expired'
-        ? row.outcome
-        : null,
+    outcome: match(row.outcome)
+      .with('won', 'gave_up', 'expired', (outcome) => outcome)
+      .otherwise(() => null),
     blurStage: row.blurStage,
     reshuffleCount: row.reshuffleCount
   }

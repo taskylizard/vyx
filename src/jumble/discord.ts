@@ -1,4 +1,5 @@
 import type { Client, EditMessageOptions, Message, Permission } from 'oceanic.js'
+import { match } from 'ts-pattern'
 import { JumbleImageRenderer } from './renderer.ts'
 import { buildJumblePayload, type JumbleComponentIds } from './presentation.ts'
 import type { JumbleAction, JumbleService, JumbleState } from './service.ts'
@@ -89,12 +90,8 @@ export async function handleJumbleMessage(
   if (active === null) return false
 
   const result = await service.submitGuess(active.session.id, message.author.id, message.content)
-  if (result.action === 'incorrect') {
-    await safeReaction(message, '❌')
-    return true
-  }
-  if (result.action === 'won' || result.action === 'expired' || result.action === 'gave_up') {
-    const rendered = await renderJumble(result.state, renderer, idsFor(result.state), result.action)
+  const renderFinished = async (action: 'won' | 'expired' | 'gave_up'): Promise<void> => {
+    const rendered = await renderJumble(result.state, renderer, idsFor(result.state), action)
     if (result.state.session.messageId !== null) {
       await editJumbleMessage(
         client,
@@ -103,8 +100,15 @@ export async function handleJumbleMessage(
         rendered
       )
     }
-    if (result.action === 'won') await safeReaction(message, '✅')
   }
+  await match(result.action)
+    .with('incorrect', async () => safeReaction(message, '❌'))
+    .with('won', async (action) => {
+      await renderFinished(action)
+      await safeReaction(message, '✅')
+    })
+    .with('expired', 'gave_up', renderFinished)
+    .otherwise(async () => undefined)
   return true
 }
 

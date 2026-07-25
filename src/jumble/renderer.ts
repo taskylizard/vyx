@@ -1,7 +1,8 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
+import { match, P } from 'ts-pattern'
 import { readBoundedBytes } from './response.ts'
 
-/** Pixel block sizes used by fmbot, from hardest to clearest. */
+/** Pixel block sizes used by Jumble, from hardest to clearest. */
 export const PIXELATION_LEVELS = [0.125, 0.085, 0.05, 0.03, 0.02, 0.015, 0.01] as const
 
 export class JumbleImageError extends Error {
@@ -167,14 +168,19 @@ export class JumbleImageRenderer {
       this.trimCache()
       return buffer
     } catch (error) {
-      if (error instanceof JumbleImageError) throw error
-      if (error instanceof Error && error.message.includes('safety limit')) {
-        throw new JumbleImageError('Cover art is too large to process.')
-      }
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new JumbleImageError('Cover art took too long to download.')
-      }
-      throw new JumbleImageError('Cover art could not be downloaded.')
+      throw match(error)
+        .with(P.instanceOf(JumbleImageError), (value) => value)
+        .when(
+          (value): value is Error =>
+            value instanceof Error && value.message.includes('safety limit'),
+          () => new JumbleImageError('Cover art is too large to process.')
+        )
+        .when(
+          (value): value is DOMException =>
+            value instanceof DOMException && value.name === 'AbortError',
+          () => new JumbleImageError('Cover art took too long to download.')
+        )
+        .otherwise(() => new JumbleImageError('Cover art could not be downloaded.'))
     } finally {
       clearTimeout(timer)
     }
@@ -211,7 +217,7 @@ class AsyncGate {
   }
 }
 
-/** Average each source block, matching fmbot's Skia implementation. */
+/** Average each source block before writing the pixelated image. */
 export function pixelate(
   data: Uint8ClampedArray,
   width: number,
