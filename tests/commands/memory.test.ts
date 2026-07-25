@@ -170,15 +170,17 @@ test('rejects server memory operations outside a server', async () => {
   const bot = createBot(memory)
   const interaction = createInteraction({ guildID: null, id: 'dm-call', userID: 'user-1' })
 
-  await runMemorySubcommand({
-    bot,
-    interaction: interaction.interaction,
-    leaf: memoryCommand.subcommands.server.subcommands.show,
-    options: {}
-  })
+  const context = {
+    app: bot,
+    defer: interaction.defer,
+    editResponse: interaction.editOriginal,
+    interaction: interaction.interaction
+  } as never
+  await memoryCommand.beforeExecute?.(context)
+  await memoryCommand.subcommands.server.subcommands.show.execute(context)
 
   expect(interaction.editOriginal).toHaveBeenLastCalledWith(
-    expect.objectContaining({ content: expect.stringContaining('only be used inside') })
+    'Server memory can only be used inside a Discord server.'
   )
 })
 
@@ -247,7 +249,8 @@ test('supports server forget, clear, and Markdown export actions', async () => {
 function createBot(memory: MarkdownMemoryStore): BotContext {
   return {
     logger: { error: vi.fn() },
-    memory
+    memory,
+    moduleStore: { read: vi.fn(async () => ['ai']) }
   } as unknown as BotContext
 }
 
@@ -279,7 +282,7 @@ async function runMemorySubcommand<TOptions extends SlashCommandValueOptionRecor
 
 function createInteraction({
   canManageServer = false,
-  guildID = null,
+  guildID = 'server-1',
   id,
   userID
 }: {

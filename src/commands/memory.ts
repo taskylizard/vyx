@@ -5,6 +5,7 @@ import {
   MemoryStoreError,
   type MemoryEntry
 } from '../memory/markdown-memory.ts'
+import { modules } from '../modules.ts'
 
 const RESPONSE_MAX_LENGTH = 1_900
 const MEMORY_PREVIEW_MAX_LENGTH = 180
@@ -12,8 +13,9 @@ const MEMORY_PREVIEW_MAX_LENGTH = 180
 export default slash({
   name: 'memory',
   description: "Manage Kanikou's saved memory",
-  contexts: ['guild', 'botDm', 'privateChannel'],
-  installations: ['guild', 'user'],
+  module: modules.ai,
+  contexts: ['guild'],
+  installations: ['guild'],
   async beforeExecute(context) {
     await context.defer({ ephemeral: true })
   },

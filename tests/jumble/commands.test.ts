@@ -2,8 +2,10 @@ import { Permission, Permissions } from 'oceanic.js'
 import { slashCommandToDiscord } from 'rosepack'
 import { expect, test, vi } from 'vite-plus/test'
 import { rosepack } from '../../src/bot/rosepack.ts'
+import askCommand from '../../src/commands/ask.ts'
 import { slashCommands } from '../../src/commands/index.ts'
 import jumbleCommand from '../../src/commands/jumble.ts'
+import memoryCommand from '../../src/commands/memory.ts'
 import { componentIds, jumbleComponents } from '../../src/jumble/components.ts'
 import { jumblePermissionError } from '../../src/jumble/discord.ts'
 import { modules } from '../../src/modules.ts'
@@ -13,9 +15,16 @@ test('keeps Jumble out of global registration until its guild module is enabled'
   const names = registry.payload.map((command) => command.name)
   expect(names).not.toContain('jumble')
   expect(names).toContain('modules')
+  expect(names).toContain('ask')
+  expect(names).not.toContain('memory')
   expect(names).not.toContain('jumble-profile')
   expect(names).not.toContain('jumble-stats')
+  expect(registry.modules.catalog.ai).toBe(modules.ai)
   expect(registry.modules.catalog.jumble).toBe(modules.jumble)
+  expect(askCommand.module).toBeUndefined()
+  expect(askCommand.contexts).toEqual(['botDm', 'privateChannel'])
+  expect(askCommand.installations).toEqual(['user'])
+  expect(memoryCommand.module).toBe(modules.ai)
   expect(slashCommandToDiscord(jumbleCommand)).toMatchObject({
     options: [{ name: 'play' }, { name: 'profile' }, { name: 'stats' }]
   })
@@ -81,6 +90,43 @@ test('enabling the Jumble module reconciles its guild command', async () => {
     'app-1',
     'guild-1',
     expect.objectContaining({ name: 'jumble' })
+  )
+})
+
+test('enabling the AI module reconciles its guild memory command', async () => {
+  const createGuildCommand = vi.fn(async () => ({}))
+  let enabledModules: readonly string[] = []
+  const moduleStore = {
+    mutate: vi.fn(async () => {
+      enabledModules = ['ai']
+      return { changed: true, modules: enabledModules }
+    }),
+    read: vi.fn(async () => enabledModules),
+    readOwnedCommandKeys: vi.fn(async () => []),
+    writeOwnedCommandKeys: vi.fn(async () => undefined)
+  }
+  const client = {
+    rest: {
+      applications: {
+        createGuildCommand,
+        getGuildCommands: vi.fn(async () => [])
+      }
+    }
+  }
+  const registry = rosepack.createRegistry({ slashCommands })
+
+  await registry.modules.enable({
+    app: { moduleStore } as never,
+    applicationID: 'app-1',
+    client: client as never,
+    guildID: 'guild-1',
+    module: modules.ai
+  })
+
+  expect(createGuildCommand).toHaveBeenCalledWith(
+    'app-1',
+    'guild-1',
+    expect.objectContaining({ name: 'memory' })
   )
 })
 

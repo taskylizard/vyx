@@ -31,7 +31,7 @@ export const rosepack = createRosepack<BotContext>({
       .with(true, async () => undefined)
       .otherwise(async () => {
         await interaction.createMessage({
-          content: `${module.label} is disabled in this server. Use /modules enable to turn it on.`,
+          content: `${module.label} is disabled in this server. Ask the bot owner to enable it with /modules enable.`,
           flags: MessageFlags.EPHEMERAL
         })
       })

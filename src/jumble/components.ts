@@ -152,13 +152,17 @@ async function assertJumbleEnabled<TRoute extends string>(
 ): Promise<void> {
   await match(context.interaction.guildID)
     .with(null, () => {
-      throw new Error('Jumble is disabled in this server. Use /modules enable to turn it on.')
+      throw new Error(
+        'Jumble is disabled in this server. Ask the bot owner to enable it with /modules enable.'
+      )
     })
     .otherwise(async () => {
       return match(await context.modules.isEnabled(modules.jumble))
         .with(true, () => undefined)
         .otherwise(() => {
-          throw new Error('Jumble is disabled in this server. Use /modules enable to turn it on.')
+          throw new Error(
+            'Jumble is disabled in this server. Ask the bot owner to enable it with /modules enable.'
+          )
         })
     })
 }

@@ -1,10 +1,11 @@
 import { slash } from '../bot/rosepack.ts'
+import { denyUnlessBotOwner } from './guards.ts'
 
 export default slash({
   name: 'ask',
   description: 'Ask the AI',
-  contexts: ['guild', 'botDm', 'privateChannel'],
-  installations: ['guild', 'user'],
+  contexts: ['botDm', 'privateChannel'],
+  installations: ['user'],
   options: {
     ephemeral: {
       description: 'Should only you see the answer?',
@@ -17,6 +18,7 @@ export default slash({
     }
   },
   async execute(context) {
+    if (await denyUnlessBotOwner(context)) return
     const { question, ephemeral = false } = context.options
     await context.defer({ ephemeral })
     await context.app.responder.answerPrompt(context.app, context.interaction, question)

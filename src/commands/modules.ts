@@ -2,6 +2,7 @@ import { moduleChoices } from 'rosepack'
 import { match } from 'ts-pattern'
 import { slash, slashSub } from '../bot/rosepack.ts'
 import { modules } from '../modules.ts'
+import { denyUnlessBotOwner } from './guards.ts'
 
 const moduleOption = {
   choices: moduleChoices(modules),
@@ -12,7 +13,7 @@ const moduleOption = {
 
 export default slash({
   name: 'modules',
-  description: 'Manage Kanikou features for this server',
+  description: 'Manage Kanikou features for this server (bot owner only)',
   contexts: ['guild'],
   installations: ['guild'],
   async onError(context, error) {
@@ -26,6 +27,7 @@ export default slash({
     list: slashSub({
       description: 'List the features enabled in this server',
       async execute(context) {
+        if (await denyUnlessBotOwner(context)) return
         await context.defer({ ephemeral: true })
         await match(context.interaction.guildID)
           .with(null, async () => {
@@ -47,28 +49,21 @@ export default slash({
       description: 'Enable a feature in this server',
       options: { module: moduleOption },
       async execute(context) {
+        if (await denyUnlessBotOwner(context)) return
         await context.defer({ ephemeral: true })
         await match(context.interaction.guildID)
           .with(null, async () => {
             await context.editResponse('Modules can only be managed inside a Discord server.')
           })
           .otherwise(async () => {
-            await match(context.interaction.memberPermissions?.has('MANAGE_GUILD'))
+            const result = await context.modules.enable(context.options.module)
+            await match(result.changed)
               .with(true, async () => {
-                const result = await context.modules.enable(context.options.module)
-                await match(result.changed)
-                  .with(true, async () => {
-                    await context.editResponse(`Enabled ${result.module.label} for this server.`)
-                  })
-                  .otherwise(async () => {
-                    await context.editResponse(
-                      `${result.module.label} is already enabled in this server.`
-                    )
-                  })
+                await context.editResponse(`Enabled ${result.module.label} for this server.`)
               })
               .otherwise(async () => {
                 await context.editResponse(
-                  'You need the Manage Server permission to change modules.'
+                  `${result.module.label} is already enabled in this server.`
                 )
               })
           })
@@ -78,28 +73,21 @@ export default slash({
       description: 'Disable a feature in this server',
       options: { module: moduleOption },
       async execute(context) {
+        if (await denyUnlessBotOwner(context)) return
         await context.defer({ ephemeral: true })
         await match(context.interaction.guildID)
           .with(null, async () => {
             await context.editResponse('Modules can only be managed inside a Discord server.')
           })
           .otherwise(async () => {
-            await match(context.interaction.memberPermissions?.has('MANAGE_GUILD'))
+            const result = await context.modules.disable(context.options.module)
+            await match(result.changed)
               .with(true, async () => {
-                const result = await context.modules.disable(context.options.module)
-                await match(result.changed)
-                  .with(true, async () => {
-                    await context.editResponse(`Disabled ${result.module.label} for this server.`)
-                  })
-                  .otherwise(async () => {
-                    await context.editResponse(
-                      `${result.module.label} is already disabled in this server.`
-                    )
-                  })
+                await context.editResponse(`Disabled ${result.module.label} for this server.`)
               })
               .otherwise(async () => {
                 await context.editResponse(
-                  'You need the Manage Server permission to change modules.'
+                  `${result.module.label} is already disabled in this server.`
                 )
               })
           })
