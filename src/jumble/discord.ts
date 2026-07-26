@@ -1,7 +1,11 @@
 import type { Client, EditMessageOptions, Message, Permission } from 'oceanic.js'
 import { match } from 'ts-pattern'
 import { JumbleImageRenderer } from './renderer.ts'
-import { buildJumblePayload, type JumbleComponentIds } from './presentation.ts'
+import {
+  buildJumblePayload,
+  buildJumbleWinnerAnnouncement,
+  type JumbleComponentIds
+} from './presentation.ts'
 import type { JumbleAction, JumbleState } from './types.ts'
 import type { JumbleService } from './service.ts'
 
@@ -108,10 +112,26 @@ export async function handleJumbleMessage(
     .with('incorrect', async () => safeReaction(message, '❌'))
     .with('won', async (action) => {
       await renderFinished(action)
+      await client.rest.channels.createMessage(message.channelID, {
+        allowedMentions: {
+          everyone: false,
+          repliedUser: false,
+          roles: false,
+          users: [message.author.id]
+        },
+        content: buildJumbleWinnerAnnouncement(result.state, message.author.id),
+        messageReference: {
+          channelID: message.channelID,
+          failIfNotExists: false,
+          guildID: message.guildID ?? undefined,
+          messageID: message.id
+        }
+      })
       await safeReaction(message, '✅')
     })
     .with('expired', 'gave_up', renderFinished)
-    .otherwise(async () => undefined)
+    .with('started', 'updated', 'unchanged', async () => undefined)
+    .exhaustive()
   return true
 }
 

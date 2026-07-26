@@ -66,7 +66,6 @@ export const jumbleReplayButton = button({
     const permissionError = jumblePermissionError(context.interaction)
     if (permissionError !== null) throw new Error(permissionError)
     if (!isJumbleKind(context.params.kind)) throw new Error('That Jumble type is not supported.')
-    const previous = context.interaction.message
     const result = await context.app.jumble.start({
       starterUserId: context.interaction.user.id,
       guildId: context.interaction.guildID,
@@ -74,14 +73,20 @@ export const jumbleReplayButton = button({
       kind: context.params.kind,
       username: (await context.app.jumble.getProfile(context.interaction.user.id)) ?? undefined
     })
-    const attached = await context.app.jumble.attachMessage(result.state.session.id, previous.id)
     const rendered = await renderJumble(
-      attached,
+      result.state,
       context.app.jumbleRenderer,
-      componentIds(attached.session.id),
+      componentIds(result.state.session.id),
       result.action
     )
-    await context.update(rendered.payload)
+    if (rendered.imageError !== undefined) {
+      context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+    }
+    const message = await context.client.rest.channels.createMessage(
+      context.interaction.channelID,
+      rendered.payload
+    )
+    await context.app.jumble.attachMessage(result.state.session.id, message.id)
   },
   onError: handleComponentError
 })

@@ -45,6 +45,18 @@ export function buildJumblePayload(
   return payload
 }
 
+export function buildJumbleWinnerAnnouncement(state: JumbleState, userId: string): string {
+  const { session } = state
+  const artist = match(session.kind)
+    .with('artist', () => '')
+    .with('album', 'track', () =>
+      session.artistName === null ? '' : ` by ${safeInline(session.artistName)}`
+    )
+    .exhaustive()
+
+  return `<@${userId}> got it! It was **${safeInline(session.answer)}**${artist}`
+}
+
 function buildContent(state: JumbleState, action: JumbleAction | undefined): string {
   const { session } = state
   const name = kindName(session.kind)
