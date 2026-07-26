@@ -22,7 +22,9 @@ test('runs the Parallel package tool through the OpenRouter model loop', async (
           objective: 'Explain Vite+.',
           search_queries: ['Vite+ vp command']
         })
-      : chatText('Vite+ uses the vp command.[source](https://viteplus.dev)')
+      : chatText(
+          'Vite+ uses the vp command.[source](https://viteplus.dev) Read https://viteplus.dev/guide/.'
+        )
   })
   const parallelFetch = vi.fn<typeof fetch>(async () =>
     Response.json({
@@ -64,7 +66,9 @@ test('runs the Parallel package tool through the OpenRouter model loop', async (
       }
     )
 
-    expect(response).toBe('Vite+ uses the vp command.[[1]](<https://viteplus.dev>)')
+    expect(response).toBe(
+      'Vite+ uses the vp command.[[1]](<https://viteplus.dev>) Read <https://viteplus.dev/guide/>.'
+    )
     expect(modelFetch).toHaveBeenCalledTimes(2)
     const firstRequest = modelFetch.mock.calls[0]
     expect(requestUrl(firstRequest?.[0])).toBe('https://openrouter.ai/api/v1/chat/completions')

@@ -10,6 +10,7 @@ import { match } from 'ts-pattern'
 import { KANIKOU_MODEL_SETTINGS } from '../config/model.ts'
 import { kanikouSystemPrompt } from '../config/system-prompt.ts'
 import { formatCitations } from './citations.ts'
+import { suppressLinkEmbeds } from './links.ts'
 
 const DEFAULT_MAX_TOOL_ITERATIONS = 6
 
@@ -129,7 +130,7 @@ function completionContent(finishReason: FinishReason, text: string): string {
       if (text.length === 0) {
         throw new Error('The model stopped without message content.')
       }
-      return formatCitations(text)
+      return suppressLinkEmbeds(formatCitations(text))
     })
     .with('length', () => 'The response hit the model length limit before it finished.')
     .with(
