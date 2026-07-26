@@ -4,13 +4,25 @@ import { answerMatches, normalizeAnswer, shuffleCharacters } from './answer.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
 import type {
+  JumbleAction,
+  JumbleActionResult,
   JumbleCandidate,
-  JumbleHint,
   JumbleKind,
   JumbleSession,
-  JumbleStats
+  JumbleServiceOptions,
+  JumbleState,
+  JumbleStats,
+  StartJumbleInput
 } from './types.ts'
 import { LastFmError, type JumbleMusicProvider } from './lastfm.ts'
+
+export type {
+  JumbleAction,
+  JumbleActionResult,
+  JumbleServiceOptions,
+  JumbleState,
+  StartJumbleInput
+} from './types.ts'
 
 export const JUMBLE_TIMEOUT_MS: Readonly<Record<JumbleKind, number>> = {
   artist: 25_000,
@@ -45,39 +57,6 @@ export class JumbleError extends Error {
     this.name = 'JumbleError'
     this.code = code
   }
-}
-
-export interface JumbleState {
-  session: JumbleSession
-  hints: readonly (JumbleHint & { shown: boolean; order: number })[]
-}
-
-export type JumbleAction =
-  | 'started'
-  | 'updated'
-  | 'incorrect'
-  | 'won'
-  | 'gave_up'
-  | 'expired'
-  | 'unchanged'
-
-export interface JumbleActionResult {
-  action: JumbleAction
-  state: JumbleState
-}
-
-export interface StartJumbleInput {
-  starterUserId: string
-  guildId: string | null
-  channelId: string
-  kind: JumbleKind
-  username?: string
-}
-
-export interface JumbleServiceOptions {
-  now?: () => number
-  randomIndex?: (maxExclusive: number) => number
-  onExpired?: (state: JumbleState) => void | Promise<void>
 }
 
 type HydratableProvider = JumbleMusicProvider & {
@@ -198,9 +177,10 @@ export class JumbleService {
     } catch (error) {
       if (error instanceof LastFmError) {
         const code = match(error.code)
-          .with('invalid-username', () => 'profile-missing' as const)
-          .with('empty-results', () => 'no-candidates' as const)
-          .otherwise(() => 'configuration' as const)
+          .returnType<JumbleError['code']>()
+          .with('invalid-username', () => 'profile-missing')
+          .with('empty-results', () => 'no-candidates')
+          .otherwise(() => 'configuration')
         throw new JumbleError(error.message, code)
       }
       if (
@@ -388,7 +368,7 @@ export class JumbleService {
     try {
       await this.onExpired(await this.getState(session.id))
     } catch {
-      // Expiry must never leave a session active because a presentation update failed.
+      // tasky: expiry owns session state; a failed UI update must not resurrect the game.
     }
   }
 }

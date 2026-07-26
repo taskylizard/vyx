@@ -1,5 +1,6 @@
 import { asc, count, eq, inArray, lt } from 'drizzle-orm'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+import type { ZodType } from 'zod'
 import { jumbleMetadataCache, jumbleSchema } from '../database/schemas/jumble.ts'
 
 const MAX_CACHE_ENTRIES = 65_536
@@ -53,7 +54,7 @@ export class JumbleMetadataCache {
     this.onError = options.onError
   }
 
-  async get<T>(cacheKey: string): Promise<JumbleMetadataCacheEntry<T> | null> {
+  async get<T>(cacheKey: string, schema: ZodType<T>): Promise<JumbleMetadataCacheEntry<T> | null> {
     try {
       const rows = await this.db
         .select()
@@ -67,16 +68,22 @@ export class JumbleMetadataCache {
         return null
       }
 
-      let value: unknown
+      let payload: unknown
       try {
-        value = JSON.parse(row.payload)
+        payload = JSON.parse(row.payload)
       } catch {
         await this.delete(cacheKey)
         return null
       }
 
+      const value = schema.safeParse(payload)
+      if (!value.success) {
+        await this.delete(cacheKey)
+        return null
+      }
+
       return {
-        value: value as T,
+        value: value.data,
         fetchedAt: row.fetchedAt,
         expiresAt: row.expiresAt,
         fresh: row.expiresAt > this.now()

@@ -1,8 +1,11 @@
 import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { eq } from 'drizzle-orm'
+import { match } from 'ts-pattern'
 import { afterEach, beforeEach, expect, test } from 'vite-plus/test'
 import { createKanikouDatabase } from '../../src/database/database.ts'
+import { jumbleSessions } from '../../src/database/schemas/jumble.ts'
 import { componentIds } from '../../src/jumble/components.ts'
 import { renderJumble } from '../../src/jumble/discord.ts'
 import { buildJumblePayload } from '../../src/jumble/presentation.ts'
@@ -23,14 +26,31 @@ beforeEach(async () => {
   const provider = {
     async getCandidates(kind: JumbleKind): Promise<readonly JumbleCandidate[]> {
       return [
-        {
-          kind,
-          answer: kind === 'artist' ? 'Björk' : kind === 'album' ? 'Homogenic' : 'Jóga',
-          artistName: kind === 'artist' ? undefined : 'Björk',
-          albumName: kind === 'track' ? 'Homogenic' : undefined,
-          imageUrl: 'https://example.test/cover.png',
-          playcount: 42
-        }
+        match(kind)
+          .returnType<JumbleCandidate>()
+          .with('artist', () => ({
+            kind: 'artist',
+            answer: 'Björk',
+            imageUrl: 'https://example.test/cover.png',
+            playcount: 42
+          }))
+          .with('album', () => ({
+            kind: 'album',
+            answer: 'Homogenic',
+            artistName: 'Björk',
+            albumName: 'Homogenic',
+            imageUrl: 'https://example.test/cover.png',
+            playcount: 42
+          }))
+          .with('track', () => ({
+            kind: 'track',
+            answer: 'Jóga',
+            albumName: 'Homogenic',
+            artistName: 'Björk',
+            imageUrl: 'https://example.test/cover.png',
+            playcount: 42
+          }))
+          .exhaustive()
       ]
     },
     async getHints(): Promise<readonly JumbleHint[]> {
@@ -174,6 +194,66 @@ test('expires an active session when its clock passes the kind timeout', async (
   await expect(service.activeForChannel('channel-1')).resolves.toBeNull()
   await expect(repository.findSession(started.state.session.id)).resolves.toMatchObject({
     outcome: 'expired'
+  })
+})
+
+test('falls back to row fields when persisted session metadata is malformed', async () => {
+  const started = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'album',
+    username: 'tasky'
+  })
+  await database.db
+    .update(jumbleSessions)
+    .set({ metadata: '{"candidate":null,"hints":"invalid"}' })
+    .where(eq(jumbleSessions.id, started.state.session.id))
+
+  const restored = await repository.findSession(started.state.session.id)
+  expect(restored?.metadata).toEqual({
+    candidate: {
+      albumName: 'Homogenic',
+      answer: 'Homogenic',
+      artistName: 'Björk',
+      imageUrl: 'https://example.test/cover.png',
+      kind: 'album'
+    },
+    hints: []
+  })
+})
+
+test('strips candidate fields that do not belong to the persisted Jumble kind', async () => {
+  const started = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'artist',
+    username: 'tasky'
+  })
+  await database.db
+    .update(jumbleSessions)
+    .set({
+      metadata: JSON.stringify({
+        candidate: {
+          kind: 'artist',
+          answer: 'Björk',
+          artistName: 'invalid duplicate artist',
+          albumName: 'invalid album',
+          durationMs: 123,
+          countryCode: 'IS'
+        },
+        hints: []
+      })
+    })
+    .where(eq(jumbleSessions.id, started.state.session.id))
+
+  const restored = await repository.findSession(started.state.session.id)
+
+  expect(restored?.metadata.candidate).toEqual({
+    kind: 'artist',
+    answer: 'Björk',
+    countryCode: 'IS'
   })
 })
 

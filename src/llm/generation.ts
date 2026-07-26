@@ -6,6 +6,7 @@ import {
   type ModelMessage,
   type ToolSet
 } from 'ai'
+import { match } from 'ts-pattern'
 import { KANIKOU_MODEL_SETTINGS } from '../config/model.ts'
 import { kanikouSystemPrompt } from '../config/system-prompt.ts'
 import { formatCitations } from './citations.ts'
@@ -122,21 +123,24 @@ function errorText(error: unknown): string {
 }
 
 function completionContent(finishReason: FinishReason, text: string): string {
-  switch (finishReason) {
-    case 'stop':
-    case 'other': {
+  return match(finishReason)
+    .returnType<string>()
+    .with('stop', 'other', () => {
       if (text.length === 0) {
         throw new Error('The model stopped without message content.')
       }
       return formatCitations(text)
-    }
-    case 'length':
-      return 'The response hit the model length limit before it finished.'
-    case 'content-filter':
-      return 'The model could not return that response because of a content filter.'
-    case 'tool-calls':
+    })
+    .with('length', () => 'The response hit the model length limit before it finished.')
+    .with(
+      'content-filter',
+      () => 'The model could not return that response because of a content filter.'
+    )
+    .with('tool-calls', () => {
       throw new Error('The model tool loop reached the iteration limit.')
-    case 'error':
+    })
+    .with('error', () => {
       throw new Error('The model stopped because of a provider error.')
-  }
+    })
+    .exhaustive()
 }

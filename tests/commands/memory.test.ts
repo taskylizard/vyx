@@ -246,6 +246,38 @@ test('supports server forget, clear, and Markdown export actions', async () => {
   await expect(memory.list(scope)).resolves.toEqual([])
 })
 
+test('reports ambiguous and missing memory identifiers consistently', async () => {
+  let idIndex = 30
+  const memory = await createStore(() => memoryID(idIndex++))
+  await memory.remember({ id: 'user-1', kind: 'user' }, 'First fact', 'setup-1')
+  await memory.remember({ id: 'user-1', kind: 'user' }, 'Second fact', 'setup-2')
+  const bot = createBot(memory)
+
+  const ambiguous = createInteraction({ id: 'ambiguous-call', userID: 'user-1' })
+  await runMemorySubcommand({
+    bot,
+    interaction: ambiguous.interaction,
+    leaf: memoryCommand.subcommands.forget,
+    options: { id: '0000' }
+  })
+  expect(ambiguous.editOriginal).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      content: 'That ID prefix matches multiple memories. Use more characters.'
+    })
+  )
+
+  const missing = createInteraction({ id: 'missing-call', userID: 'user-1' })
+  await runMemorySubcommand({
+    bot,
+    interaction: missing.interaction,
+    leaf: memoryCommand.subcommands.forget,
+    options: { id: 'deadbeef' }
+  })
+  expect(missing.editOriginal).toHaveBeenLastCalledWith(
+    expect.objectContaining({ content: 'No memory matched `deadbeef`.' })
+  )
+})
+
 function createBot(memory: MarkdownMemoryStore): BotContext {
   return {
     logger: { error: vi.fn() },

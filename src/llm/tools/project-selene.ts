@@ -1,5 +1,14 @@
 import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
+import type {
+  GitHubCodeSearchResponse,
+  GitHubCommitResponse,
+  GitHubTreeEntry,
+  GitHubTreeResponse,
+  ProjectSeleneConfig
+} from './project-selene-types.ts'
+
+export type { ProjectSeleneConfig } from './project-selene-types.ts'
 
 export const PROJECT_SELENE_LIST_FILES_TOOL_NAME = 'seleneListFiles'
 export const PROJECT_SELENE_READ_FILE_TOOL_NAME = 'seleneReadFile'
@@ -36,33 +45,27 @@ const SearchCodeArgsSchema = z.object({
   query: z.string().min(1).describe('Code, symbol, filename, or concept to search for.')
 })
 
-export interface ProjectSeleneConfig {
-  fetch?: typeof fetch
-  token?: string
-}
-
-interface GitHubTreeResponse {
-  tree: GitHubTreeEntry[]
-  truncated: boolean
-}
-
-interface GitHubTreeEntry {
-  path: string
-  size?: number
-  type: 'blob' | 'commit' | 'tree'
-}
-
-interface GitHubCommitResponse {
-  sha: string
-}
-
-interface GitHubCodeSearchResponse {
-  items: Array<{
-    path: string
-    text_matches?: Array<{ fragment: string }>
-  }>
-  total_count: number
-}
+const GitHubTreeEntrySchema: z.ZodType<GitHubTreeEntry> = z.object({
+  path: z.string(),
+  size: z.number().optional(),
+  type: z.enum(['blob', 'commit', 'tree'])
+})
+const GitHubTreeResponseSchema: z.ZodType<GitHubTreeResponse> = z.object({
+  tree: z.array(GitHubTreeEntrySchema),
+  truncated: z.boolean()
+})
+const GitHubCommitResponseSchema: z.ZodType<GitHubCommitResponse> = z.object({
+  sha: z.string()
+})
+const GitHubCodeSearchResponseSchema: z.ZodType<GitHubCodeSearchResponse> = z.object({
+  items: z.array(
+    z.object({
+      path: z.string(),
+      text_matches: z.array(z.object({ fragment: z.string() })).optional()
+    })
+  ),
+  total_count: z.number()
+})
 
 export function createProjectSeleneTools(config: ProjectSeleneConfig = {}): ToolSet {
   const repository = new ProjectSeleneRepository(config)
@@ -109,11 +112,10 @@ export class ProjectSeleneRepository {
     const path = normalizeOptionalPath(args.path)
     const limit = args.limit ?? 100
     const [commit, tree] = await Promise.all([this.#commit(), this.#tree()])
-    const files = tree.tree
-      .filter(
-        (entry) => entry.type === 'blob' && (path === undefined || matchesPath(entry.path, path))
-      )
-      .slice(0, limit)
+    const matchingFiles = tree.tree.filter(
+      (entry) => entry.type === 'blob' && (path === undefined || matchesPath(entry.path, path))
+    )
+    const files = matchingFiles.slice(0, limit)
 
     if (files.length === 0) {
       return `No Project Selene files found under ${path ?? 'the repository root'}.`
@@ -123,10 +125,7 @@ export class ProjectSeleneRepository {
       const size = entry.size === undefined ? '' : ` (${entry.size} bytes)`
       return `- ${entry.path}${size}`
     })
-    const remaining =
-      tree.tree.filter(
-        (entry) => entry.type === 'blob' && (path === undefined || matchesPath(entry.path, path))
-      ).length - files.length
+    const remaining = matchingFiles.length - files.length
     return [
       `[Project Selene files at ${commit}]`,
       `Source: ${treeUrl(commit)}`,
@@ -175,8 +174,9 @@ export class ProjectSeleneRepository {
     const query = [`${args.query.trim()} repo:${OWNER}/${REPOSITORY}`, path && `path:${path}`]
       .filter(Boolean)
       .join(' ')
-    const search = await this.#requestJson<GitHubCodeSearchResponse>(
+    const search = await this.#requestJson(
       `${API_BASE_URL}/search/code?q=${encodeURIComponent(query)}&per_page=${limit}`,
+      GitHubCodeSearchResponseSchema,
       'application/vnd.github.text-match+json'
     )
     const commit = await this.#commit()
@@ -205,31 +205,48 @@ export class ProjectSeleneRepository {
   }
 
   async #commit(): Promise<string> {
-    this.#commitPromise ??= this.#requestJson<GitHubCommitResponse>(
-      `${API_BASE_URL}/repos/${OWNER}/${REPOSITORY}/commits/${DEFAULT_BRANCH}`
-    ).then((response) => response.sha)
+    this.#commitPromise ??= this.#requestJson(
+      `${API_BASE_URL}/repos/${OWNER}/${REPOSITORY}/commits/${DEFAULT_BRANCH}`,
+      GitHubCommitResponseSchema
+    )
+      .then((response) => response.sha)
+      .catch((error: unknown) => {
+        this.#commitPromise = undefined
+        throw error
+      })
     return this.#commitPromise
   }
 
   async #tree(): Promise<GitHubTreeResponse> {
-    this.#treePromise ??= this.#commit().then(async (commit) => {
-      const tree = await this.#requestJson<GitHubTreeResponse>(
-        `${API_BASE_URL}/repos/${OWNER}/${REPOSITORY}/git/trees/${commit}?recursive=1`
-      )
-      if (tree.truncated) {
-        throw new Error('GitHub returned a truncated Project Selene repository tree.')
-      }
-      return tree
-    })
+    this.#treePromise ??= this.#commit()
+      .then(async (commit) => {
+        const tree = await this.#requestJson(
+          `${API_BASE_URL}/repos/${OWNER}/${REPOSITORY}/git/trees/${commit}?recursive=1`,
+          GitHubTreeResponseSchema
+        )
+        if (tree.truncated) {
+          throw new Error('GitHub returned a truncated Project Selene repository tree.')
+        }
+        return tree
+      })
+      .catch((error: unknown) => {
+        this.#treePromise = undefined
+        throw error
+      })
     return this.#treePromise
   }
 
-  async #requestJson<T>(url: string, accept = 'application/vnd.github+json'): Promise<T> {
+  async #requestJson<T>(
+    url: string,
+    schema: z.ZodType<T>,
+    accept = 'application/vnd.github+json'
+  ): Promise<T> {
     const response = await this.#fetch(url, { headers: this.#headers(accept) })
     if (!response.ok) {
       throw new Error(`GitHub request failed (${response.status} ${response.statusText}).`)
     }
-    return (await response.json()) as T
+    const payload: unknown = await response.json()
+    return schema.parse(payload)
   }
 
   async #requestText(url: string): Promise<string> {

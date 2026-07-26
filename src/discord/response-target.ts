@@ -1,4 +1,5 @@
 import type { CommandInteraction, EmbedOptions } from 'oceanic.js'
+import { match } from 'ts-pattern'
 import type { BotContext } from '../bot/context.ts'
 import { editSentMessage, editSentMessageWithEmbed, type SentDiscordMessage } from './replies.ts'
 
@@ -19,30 +20,35 @@ export async function sendResponse(
   target: ResponseTarget,
   content: string
 ): Promise<void> {
-  if (target.kind === 'interaction') {
-    if (content.length > DISCORD_CONTENT_LIMIT) {
-      const embed = {
-        description: content
-      } satisfies EmbedOptions
+  const exceedsContentLimit = content.length > DISCORD_CONTENT_LIMIT
 
-      await target.interaction.editOriginal({
-        content: null,
-        embeds: [embed]
+  return match(target)
+    .returnType<Promise<void>>()
+    .with({ kind: 'interaction' }, async ({ interaction }) => {
+      if (exceedsContentLimit) {
+        const embed = {
+          description: content
+        } satisfies EmbedOptions
+
+        await interaction.editOriginal({
+          content: null,
+          embeds: [embed]
+        })
+        return
+      }
+
+      await interaction.editOriginal({
+        content,
+        embeds: null
       })
-      return
-    }
-
-    await target.interaction.editOriginal({
-      content,
-      embeds: null
     })
-    return
-  }
+    .with({ kind: 'message' }, async ({ placeholder }) => {
+      if (exceedsContentLimit) {
+        await editSentMessageWithEmbed(context.client, placeholder, content)
+        return
+      }
 
-  if (content.length > DISCORD_CONTENT_LIMIT) {
-    await editSentMessageWithEmbed(context.client, target.placeholder, content)
-    return
-  }
-
-  await editSentMessage(context.client, target.placeholder, content)
+      await editSentMessage(context.client, placeholder, content)
+    })
+    .exhaustive()
 }

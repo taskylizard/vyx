@@ -188,10 +188,10 @@ export class JumbleImageRenderer {
 
   private trimCache(): void {
     while (this.cache.size > this.cacheEntries || this.cacheSize > this.cacheBytes) {
-      const oldest = this.cache.entries().next().value as [string, CachedImage] | undefined
-      if (oldest === undefined) return
-      this.cache.delete(oldest[0])
-      this.cacheSize -= oldest[1].bytes
+      const oldest = this.cache.entries().next()
+      if (oldest.done) return
+      this.cache.delete(oldest.value[0])
+      this.cacheSize -= oldest.value[1].bytes
     }
   }
 }

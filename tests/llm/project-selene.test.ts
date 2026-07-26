@@ -30,6 +30,31 @@ test('lists files from a commit-pinned repository tree', async () => {
   expect(fetcher).toHaveBeenCalledTimes(2)
 })
 
+test('retries repository discovery after a failed commit request', async () => {
+  const fetcher = createGitHubFetcher([
+    new Response('Unavailable', { status: 503, statusText: 'Unavailable' })
+  ])
+  const repository = new ProjectSeleneRepository({ fetch: fetcher })
+
+  await expect(repository.listFiles({})).rejects.toThrow('503 Unavailable')
+  await expect(repository.listFiles({ path: 'ProjectSelene.Domain' })).resolves.toContain(
+    'ProjectSelene.Domain/Entities/Mod.cs'
+  )
+  expect(fetcher).toHaveBeenCalledTimes(3)
+})
+
+test('retries repository discovery after a failed tree request', async () => {
+  const fetcher = createGitHubFetcher([
+    Response.json({ sha: commit }),
+    new Response('Unavailable', { status: 503, statusText: 'Unavailable' })
+  ])
+  const repository = new ProjectSeleneRepository({ fetch: fetcher })
+
+  await expect(repository.listFiles({})).rejects.toThrow('503 Unavailable')
+  await expect(repository.listFiles({})).resolves.toContain('README.md')
+  expect(fetcher).toHaveBeenCalledTimes(3)
+})
+
 test('reads bounded lines with a permanent GitHub citation', async () => {
   const fetcher = createGitHubFetcher()
   const repository = new ProjectSeleneRepository({ fetch: fetcher })
@@ -72,6 +97,14 @@ test('requires a token for GitHub code search', async () => {
   )
 })
 
+test('rejects malformed GitHub JSON at the response boundary', async () => {
+  const repository = new ProjectSeleneRepository({
+    fetch: vi.fn<typeof fetch>(async () => Response.json({}))
+  })
+
+  await expect(repository.listFiles({})).rejects.toThrow()
+})
+
 test('rejects traversal and oversized reads', async () => {
   const repository = new ProjectSeleneRepository({ fetch: createGitHubFetcher() })
 
@@ -81,8 +114,13 @@ test('rejects traversal and oversized reads', async () => {
   ).rejects.toThrow('limited to 300 lines')
 })
 
-function createGitHubFetcher() {
+function createGitHubFetcher(initialResponses: Response[] = []) {
   return vi.fn<typeof fetch>(async (input) => {
+    const initialResponse = initialResponses.shift()
+    if (initialResponse !== undefined) {
+      return initialResponse
+    }
+
     const url = requestUrl(input)
     if (url.includes('/commits/master')) {
       return Response.json({ sha: commit })

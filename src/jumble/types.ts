@@ -19,29 +19,55 @@ export interface JumbleArtistMetadata {
   summary?: string
 }
 
-export interface JumbleCandidate {
-  kind: JumbleKind
+interface JumbleCandidateBase {
   answer: string
-  artistName?: string
-  albumName?: string
   imageUrl?: string
   playcount?: number
   listeners?: number
   mbid?: string
-  releaseDate?: string
-  releaseType?: string
-  label?: string
-  durationMs?: number
   disambiguation?: string
-  entityType?: string
-  countryCode?: string
-  startDate?: string
-  endDate?: string
   artistMetadata?: JumbleArtistMetadata
   tags?: readonly string[]
   summary?: string
   sourceUrl?: string
 }
+
+export interface JumbleArtistCandidate extends JumbleCandidateBase {
+  kind: 'artist'
+  artistName?: never
+  albumName?: never
+  releaseDate?: never
+  releaseType?: never
+  label?: never
+  durationMs?: never
+  entityType?: string
+  countryCode?: string
+  startDate?: string
+  endDate?: string
+}
+
+interface JumbleReleaseCandidateBase extends JumbleCandidateBase {
+  artistName?: string
+  albumName?: string
+  releaseDate?: string
+  releaseType?: string
+  label?: string
+  durationMs?: number
+  entityType?: never
+  countryCode?: never
+  startDate?: never
+  endDate?: never
+}
+
+export interface JumbleAlbumCandidate extends JumbleReleaseCandidateBase {
+  kind: 'album'
+}
+
+export interface JumbleTrackCandidate extends JumbleReleaseCandidateBase {
+  kind: 'track'
+}
+
+export type JumbleCandidate = JumbleArtistCandidate | JumbleAlbumCandidate | JumbleTrackCandidate
 
 export interface JumbleSessionMetadata {
   candidate: JumbleCandidate
@@ -81,6 +107,38 @@ export interface JumbleStats {
   averageReshuffles: number | null
 }
 
+export interface JumbleState {
+  session: JumbleSession
+  hints: readonly (JumbleHint & { shown: boolean; order: number })[]
+}
+
+export type JumbleAction =
+  | 'started'
+  | 'updated'
+  | 'incorrect'
+  | 'won'
+  | 'gave_up'
+  | 'expired'
+  | 'unchanged'
+
+export type JumbleActionResult<TAction extends JumbleAction = JumbleAction> = {
+  [Action in TAction]: { action: Action; state: JumbleState }
+}[TAction]
+
+export interface StartJumbleInput {
+  starterUserId: string
+  guildId: string | null
+  channelId: string
+  kind: JumbleKind
+  username?: string
+}
+
+export interface JumbleServiceOptions {
+  now?: () => number
+  randomIndex?: (maxExclusive: number) => number
+  onExpired?: (state: JumbleState) => void | Promise<void>
+}
+
 export function isJumbleKind(value: string): value is JumbleKind {
-  return (JUMBLE_KINDS as readonly string[]).includes(value)
+  return JUMBLE_KINDS.some((kind) => kind === value)
 }

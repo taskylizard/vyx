@@ -2,8 +2,7 @@ import { ButtonStyles, ComponentTypes } from 'oceanic.js'
 import type { InteractionContent, MessageActionRow, TextButton } from 'oceanic.js'
 import { match } from 'ts-pattern'
 import { PIXELATION_LEVELS } from './renderer.ts'
-import type { JumbleAction, JumbleState } from './service.ts'
-import type { JumbleKind } from './types.ts'
+import type { JumbleAction, JumbleKind, JumbleState } from './types.ts'
 
 export interface JumbleComponentIds {
   hint: string

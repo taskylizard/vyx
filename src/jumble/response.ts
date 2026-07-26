@@ -1,5 +1,8 @@
 /** Read a fetch response without allowing an unbounded body into memory. */
 export async function readBoundedBytes(response: Response, maxBytes: number): Promise<Uint8Array> {
+  if (!Number.isFinite(maxBytes)) {
+    throw new RangeError('Response byte limit must be finite.')
+  }
   const limit = Math.max(1, Math.trunc(maxBytes))
   const body = response.body
   if (body === null) {
@@ -37,5 +40,5 @@ export async function readBoundedBytes(response: Response, maxBytes: number): Pr
 
 export async function readBoundedJson(response: Response, maxBytes: number): Promise<unknown> {
   const bytes = await readBoundedBytes(response, maxBytes)
-  return JSON.parse(new TextDecoder().decode(bytes)) as unknown
+  return JSON.parse(new TextDecoder().decode(bytes))
 }

@@ -2,7 +2,8 @@ import type { Client, EditMessageOptions, Message, Permission } from 'oceanic.js
 import { match } from 'ts-pattern'
 import { JumbleImageRenderer } from './renderer.ts'
 import { buildJumblePayload, type JumbleComponentIds } from './presentation.ts'
-import type { JumbleAction, JumbleService, JumbleState } from './service.ts'
+import type { JumbleAction, JumbleState } from './types.ts'
+import type { JumbleService } from './service.ts'
 
 export interface JumbleComponentIdFactory {
   hint(sessionId: string): string
@@ -118,6 +119,6 @@ async function safeReaction(message: Message, emoji: string): Promise<void> {
   try {
     await message.createReaction(emoji)
   } catch {
-    // Reactions are a convenience; missing Add Reactions permission must not break gameplay.
+    // tasky: reactions are optional, so missing permission can't break the guess path.
   }
 }

@@ -1,3 +1,5 @@
+import { match } from 'ts-pattern'
+
 const AUTOEMBED_URL_PATTERN =
   /https?:\/\/(?<host>(?:www\.|mobile\.)?(?:twitter\.com|x\.com)|(?:www\.)?instagram\.com|kkinstagram\.com|vxinstagram\.com|kkclip\.com|imginn\.com|(?:(?:www|old|new|np|m)\.)?reddit\.com)(?<path>\/[^\s<>\]]*)?/giu
 const TWITTER_STATUS_PATH_PATTERN = /^\/([^/?#]+)\/status\/(\d+)/iu
@@ -70,14 +72,12 @@ function serviceForURL(host: string, url: string): AutoembedService | undefined 
 }
 
 function replacementHost(service: AutoembedService): string {
-  switch (service.type) {
-    case 'twitter':
-      return 'fixupx.com'
-    case 'instagram':
-      return 'vxinstagram.com'
-    case 'reddit':
-      return 'rxddit.com'
-  }
+  return match(service)
+    .returnType<string>()
+    .with({ type: 'twitter' }, () => 'fixupx.com')
+    .with({ type: 'instagram' }, () => 'vxinstagram.com')
+    .with({ type: 'reddit' }, () => 'rxddit.com')
+    .exhaustive()
 }
 
 function statusIDFromURL(url: string): string | undefined {

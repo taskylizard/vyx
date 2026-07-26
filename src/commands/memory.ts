@@ -1,8 +1,10 @@
+import { match } from 'ts-pattern'
 import { slash, slashSub } from '../bot/rosepack.ts'
 import {
   MEMORY_ENTRY_LIMIT,
   MEMORY_ENTRY_MAX_LENGTH,
   MemoryStoreError,
+  type ForgetMemoryResult,
   type MemoryEntry
 } from '../memory/markdown-memory.ts'
 import { modules } from '../modules.ts'
@@ -158,23 +160,7 @@ export default slash({
               { id: context.interaction.guildID, kind: 'server' },
               context.options.id
             )
-            switch (result.outcome) {
-              case 'not-found': {
-                await context.editResponse(`No memory matched \`${context.options.id}\`.`)
-                return
-              }
-              case 'ambiguous': {
-                await context.editResponse(
-                  'That ID prefix matches multiple memories. Use more characters.'
-                )
-                return
-              }
-              case 'forgotten': {
-                await context.editResponse(
-                  `Forgot \`${result.entry.id.slice(0, 8)}\`: ${previewMemory(result.entry.content)}`
-                )
-              }
-            }
+            await context.editResponse(formatForgetMemoryResult(result, context.options.id))
           }
         }),
         show: slashSub({
@@ -240,23 +226,7 @@ export default slash({
           { id: context.interaction.user.id, kind: 'user' },
           context.options.id
         )
-        switch (result.outcome) {
-          case 'not-found': {
-            await context.editResponse(`No memory matched \`${context.options.id}\`.`)
-            return
-          }
-          case 'ambiguous': {
-            await context.editResponse(
-              'That ID prefix matches multiple memories. Use more characters.'
-            )
-            return
-          }
-          case 'forgotten': {
-            await context.editResponse(
-              `Forgot \`${result.entry.id.slice(0, 8)}\`: ${previewMemory(result.entry.content)}`
-            )
-          }
-        }
+        await context.editResponse(formatForgetMemoryResult(result, context.options.id))
       }
     }),
     show: slashSub({
@@ -292,6 +262,21 @@ export default slash({
     })
   }
 })
+
+function formatForgetMemoryResult(result: ForgetMemoryResult, identifier: string): string {
+  return match(result)
+    .returnType<string>()
+    .with({ outcome: 'not-found' }, () => `No memory matched \`${identifier}\`.`)
+    .with(
+      { outcome: 'ambiguous' },
+      () => 'That ID prefix matches multiple memories. Use more characters.'
+    )
+    .with(
+      { outcome: 'forgotten' },
+      ({ entry }) => `Forgot \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content)}`
+    )
+    .exhaustive()
+}
 
 function formatMemoryList(title: string, entries: readonly MemoryEntry[]): string {
   if (entries.length === 0) {

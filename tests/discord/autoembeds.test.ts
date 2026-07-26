@@ -471,6 +471,37 @@ test('falls back to a rewritten Instagram link when public lookup fails', async 
   )
 })
 
+test('falls back to a rewritten Twitter link when component lookup fails', async () => {
+  const createMessage = vi.fn(async () => ({}))
+  const editMessage = vi.fn(async () => ({}))
+  const warn = vi.fn()
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('unavailable', { status: 503 }))
+  )
+
+  const context = {
+    client: { rest: { channels: { createMessage, editMessage } } },
+    env: { FAUNA_URL: 'https://private.example' },
+    logger: { warn }
+  } as unknown as BotContext
+  const message = {
+    channelID: 'channel',
+    content: 'https://x.com/alyxia/status/123',
+    flags: 0,
+    guildID: 'guild',
+    id: 'message'
+  } as Message
+
+  await handleAutoembeds(context, message)
+
+  expect(createMessage).toHaveBeenCalledWith(
+    'channel',
+    expect.objectContaining({ content: 'https://fixupx.com/alyxia/status/123' })
+  )
+  expect(warn).toHaveBeenCalledWith('twitter component autoembed failed', expect.any(Error))
+})
+
 test('replies with rewritten links and suppresses the original embed', async () => {
   const createMessage = vi.fn(async () => ({}))
   const editMessage = vi.fn(async () => ({}))

@@ -1,4 +1,5 @@
 import type { Message } from 'oceanic.js'
+import { match } from 'ts-pattern'
 import type { BotContext } from '../../bot/context.ts'
 import { sendTextReply, suppressOriginalEmbed } from './discord.ts'
 import { sendInstagramAutoembed } from './instagram.ts'
@@ -6,7 +7,7 @@ import { findAutoembedLinks } from './links.ts'
 import { sendTwitterAutoembed } from './twitter.ts'
 
 export async function handleAutoembeds(context: BotContext, message: Message): Promise<void> {
-  if (!isAutoembedMessage(message.content)) {
+  if (message.content.toLowerCase().includes('-ignore')) {
     return
   }
 
@@ -16,27 +17,24 @@ export async function handleAutoembeds(context: BotContext, message: Message): P
   }
 
   for (const link of links) {
-    switch (link.service.type) {
-      case 'twitter':
+    await match(link.service)
+      .returnType<Promise<void>>()
+      .with({ type: 'reddit' }, () => sendTextReply(context, message, link.rewritten))
+      .with({ type: 'twitter' }, { type: 'instagram' }, async (service) => {
         try {
-          await sendTwitterAutoembed(context, message, link.url, link.service.statusID)
+          await match(service)
+            .returnType<Promise<void>>()
+            .with({ type: 'twitter' }, ({ statusID }) =>
+              sendTwitterAutoembed(context, message, link.url, statusID)
+            )
+            .with({ type: 'instagram' }, () => sendInstagramAutoembed(context, message, link.url))
+            .exhaustive()
         } catch (error) {
-          context.logger.warn('twitter component autoembed failed', error)
+          context.logger.warn(`${service.type} component autoembed failed`, error)
           await sendTextReply(context, message, link.rewritten)
         }
-        break
-      case 'instagram':
-        try {
-          await sendInstagramAutoembed(context, message, link.url)
-        } catch (error) {
-          context.logger.warn('instagram component autoembed failed', error)
-          await sendTextReply(context, message, link.rewritten)
-        }
-        break
-      case 'reddit':
-        await sendTextReply(context, message, link.rewritten)
-        break
-    }
+      })
+      .exhaustive()
   }
 
   await suppressOriginalEmbed(context, message)

@@ -3,7 +3,6 @@ import {
   ComponentTypes,
   MessageFlags,
   type ContainerComponent,
-  type MediaGalleryItem,
   type Message,
   type MessageComponent
 } from 'oceanic.js'
@@ -11,9 +10,17 @@ import type { BotContext } from '../../bot/context.ts'
 import { escapeMarkdown, textDisplay, trimComponentText, unfurledMedia } from './components.ts'
 import { allowedMentions, messageReference } from './discord.ts'
 import { BROWSER_USER_AGENT, MAX_DISCORD_ATTACHMENTS } from './media.ts'
+import type {
+  InstagramCacheEntry,
+  InstagramComponentAssets,
+  InstagramPost,
+  InstagramResolution
+} from './instagram-types.ts'
 import { resolveAxInstagramMedia } from './vendor/axinstagram.ts'
 import { resolveSnapSaveInstagramMedia } from './vendor/snapsave/instagram.ts'
 import type { ResolvedInstagramMedia } from './vendor/types.ts'
+
+export type { InstagramComponentAssets } from './instagram-types.ts'
 
 const INSTAGRAM_POST_PATH_PATTERN = /\/(?:[^/]+\/)?(?:p|reels?|tv)\/([a-z0-9_-]+)/iu
 const INSTAGRAM_COMPONENT_COLOR = 0xce0071
@@ -25,58 +32,9 @@ const INSTAGRAM_CACHE_TTL_MS = 5 * 60_000
 const INSTAGRAM_NEGATIVE_CACHE_TTL_MS = 30_000
 const INSTAGRAM_RICH_COOLDOWN_MS = 60_000
 
-type InstagramResolution =
-  | { kind: 'rich'; post: InstagramPost }
-  | { kind: 'media'; media: ResolvedInstagramMedia; strategy: 'native' | 'snapsave' }
-
-interface InstagramCacheEntry {
-  expiresAt: number
-  resolution: InstagramResolution | undefined
-}
-
 const instagramCache = new Map<string, InstagramCacheEntry>()
 const instagramInFlight = new Map<string, Promise<InstagramResolution | undefined>>()
 let richLookupBlockedUntil = 0
-
-interface InstagramPost {
-  caption?: { text?: string | null } | null
-  carousel_media?: Array<InstagramMedia> | null
-  clips_metadata?: {
-    music_info?: {
-      music_asset_info?: {
-        display_artist?: string | null
-        title?: string | null
-      } | null
-    } | null
-  } | null
-  coauthor_producers?: Array<{ username?: string | null }> | null
-  comment_count?: number | null
-  image_versions2?: InstagramImageVersions | null
-  like_count?: number | null
-  media_type?: number | null
-  taken_at?: number | null
-  user: {
-    full_name?: string | null
-    is_verified?: boolean | null
-    profile_pic_url?: string | null
-    username: string
-  }
-  video_versions?: Array<{ url?: string | null }> | null
-}
-
-interface InstagramMedia {
-  image_versions2?: InstagramImageVersions | null
-  media_type?: number | null
-  video_versions?: Array<{ url?: string | null }> | null
-}
-
-interface InstagramImageVersions {
-  candidates?: Array<{ url?: string | null }> | null
-}
-
-export interface InstagramComponentAssets {
-  mediaItems: Array<MediaGalleryItem>
-}
 
 export async function sendInstagramAutoembed(
   context: BotContext,

@@ -1,19 +1,22 @@
 import { match, P } from 'ts-pattern'
 import { normalizeAnswer } from './answer.ts'
+import {
+  type JumbleMusicProvider,
+  type LastFmClientOptions,
+  type LastFmEnvelope
+} from './lastfm-types.ts'
+import {
+  isLastFmObject,
+  mergeLastFmArtistDetails,
+  mergeLastFmDetails,
+  normalizeLastFmUsername,
+  parseLastFmString,
+  parseLastFmTopItems
+} from './lastfm-parser.ts'
 import { readBoundedJson } from './response.ts'
 import type { JumbleArtistMetadata, JumbleCandidate, JumbleHint, JumbleKind } from './types.ts'
-import type { MusicBrainzClient } from './musicbrainz.ts'
 
-export interface LastFmClientOptions {
-  apiKey: string
-  fetchImpl?: typeof fetch
-  baseUrl?: string
-  timeoutMs?: number
-  cacheEntries?: number
-  cacheBytes?: number
-  maxResponseBytes?: number
-  musicBrainz?: Pick<MusicBrainzClient, 'enrich'>
-}
+export type { JumbleMusicProvider, LastFmClientOptions } from './lastfm-types.ts'
 
 export class LastFmError extends Error {
   readonly code: string
@@ -25,16 +28,6 @@ export class LastFmError extends Error {
     this.code = code
     this.status = status
   }
-}
-
-export interface JumbleMusicProvider {
-  getCandidates(
-    kind: JumbleKind,
-    username: string,
-    limit?: number
-  ): Promise<readonly JumbleCandidate[]>
-  getHints(candidate: JumbleCandidate): Promise<readonly JumbleHint[]>
-  validateUsername?(username: string): Promise<string>
 }
 
 export class MissingLastFmProvider implements JumbleMusicProvider {
@@ -51,17 +44,6 @@ export class MissingLastFmProvider implements JumbleMusicProvider {
   }
 }
 
-interface LastFmEnvelope {
-  error?: number
-  message?: string
-  [key: string]: unknown
-}
-
-interface LastFmImage {
-  '#text'?: unknown
-  size?: unknown
-}
-
 /** A small Last.fm REST client tailored to the data Jumble needs. */
 export class LastFmClient implements JumbleMusicProvider {
   private readonly options: LastFmClientOptions
@@ -71,7 +53,10 @@ export class LastFmClient implements JumbleMusicProvider {
   private readonly cacheEntries: number
   private readonly cacheBytes: number
   private readonly maxResponseBytes: number
-  private readonly cache = new Map<string, { expiresAt: number; value: unknown; bytes: number }>()
+  private readonly cache = new Map<
+    string,
+    { expiresAt: number; value: LastFmEnvelope; bytes: number }
+  >()
   private cacheSize = 0
   private readonly inflight = new Map<string, Promise<LastFmEnvelope>>()
 
@@ -96,7 +81,7 @@ export class LastFmClient implements JumbleMusicProvider {
     username: string,
     limit = 100
   ): Promise<readonly JumbleCandidate[]> {
-    const safeUsername = normalizeUsername(username)
+    const safeUsername = normalizeLastFmUsername(username)
     if (safeUsername.length === 0) {
       throw new LastFmError('Enter a Last.fm username first.', 'invalid-username')
     }
@@ -111,7 +96,7 @@ export class LastFmClient implements JumbleMusicProvider {
       limit: String(Math.min(Math.max(limit, 1), 200)),
       page: '1'
     })
-    const candidates = parseTopItems(payload, kind)
+    const candidates = parseLastFmTopItems(payload, kind)
     if (candidates.length === 0) {
       throw new LastFmError(
         `Last.fm did not return any ${kind} scrobbles for "${safeUsername}".`,
@@ -191,12 +176,12 @@ export class LastFmClient implements JumbleMusicProvider {
   }
 
   async validateUsername(username: string): Promise<string> {
-    const normalized = normalizeUsername(username)
+    const normalized = normalizeLastFmUsername(username)
     const payload = await this.request('user.getinfo', { user: normalized })
     const user = payload.user
-    if (!isRecord(user))
+    if (!isLastFmObject(user))
       throw new LastFmError('Last.fm could not find that user.', 'invalid-username')
-    return stringValue(user.name) ?? normalized
+    return parseLastFmString(user.name) ?? normalized
   }
 
   /** Enriches one selected item without making the whole top-list request expensive. */
@@ -224,23 +209,21 @@ export class LastFmClient implements JumbleMusicProvider {
           : this.request('artist.getinfo', { artist: candidate.artistName })
       const [detailResult, artistResult] = await Promise.allSettled([detailPromise, artistPromise])
       hydrated = match(detailResult)
-        .with({ status: 'fulfilled' }, ({ value }) =>
-          mergeDetails(candidate, value, candidate.kind)
-        )
+        .with({ status: 'fulfilled' }, ({ value }) => mergeLastFmDetails(candidate, value))
         .otherwise(() => hydrated)
       hydrated = match(artistResult)
         .with({ status: 'fulfilled', value: P.nonNullable }, ({ value }) =>
-          mergeArtistDetails(hydrated, value)
+          mergeLastFmArtistDetails(hydrated, value)
         )
         .otherwise(() => hydrated)
     } catch {
-      // Top-list data is sufficient to play; detail endpoints are best-effort hints.
+      // tasky: top-list data is enough to play; detail calls only improve hints.
     }
     if (this.options.musicBrainz !== undefined) {
       try {
         hydrated = await this.options.musicBrainz.enrich(hydrated)
       } catch {
-        // MusicBrainz is an optional hint source; never make a game fail for it.
+        // tasky: MusicBrainz is bonus metadata, never a reason to fail the game.
       }
     }
     return hydrated
@@ -259,7 +242,7 @@ export class LastFmClient implements JumbleMusicProvider {
       this.cache.delete(url)
       this.cacheSize -= cached.bytes
       this.cache.set(url, cached)
-      return cached.value as LastFmEnvelope
+      return cached.value
     }
     if (cached !== undefined) {
       this.cache.delete(url)
@@ -295,7 +278,7 @@ export class LastFmClient implements JumbleMusicProvider {
         throw new LastFmError('Last.fm response was too large.', 'response-too-large')
       }
       const payload: unknown = await readBoundedJson(response, this.maxResponseBytes)
-      if (!isEnvelope(payload))
+      if (!isLastFmObject(payload))
         throw new LastFmError('Last.fm returned an invalid response.', 'invalid-response')
       if (payload.error !== undefined) {
         throw new LastFmError(
@@ -334,151 +317,6 @@ export class LastFmClient implements JumbleMusicProvider {
       clearTimeout(timer)
     }
   }
-}
-
-function parseTopItems(payload: LastFmEnvelope, kind: JumbleKind): JumbleCandidate[] {
-  const container = match(kind)
-    .with('artist', () => payload.topartists)
-    .with('album', () => payload.topalbums)
-    .with('track', () => payload.toptracks)
-    .exhaustive()
-  if (!isRecord(container)) return []
-  const rawItems = Array.isArray(container[kind]) ? container[kind].slice(0, 200) : []
-  return rawItems.flatMap((raw) => parseTopItem(raw, kind))
-}
-
-function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
-  if (!isRecord(value)) return []
-  const answer = stringValue(value.name)
-  if (answer === undefined || answer.trim().length < 2) return []
-  const listedArtist = isRecord(value.artist)
-    ? stringValue(value.artist.name)
-    : stringValue(value.artist)
-  const listedAlbum = isRecord(value.album) ? stringValue(value.album.name) : undefined
-  const kindFields = match(kind)
-    .with('artist', () => ({
-      albumName: undefined,
-      artistName: undefined,
-      durationMs: undefined,
-      imageUrl: firstImage(value.image),
-      releaseType: undefined
-    }))
-    .with('album', () => ({
-      albumName: answer,
-      artistName: listedArtist,
-      durationMs: undefined,
-      imageUrl: firstImage(value.image),
-      releaseType: stringValue(value.type)
-    }))
-    .with('track', () => ({
-      albumName: listedAlbum,
-      artistName: listedArtist,
-      durationMs: numberValue(value.duration),
-      imageUrl:
-        firstImage(value.image) ??
-        (isRecord(value.album) ? firstImage(value.album.image) : undefined),
-      releaseType: undefined
-    }))
-    .exhaustive()
-  return [
-    {
-      kind,
-      answer: answer.trim(),
-      ...kindFields,
-      playcount: numberValue(value.playcount),
-      listeners: numberValue(value.listeners),
-      mbid: stringValue(value.mbid),
-      releaseDate: stringValue(value.releasedate) ?? stringValue(value.date),
-      sourceUrl: stringValue(value.url)
-    }
-  ]
-}
-
-function mergeDetails(
-  candidate: JumbleCandidate,
-  payload: LastFmEnvelope,
-  kind: JumbleKind
-): JumbleCandidate {
-  const root = payload[kind]
-  if (!isRecord(root)) return candidate
-  const tags =
-    isRecord(root.tags) && Array.isArray(root.tags.tag)
-      ? root.tags.tag
-          .slice(0, 16)
-          .flatMap((tag) =>
-            isRecord(tag) && stringValue(tag.name) !== undefined ? [stringValue(tag.name)!] : []
-          )
-      : undefined
-  const wiki = isRecord(root.wiki) ? stringValue(root.wiki.summary) : undefined
-  const releaseDate = stringValue(root.releasedate) ?? stringValue(root.date)
-  const artistName =
-    stringValue(root.artist) ?? (isRecord(root.artist) ? stringValue(root.artist.name) : undefined)
-  const albumName =
-    stringValue(root.album) ??
-    (isRecord(root.album)
-      ? (stringValue(root.album.title) ?? stringValue(root.album.name))
-      : undefined)
-  const duration = numberValue(root.duration)
-  const stats = isRecord(root.stats) ? root.stats : undefined
-  return {
-    ...candidate,
-    imageUrl: candidate.imageUrl ?? firstImage(root.image),
-    mbid: candidate.mbid ?? stringValue(root.mbid),
-    artistName: candidate.artistName ?? artistName,
-    albumName: candidate.albumName ?? albumName,
-    playcount: candidate.playcount ?? numberValue(root.playcount) ?? numberValue(stats?.playcount),
-    listeners: candidate.listeners ?? numberValue(root.listeners) ?? numberValue(stats?.listeners),
-    tags: tags === undefined || tags.length === 0 ? candidate.tags : tags,
-    summary: candidate.summary ?? wiki,
-    releaseDate: candidate.releaseDate ?? releaseDate,
-    durationMs: candidate.durationMs ?? duration
-  }
-}
-
-function mergeArtistDetails(candidate: JumbleCandidate, payload: LastFmEnvelope): JumbleCandidate {
-  const root = payload.artist
-  if (!isRecord(root)) return candidate
-  const tags = parseTags(root.tags)
-  const stats = isRecord(root.stats) ? root.stats : undefined
-  const metadata: JumbleArtistMetadata = {
-    mbid: stringValue(root.mbid),
-    tags,
-    summary: isRecord(root.bio) ? stringValue(root.bio.summary) : undefined,
-    countryCode: undefined
-  }
-  const artistFields = match(candidate.kind)
-    .with('artist', () => ({
-      mbid: candidate.mbid ?? metadata.mbid,
-      playcount:
-        candidate.playcount ?? numberValue(root.playcount) ?? numberValue(stats?.playcount),
-      listeners: candidate.listeners ?? numberValue(root.listeners) ?? numberValue(stats?.listeners)
-    }))
-    .with('album', 'track', () => ({
-      mbid: candidate.mbid,
-      playcount: candidate.playcount,
-      listeners: candidate.listeners
-    }))
-    .exhaustive()
-  return {
-    ...candidate,
-    ...artistFields,
-    artistMetadata: {
-      ...candidate.artistMetadata,
-      ...metadata,
-      tags: mergeTagValues(candidate.artistMetadata?.tags, tags),
-      summary: candidate.artistMetadata?.summary ?? metadata.summary
-    }
-  }
-}
-
-function parseTags(value: unknown): string[] | undefined {
-  if (!isRecord(value)) return undefined
-  const tags = Array.isArray(value.tag) ? value.tag : []
-  const names = tags
-    .filter(isRecord)
-    .map((tag) => stringValue(tag.name))
-    .filter((name): name is string => name !== undefined)
-  return names.length === 0 ? undefined : names.slice(0, 8)
 }
 
 function addHint(hints: JumbleHint[], kind: string, content: string | undefined): void {
@@ -619,61 +457,4 @@ function countryFlag(value: string): string | undefined {
   const code = value.trim().toUpperCase()
   if (!/^[A-Z]{2}$/u.test(code)) return undefined
   return String.fromCodePoint(...Array.from(code, (letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))
-}
-
-function mergeTagValues(
-  first: readonly string[] | undefined,
-  second: readonly string[] | undefined
-): string[] | undefined {
-  const values = [...(first ?? []), ...(second ?? [])]
-  const unique = [...new Map(values.map((value) => [normalizeAnswer(value), value])).values()]
-  return unique.length === 0 ? undefined : unique.slice(0, 8)
-}
-
-function firstImage(value: unknown): string | undefined {
-  if (!Array.isArray(value)) return undefined
-  const ranked = value
-    .filter((entry): entry is LastFmImage => isRecord(entry))
-    .sort((first, second) => imageRank(String(second.size)) - imageRank(String(first.size)))
-  for (const entry of ranked) {
-    const url = stringValue(entry['#text'])
-    if (
-      url !== undefined &&
-      url.startsWith('http') &&
-      !url.includes('2a96cbd8b46e442fc41c2b86b821562f')
-    )
-      return url
-  }
-  return undefined
-}
-
-function imageRank(size: string): number {
-  return { mega: 5, extralarge: 4, large: 3, medium: 2, small: 1 }[size] ?? 0
-}
-
-function normalizeUsername(value: string): string {
-  return value.trim().replace(/^@/u, '').slice(0, 64)
-}
-
-function isEnvelope(value: unknown): value is LastFmEnvelope {
-  return isRecord(value)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
-}
-
-function stringValue(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
-  const trimmed = value.trim()
-  return trimmed.length === 0 ? undefined : trimmed.slice(0, 512)
-}
-
-function numberValue(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : undefined
-  }
-  return undefined
 }

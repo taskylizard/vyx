@@ -162,7 +162,7 @@ function geminiCompatibleSchema(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map(geminiCompatibleSchema)
   }
-  if (!isRecord(value)) {
+  if (typeof value !== 'object' || value === null) {
     return value
   }
 
@@ -181,8 +181,4 @@ function geminiCompatibleSchema(value: unknown): unknown {
     compatible[key] = geminiCompatibleSchema(child)
   }
   return compatible
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null
 }

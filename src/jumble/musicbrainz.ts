@@ -1,7 +1,34 @@
 import { match } from 'ts-pattern'
+import type { ZodType } from 'zod'
 import type { JumbleArtistMetadata, JumbleCandidate } from './types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
+import {
+  chooseArtist,
+  chooseRecording,
+  chooseReleaseGroup,
+  firstReleaseId,
+  isMusicBrainzObject,
+  mergeMusicBrainzTags,
+  mergeRelease,
+  normalizeMusicBrainzKey,
+  parseArtist,
+  parseRecording,
+  parseRelease,
+  parseReleaseGroup
+} from './musicbrainz-parser.ts'
+import {
+  type CachedMusicBrainzLookup,
+  type CachedMusicBrainzValue,
+  type MusicBrainzClientOptions,
+  type MusicBrainzEnvelope,
+  RecordingMetadataSchema,
+  type RecordingMetadata,
+  ReleaseMetadataSchema,
+  type ReleaseMetadata,
+  musicBrainzCachedValueSchema
+} from './musicbrainz-types.ts'
 import { readBoundedJson } from './response.ts'
+import { JumbleArtistMetadataSchema } from './schemas.ts'
 
 const DEFAULT_BASE_URL = 'https://musicbrainz.org/ws/2'
 const DEFAULT_USER_AGENT = 'Kanikou/0.0.0 (https://github.com/taskylizard/kanikou)'
@@ -9,46 +36,7 @@ const ARTIST_TTL_MS = 90 * 24 * 60 * 60 * 1_000
 const RELEASE_TTL_MS = 90 * 24 * 60 * 60 * 1_000
 const NEGATIVE_TTL_MS = 24 * 60 * 60 * 1_000
 
-export interface MusicBrainzClientOptions {
-  cache?: Pick<JumbleMetadataCache, 'get' | 'set'>
-  fetchImpl?: typeof fetch
-  baseUrl?: string
-  userAgent?: string
-  timeoutMs?: number
-  minIntervalMs?: number
-  maxPending?: number
-  maxResponseBytes?: number
-  now?: () => number
-  onError?: (error: unknown) => void
-}
-
-interface MusicBrainzEnvelope {
-  [key: string]: unknown
-}
-
-interface ReleaseMetadata {
-  releaseDate?: string
-  releaseType?: string
-  label?: string
-  disambiguation?: string
-  mbid?: string
-}
-
-interface RecordingMetadata extends ReleaseMetadata {
-  durationMs?: number
-  albumName?: string
-}
-
-interface CachedValue<T> {
-  found: boolean
-  value?: T
-}
-
-interface CachedLookup<T> {
-  fresh: boolean
-  found: boolean
-  value?: T
-}
+export type { MusicBrainzClientOptions } from './musicbrainz-types.ts'
 
 /**
  * Small, read-only MusicBrainz enrichment client.
@@ -92,53 +80,71 @@ export class MusicBrainzClient {
 
   async enrich(candidate: JumbleCandidate): Promise<JumbleCandidate> {
     try {
-      const artistName = match(candidate.kind)
-        .with('artist', () => candidate.answer)
-        .with('album', 'track', () => candidate.artistName)
-        .exhaustive()
-      const artistPromise =
-        artistName === undefined
-          ? Promise.resolve(undefined)
-          : this.getArtist(
-              artistName,
-              match(candidate.kind)
-                .with('artist', () => candidate.mbid)
-                .with('album', 'track', () => undefined)
-                .exhaustive()
-            )
-      const itemPromise: Promise<ReleaseMetadata | RecordingMetadata | undefined> = match(
-        candidate.kind
-      )
-        .with('artist', () => Promise.resolve(undefined))
-        .with('album', () => this.getRelease(candidate.answer, artistName, candidate.mbid))
-        .with('track', () => this.getRecording(candidate.answer, artistName, candidate.mbid))
-        .exhaustive()
-      const [artistMetadata, itemMetadata] = await Promise.all([artistPromise, itemPromise])
+      return await match(candidate)
+        .returnType<Promise<JumbleCandidate>>()
+        .with({ kind: 'artist' }, async (artist) => {
+          const metadata = await this.getArtist(artist.answer, artist.mbid)
+          if (metadata === undefined) return artist
 
-      const next: JumbleCandidate = { ...candidate }
-      if (artistMetadata !== undefined) next.artistMetadata = artistMetadata
-      if (candidate.kind === 'artist' && artistMetadata !== undefined) {
-        next.mbid = candidate.mbid ?? artistMetadata.mbid
-        next.disambiguation = candidate.disambiguation ?? artistMetadata.disambiguation
-        next.tags = mergeTags(candidate.tags, artistMetadata.tags)
-        next.startDate = candidate.startDate ?? artistMetadata.startDate
-        next.endDate = candidate.endDate ?? artistMetadata.endDate
-        next.countryCode = candidate.countryCode ?? artistMetadata.countryCode
-        next.entityType = candidate.entityType ?? artistMetadata.type
-      }
-      if (itemMetadata !== undefined) {
-        next.mbid = candidate.mbid ?? itemMetadata.mbid
-        next.releaseDate = candidate.releaseDate ?? itemMetadata.releaseDate
-        next.releaseType = candidate.releaseType ?? itemMetadata.releaseType
-        next.label = candidate.label ?? itemMetadata.label
-        next.disambiguation = candidate.disambiguation ?? itemMetadata.disambiguation
-        if (candidate.kind === 'track') {
-          const recordingMetadata = 'durationMs' in itemMetadata ? itemMetadata : undefined
-          next.durationMs = candidate.durationMs ?? recordingMetadata?.durationMs
-          next.albumName = candidate.albumName ?? recordingMetadata?.albumName
-        }
-      }
-      return next
+          return {
+            ...artist,
+            artistMetadata: metadata,
+            mbid: artist.mbid ?? metadata.mbid,
+            disambiguation: artist.disambiguation ?? metadata.disambiguation,
+            tags: mergeMusicBrainzTags(artist.tags, metadata.tags),
+            startDate: artist.startDate ?? metadata.startDate,
+            endDate: artist.endDate ?? metadata.endDate,
+            countryCode: artist.countryCode ?? metadata.countryCode,
+            entityType: artist.entityType ?? metadata.type
+          }
+        })
+        .with({ kind: 'album' }, async (album) => {
+          const [artistMetadata, releaseMetadata] = await Promise.all([
+            album.artistName === undefined
+              ? Promise.resolve(undefined)
+              : this.getArtist(album.artistName),
+            this.getRelease(album.answer, album.artistName, album.mbid)
+          ])
+
+          return {
+            ...album,
+            ...(artistMetadata === undefined ? {} : { artistMetadata }),
+            ...(releaseMetadata === undefined
+              ? {}
+              : {
+                  mbid: album.mbid ?? releaseMetadata.mbid,
+                  releaseDate: album.releaseDate ?? releaseMetadata.releaseDate,
+                  releaseType: album.releaseType ?? releaseMetadata.releaseType,
+                  label: album.label ?? releaseMetadata.label,
+                  disambiguation: album.disambiguation ?? releaseMetadata.disambiguation
+                })
+          }
+        })
+        .with({ kind: 'track' }, async (track) => {
+          const [artistMetadata, recordingMetadata] = await Promise.all([
+            track.artistName === undefined
+              ? Promise.resolve(undefined)
+              : this.getArtist(track.artistName),
+            this.getRecording(track.answer, track.artistName, track.mbid)
+          ])
+
+          return {
+            ...track,
+            ...(artistMetadata === undefined ? {} : { artistMetadata }),
+            ...(recordingMetadata === undefined
+              ? {}
+              : {
+                  mbid: track.mbid ?? recordingMetadata.mbid,
+                  releaseDate: track.releaseDate ?? recordingMetadata.releaseDate,
+                  releaseType: track.releaseType ?? recordingMetadata.releaseType,
+                  label: track.label ?? recordingMetadata.label,
+                  disambiguation: track.disambiguation ?? recordingMetadata.disambiguation,
+                  durationMs: track.durationMs ?? recordingMetadata.durationMs,
+                  albumName: track.albumName ?? recordingMetadata.albumName
+                })
+          }
+        })
+        .exhaustive()
     } catch (error) {
       this.report(error)
       return candidate
@@ -146,8 +152,8 @@ export class MusicBrainzClient {
   }
 
   private async getArtist(name: string, mbid?: string): Promise<JumbleArtistMetadata | undefined> {
-    const cacheKey = `musicbrainz:artist:${mbid ?? normalizeKey(name)}`
-    const cached = await this.readCache<JumbleArtistMetadata>(cacheKey)
+    const cacheKey = `musicbrainz:artist:${mbid ?? normalizeMusicBrainzKey(name)}`
+    const cached = await this.readCache(cacheKey, JumbleArtistMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
 
     let result: JumbleArtistMetadata | undefined
@@ -176,8 +182,8 @@ export class MusicBrainzClient {
     artistName: string | undefined,
     mbid?: string
   ): Promise<ReleaseMetadata | undefined> {
-    const cacheKey = `musicbrainz:release:${mbid ?? `${normalizeKey(artistName ?? '')}:${normalizeKey(name)}`}`
-    const cached = await this.readCache<ReleaseMetadata>(cacheKey)
+    const cacheKey = `musicbrainz:release:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
+    const cached = await this.readCache(cacheKey, ReleaseMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
 
     let result: ReleaseMetadata | undefined
@@ -219,8 +225,8 @@ export class MusicBrainzClient {
     artistName: string | undefined,
     mbid?: string
   ): Promise<RecordingMetadata | undefined> {
-    const cacheKey = `musicbrainz:recording:${mbid ?? `${normalizeKey(artistName ?? '')}:${normalizeKey(name)}`}`
-    const cached = await this.readCache<RecordingMetadata>(cacheKey)
+    const cacheKey = `musicbrainz:recording:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
+    const cached = await this.readCache(cacheKey, RecordingMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
 
     let result: RecordingMetadata | undefined
@@ -246,20 +252,24 @@ export class MusicBrainzClient {
     return result
   }
 
-  private async readCache<T>(cacheKey: string): Promise<CachedLookup<T> | null> {
+  private async readCache<T>(
+    cacheKey: string,
+    valueSchema: ZodType<T>
+  ): Promise<CachedMusicBrainzLookup<T> | null> {
     if (this.cache === undefined) return null
-    const entry = await this.cache.get<CachedValue<T>>(cacheKey)
+    const entry = await this.cache.get(cacheKey, musicBrainzCachedValueSchema(valueSchema))
     if (entry === null) return null
-    return {
-      fresh: entry.fresh,
-      found: entry.value.found === true,
-      value: entry.value.value
-    }
+
+    return match(entry.value)
+      .returnType<CachedMusicBrainzLookup<T>>()
+      .with({ found: false }, () => ({ found: false, fresh: entry.fresh }))
+      .with({ found: true }, ({ value }) => ({ found: true, fresh: entry.fresh, value }))
+      .exhaustive()
   }
 
   private async writeCache<T>(
     cacheKey: string,
-    value: CachedValue<T>,
+    value: CachedMusicBrainzValue<T>,
     ttlMs: number
   ): Promise<void> {
     if (this.cache === undefined) return
@@ -312,7 +322,7 @@ export class MusicBrainzClient {
         const length = Number(response.headers.get('content-length') ?? 0)
         if (length > this.maxResponseBytes) return null
         const payload: unknown = await readBoundedJson(response, this.maxResponseBytes)
-        return isRecord(payload) ? payload : null
+        return isMusicBrainzObject(payload) ? payload : null
       } catch (error) {
         this.report(error)
         return null
@@ -330,240 +340,11 @@ export class MusicBrainzClient {
   }
 }
 
-function parseArtist(payload: MusicBrainzEnvelope | null): JumbleArtistMetadata | undefined {
-  if (payload === null || typeof payload.id !== 'string') return undefined
-  const lifeSpan = isRecord(payload['life-span']) ? payload['life-span'] : undefined
-  return {
-    mbid: stringValue(payload.id),
-    type: stringValue(payload.type),
-    countryCode: stringValue(payload.country),
-    startDate: lifeSpan === undefined ? undefined : stringValue(lifeSpan.begin),
-    endDate: lifeSpan === undefined ? undefined : stringValue(lifeSpan.end),
-    disambiguation: stringValue(payload.disambiguation),
-    tags: parseNames(payload.tags)
-  }
-}
-
-function chooseArtist(
-  payload: MusicBrainzEnvelope | null,
-  name: string
-): JumbleArtistMetadata | undefined {
-  const artists = arrayValue(payload?.artists)
-  const exact = artists
-    .filter(isRecord)
-    .filter(
-      (artist) =>
-        stringValue(artist.name)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0
-    )
-    .sort((first, second) => numberValue(second.score) - numberValue(first.score))[0]
-  return parseArtist(exact ?? artists.find(isRecord) ?? null)
-}
-
-function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetadata | undefined {
-  if (payload === null || typeof payload.id !== 'string') return undefined
-  const group = isRecord(payload['release-group']) ? payload['release-group'] : undefined
-  const labelInfo = arrayValue(payload['label-info']).find(isRecord)
-  const label =
-    labelInfo !== undefined && isRecord(labelInfo.label)
-      ? stringValue(labelInfo.label.name)
-      : undefined
-  return {
-    mbid: stringValue(payload.id),
-    releaseDate:
-      stringValue(payload.date) ??
-      (group === undefined ? undefined : stringValue(group['first-release-date'])),
-    releaseType: group === undefined ? undefined : releaseType(group),
-    label,
-    disambiguation:
-      stringValue(payload.disambiguation) ??
-      (group === undefined ? undefined : stringValue(group.disambiguation))
-  }
-}
-
-function parseReleaseGroup(group: MusicBrainzEnvelope): ReleaseMetadata | undefined {
-  if (typeof group.id !== 'string') return undefined
-  return {
-    mbid: stringValue(group.id),
-    releaseDate: stringValue(group['first-release-date']),
-    releaseType: releaseType(group),
-    disambiguation: stringValue(group.disambiguation)
-  }
-}
-
-function parseRecording(payload: MusicBrainzEnvelope | null): RecordingMetadata | undefined {
-  if (payload === null || typeof payload.id !== 'string') return undefined
-  const releases = arrayValue(payload.releases).filter(isRecord)
-  const firstRelease = chooseEarliestRelease(releases)
-  const group =
-    firstRelease !== undefined && isRecord(firstRelease['release-group'])
-      ? firstRelease['release-group']
-      : undefined
-  const release = firstRelease === undefined ? undefined : parseRelease(firstRelease)
-  return {
-    mbid: stringValue(payload.id),
-    releaseDate: stringValue(payload['first-release-date']) ?? release?.releaseDate,
-    releaseType: release?.releaseType ?? (group === undefined ? undefined : releaseType(group)),
-    label: release?.label,
-    disambiguation: stringValue(payload.disambiguation),
-    durationMs: numberValue(payload.length),
-    albumName:
-      firstRelease === undefined
-        ? undefined
-        : (stringValue(firstRelease.title) ??
-          (group === undefined ? undefined : stringValue(group.title)))
-  }
-}
-
-function chooseReleaseGroup(
-  payload: MusicBrainzEnvelope | null,
-  name: string,
-  artistName: string | undefined
-): MusicBrainzEnvelope | undefined {
-  const groups = arrayValue(payload?.['release-groups']).filter(isRecord)
-  return groups
-    .filter(
-      (group) =>
-        stringValue(group.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0
-    )
-    .filter(
-      (group) => artistName === undefined || artistCreditMatches(group['artist-credit'], artistName)
-    )
-    .sort((first, second) => numberValue(second.score) - numberValue(first.score))[0]
-}
-
-function chooseRecording(
-  payload: MusicBrainzEnvelope | null,
-  name: string,
-  artistName: string | undefined
-): MusicBrainzEnvelope | null {
-  const recordings = arrayValue(payload?.recordings).filter(isRecord)
-  return (
-    recordings
-      .filter(
-        (recording) =>
-          stringValue(recording.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) ===
-          0
-      )
-      .filter(
-        (recording) =>
-          artistName === undefined || artistCreditMatches(recording['artist-credit'], artistName)
-      )
-      .sort((first, second) => {
-        const firstLive = stringValue(first.disambiguation)?.toLowerCase().includes('live') ? 1 : 0
-        const secondLive = stringValue(second.disambiguation)?.toLowerCase().includes('live')
-          ? 1
-          : 0
-        return firstLive - secondLive || numberValue(second.score) - numberValue(first.score)
-      })[0] ?? null
-  )
-}
-
-function chooseEarliestRelease(
-  releases: readonly MusicBrainzEnvelope[]
-): MusicBrainzEnvelope | undefined {
-  return [...releases]
-    .filter((release) => stringValue(release.date) !== undefined)
-    .sort((first, second) => {
-      const firstOfficial = stringValue(first.status)?.toLowerCase() === 'official' ? 0 : 1
-      const secondOfficial = stringValue(second.status)?.toLowerCase() === 'official' ? 0 : 1
-      return firstOfficial - secondOfficial || String(first.date).localeCompare(String(second.date))
-    })[0]
-}
-
-function firstReleaseId(group: MusicBrainzEnvelope): string | undefined {
-  return arrayValue(group.releases)
-    .filter(isRecord)
-    .map((release) => stringValue(release.id))
-    .find(Boolean)
-}
-
-function mergeRelease(
-  first: ReleaseMetadata | undefined,
-  second: ReleaseMetadata | undefined
-): ReleaseMetadata | undefined {
-  if (first === undefined) return second
-  if (second === undefined) return first
-  return {
-    mbid: first.mbid ?? second.mbid,
-    releaseDate: first.releaseDate ?? second.releaseDate,
-    releaseType: first.releaseType ?? second.releaseType,
-    label: first.label ?? second.label,
-    disambiguation: first.disambiguation ?? second.disambiguation
-  }
-}
-
-function releaseType(group: MusicBrainzEnvelope): string | undefined {
-  const primary = stringValue(group['primary-type'])
-  const secondary = arrayValue(group['secondary-types']).filter(
-    (value): value is string => typeof value === 'string'
-  )
-  if (primary === undefined) return undefined
-  return secondary.length === 0 ? primary : `${primary} (${secondary.join(', ')})`
-}
-
-function artistCreditMatches(value: unknown, artistName: string): boolean {
-  return arrayValue(value).some((credit) => {
-    if (!isRecord(credit)) return false
-    const artist = isRecord(credit.artist) ? stringValue(credit.artist.name) : undefined
-    return (
-      stringValue(credit.name)?.localeCompare(artistName, undefined, { sensitivity: 'base' }) ===
-        0 || artist?.localeCompare(artistName, undefined, { sensitivity: 'base' }) === 0
-    )
-  })
-}
-
-function parseNames(value: unknown): string[] | undefined {
-  const names = arrayValue(value)
-    .filter(isRecord)
-    .map((entry) => stringValue(entry.name))
-    .filter((name): name is string => name !== undefined)
-  return names.length === 0 ? undefined : names.slice(0, 8)
-}
-
-function mergeTags(
-  first: readonly string[] | undefined,
-  second: readonly string[] | undefined
-): string[] | undefined {
-  const values = [...(first ?? []), ...(second ?? [])]
-  const unique = [...new Map(values.map((value) => [normalizeKey(value), value])).values()]
-  return unique.length === 0 ? undefined : unique.slice(0, 8)
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function isRecord(value: unknown): value is MusicBrainzEnvelope {
-  return typeof value === 'object' && value !== null
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
-}
-
-function numberValue(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return 0
-}
-
 function isMbid(value: string | undefined): value is string {
   return (
     value !== undefined &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value)
   )
-}
-
-function normalizeKey(value: string): string {
-  return value
-    .trim()
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/gu, '')
-    .toLowerCase()
-    .replace(/\s+/gu, ' ')
 }
 
 function escapeLucene(value: string): string {

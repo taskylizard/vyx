@@ -5,8 +5,7 @@ import { jumblePermissionError, renderJumble } from './discord.ts'
 import type { ComponentContext } from 'rosepack'
 import type { BotContext } from '../bot/context.ts'
 import { modules } from '../modules.ts'
-import { isJumbleKind } from './types.ts'
-import type { JumbleActionResult } from './service.ts'
+import { isJumbleKind, type JumbleActionResult } from './types.ts'
 
 export const jumbleHintButton = button({
   customID: 'jumble/hint/:sessionId',

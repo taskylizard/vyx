@@ -9,8 +9,10 @@ import {
   jumbleSessions,
   type JumbleSessionRow
 } from '../database/schemas/jumble.ts'
+import { JumbleSessionMetadataSchema } from './schemas.ts'
 import {
   isJumbleKind,
+  type JumbleCandidate,
   type JumbleHint,
   type JumbleKind,
   type JumbleOutcome,
@@ -334,7 +336,7 @@ function toSession(row: JumbleSessionRow): JumbleSession {
     artistName: row.artistName,
     albumName: row.albumName,
     imageUrl: row.imageUrl,
-    metadata: parseMetadata(row.metadata, row),
+    metadata: parseMetadata(row.metadata, row, row.kind),
     startedAt: row.startedAt,
     endedAt: row.endedAt,
     outcome: match(row.outcome)
@@ -345,28 +347,42 @@ function toSession(row: JumbleSessionRow): JumbleSession {
   }
 }
 
-function parseMetadata(value: string, row: JumbleSessionRow): JumbleSessionMetadata {
+function parseMetadata(
+  value: string,
+  row: JumbleSessionRow,
+  kind: JumbleKind
+): JumbleSessionMetadata {
   try {
-    const parsed: unknown = JSON.parse(value)
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      'candidate' in parsed &&
-      'hints' in parsed
-    ) {
-      return parsed as JumbleSessionMetadata
-    }
+    const parsed = JumbleSessionMetadataSchema.safeParse(JSON.parse(value))
+    if (parsed.success) return parsed.data
   } catch {
-    // A malformed metadata blob should not make an otherwise answerable game inaccessible.
+    // tasky: bad metadata should fall back to row fields, not brick an otherwise playable game.
   }
-  return {
-    candidate: {
-      kind: row.kind as JumbleKind,
+  const candidate = match(kind)
+    .returnType<JumbleCandidate>()
+    .with('artist', () => ({
+      kind: 'artist',
+      answer: row.answer,
+      imageUrl: row.imageUrl ?? undefined
+    }))
+    .with('album', () => ({
+      kind: 'album',
       answer: row.answer,
       artistName: row.artistName ?? undefined,
       albumName: row.albumName ?? undefined,
       imageUrl: row.imageUrl ?? undefined
-    },
+    }))
+    .with('track', () => ({
+      kind: 'track',
+      answer: row.answer,
+      artistName: row.artistName ?? undefined,
+      albumName: row.albumName ?? undefined,
+      imageUrl: row.imageUrl ?? undefined
+    }))
+    .exhaustive()
+
+  return {
+    candidate,
     hints: []
   }
 }

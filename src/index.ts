@@ -95,16 +95,14 @@ export {
   type JumbleImageRendererOptions
 } from './jumble/renderer.ts'
 export { JumbleRepository } from './jumble/repository.ts'
-export {
-  JUMBLE_TIMEOUT_MS,
-  JumbleError,
-  JumbleService,
-  type JumbleAction,
-  type JumbleActionResult,
-  type JumbleServiceOptions,
-  type JumbleState,
-  type StartJumbleInput
-} from './jumble/service.ts'
+export { JUMBLE_TIMEOUT_MS, JumbleError, JumbleService } from './jumble/service.ts'
+export type {
+  JumbleAction,
+  JumbleActionResult,
+  JumbleServiceOptions,
+  JumbleState,
+  StartJumbleInput
+} from './jumble/types.ts'
 export {
   JUMBLE_KINDS,
   isJumbleKind,
