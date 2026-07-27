@@ -40,7 +40,7 @@ export async function suppressOriginalEmbed(context: BotContext, message: Messag
     })
   } catch (error) {
     if (!isDiscordPermissionError(error)) {
-      context.logger.warn('failed to suppress original autoembedded message', error)
+      context.logger.warn('failed to suppress original autoembedded message', { error })
     }
   }
 }

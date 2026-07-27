@@ -17,7 +17,7 @@ export default slash({
   contexts: ['guild'],
   installations: ['guild'],
   async onError(context, error) {
-    context.app.logger.warn('module management command failed', error)
+    context.app.logger.error('module management command failed', { error })
     await match(context.acknowledged)
       .with(true, async () => undefined)
       .otherwise(async () => context.defer({ ephemeral: true }))

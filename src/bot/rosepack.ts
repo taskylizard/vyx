@@ -9,7 +9,10 @@ const knownModuleIDs = new Set(Object.keys(modules))
 /** Kanikou's rosepack instance, bound to the services available to command handlers. */
 export const rosepack = createRosepack<BotContext>({
   onUnknownCommand({ app, interaction }) {
-    app.logger.debug(`received unregistered slash command ${interaction.data.name}`)
+    app.logger.debug('received unregistered slash command', {
+      commandName: interaction.data.name,
+      interactionId: interaction.id
+    })
   }
 }).withModules({
   catalog: modules,

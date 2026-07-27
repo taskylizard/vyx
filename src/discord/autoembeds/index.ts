@@ -31,7 +31,7 @@ export async function handleAutoembeds(context: BotContext, message: Message): P
               .with({ type: 'instagram' }, () => sendInstagramAutoembed(context, message, link.url))
               .exhaustive()
           } catch (error) {
-            context.logger.warn(`${service.type} component autoembed failed`, error)
+            context.logger.warn('component autoembed failed', { error, service: service.type })
             await sendTextReply(context, message, link.rewritten)
           }
         })

@@ -1,8 +1,6 @@
-import { Client, Intents } from 'oceanic.js'
+import { Client, Intents, InteractionTypes, type AnyInteractionGateway } from 'oceanic.js'
 import { match } from 'ts-pattern'
-import type { Logger } from 'tracix'
 import { loadKanikouEnv, type KanikouEnv } from '../config/env.ts'
-import { createKanikouLogger } from '../logging.ts'
 import { slashCommands } from '../commands/index.ts'
 import { createKanikouModel } from '../llm/client.ts'
 import { MintlifyMcpToolProvider, OperationsToolProvider } from '../llm/mintlify-mcp.ts'
@@ -13,7 +11,9 @@ import {
   createProjectSeleneTools,
   PROJECT_SELENE_INSTRUCTIONS
 } from '../llm/tools/index.ts'
-import { startAxiomObservability } from '../observability/axiom.ts'
+import { startKanikouObservability } from '../observability/axiom.ts'
+import { addActiveSpanEvent, traceOperation } from '../observability/tracing.ts'
+import type { KanikouLogger, KanikouObservability } from '../observability/types.ts'
 import { componentIds, jumbleComponents } from '../jumble/components.ts'
 import { editJumbleMessage, renderJumble } from '../jumble/discord.ts'
 import { LastFmClient, MissingLastFmProvider } from '../jumble/lastfm.ts'
@@ -47,26 +47,27 @@ function createJumbleInfrastructure(
   config: KanikouEnv,
   database: KanikouDatabase,
   client: Client,
-  logger: Logger
+  logger: KanikouLogger
 ): JumbleInfrastructure {
   const jumbleMetadataCache = new JumbleMetadataCache(database.db, {
-    onError: (error) => logger.warn('jumble metadata cache error', error)
+    onError: (error) => logger.warn('jumble metadata cache error', { error })
   })
   const onTiming: JumbleTimingSink = (event) => {
-    logger.info(`jumble timing ${JSON.stringify(event)}`)
+    logger.info('jumble timing', { ...event })
+    addActiveSpanEvent(`jumble.${event.type}`, { ...event })
   }
   const musicBrainz = new MusicBrainzClient({
     cache: jumbleMetadataCache,
-    onError: (error) => logger.warn('MusicBrainz enrichment error', error)
+    onError: (error) => logger.warn('MusicBrainz enrichment error', { error })
   })
   const discogs = new DiscogsClient({
     token: config.DISCOGS_TOKEN,
     cache: jumbleMetadataCache,
-    onError: (error) => logger.warn('Discogs enrichment error', error)
+    onError: (error) => logger.warn('Discogs enrichment error', { error })
   })
   const deezer = new DeezerClient({
     cache: jumbleMetadataCache,
-    onError: (error) => logger.warn('Deezer enrichment error', error)
+    onError: (error) => logger.warn('Deezer enrichment error', { error })
   })
   const jumbleRenderer = new JumbleImageRenderer({ onTiming })
   const jumbleProvider = match(config.LASTFM_API_KEY)
@@ -80,28 +81,46 @@ function createJumbleInfrastructure(
           discogs,
           deezer,
           onTiming,
-          onError: (error) => logger.warn('Last.fm candidate cache error', error)
+          onError: (error) => logger.warn('Last.fm candidate cache error', { error })
         })
     )
   const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
     onTiming,
-    onExpired: async (state) => {
-      if (state.session.messageId === null) return
-      const rendered = await renderJumble(
-        state,
-        jumbleRenderer,
-        componentIds(state.session.id),
-        'expired'
+    onExpired: (state) =>
+      traceOperation(
+        'jumble.expired_message.update',
+        {
+          attributes: {
+            'discord.channel.id': state.session.channelId,
+            'jumble.session.id': state.session.id
+          },
+          parent: 'root'
+        },
+        async () => {
+          if (state.session.messageId === null) return
+          const rendered = await renderJumble(
+            state,
+            jumbleRenderer,
+            componentIds(state.session.id),
+            'expired'
+          )
+          if (rendered.imageError !== undefined) {
+            logger.warn('expired jumble image could not be rendered', {
+              error: rendered.imageError
+            })
+          }
+          try {
+            await editJumbleMessage(
+              client,
+              state.session.channelId,
+              state.session.messageId,
+              rendered
+            )
+          } catch (error) {
+            logger.warn('expired jumble message could not be updated', { error })
+          }
+        }
       )
-      if (rendered.imageError !== undefined) {
-        logger.warn('expired jumble image could not be rendered', rendered.imageError)
-      }
-      try {
-        await editJumbleMessage(client, state.session.channelId, state.session.messageId, rendered)
-      } catch (error) {
-        logger.warn('expired jumble message could not be updated', error)
-      }
-    }
   })
   return { jumble, jumbleRenderer, jumbleMetadataCache }
 }
@@ -120,12 +139,18 @@ interface ReadySetupDeps {
 async function performReadySetup(
   client: Client,
   registry: ReturnType<typeof rosepack.createRegistry>,
-  logger: Logger,
+  logger: KanikouLogger,
   deps: ReadySetupDeps
 ): Promise<BotContext> {
-  await deps.database.initialize()
-  await deps.jumbleMetadataCache.prune()
-  await deps.jumble.restoreActive()
+  await traceOperation('database.initialize', { parent: 'active' }, async () =>
+    deps.database.initialize()
+  )
+  await traceOperation('jumble.metadata_cache.prune', { parent: 'active' }, async () =>
+    deps.jumbleMetadataCache.prune()
+  )
+  await traceOperation('jumble.restore_active', { parent: 'active' }, async () =>
+    deps.jumble.restoreActive()
+  )
   const context: BotContext = {
     applicationID: client.application.id,
     botUserID: client.user.id,
@@ -138,44 +163,44 @@ async function performReadySetup(
     jumble: deps.jumble,
     jumbleRenderer: deps.jumbleRenderer
   }
-  logger.info(`kanikou connected as ${client.user.tag}`)
-  const registered = await registry.registerGlobal({
-    applicationID: context.applicationID,
-    client: context.client
-  })
-  logger.info(`registered ${registered.length} global slash command(s)`)
+  logger.info('kanikou connected', { botUserId: client.user.id, botUserTag: client.user.tag })
+  const registered = await traceOperation(
+    'discord.commands.register_global',
+    { parent: 'active' },
+    async () =>
+      registry.registerGlobal({
+        applicationID: context.applicationID,
+        client: context.client
+      })
+  )
+  logger.info('registered global slash commands', { commandCount: registered.length })
   try {
-    const synchronized = await registry.modules.syncAll({
-      app: context,
-      applicationID: context.applicationID,
-      client: context.client,
-      guildIDs: context.client.guilds.keys()
-    })
-    logger.info(`synchronized modules for ${synchronized.size} guild(s)`)
+    const synchronized = await traceOperation(
+      'discord.modules.synchronize',
+      { parent: 'active' },
+      async () =>
+        registry.modules.syncAll({
+          app: context,
+          applicationID: context.applicationID,
+          client: context.client,
+          guildIDs: context.client.guilds.keys()
+        })
+    )
+    logger.info('synchronized guild modules', { guildCount: synchronized.size })
   } catch (error) {
-    logger.warn('guild module synchronization failed', error)
+    logger.warn('guild module synchronization failed', { error })
   }
   return context
 }
 
-export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): KanikouApp {
-  const registry = rosepack.createRegistry({ components: jumbleComponents, slashCommands })
-  const logger = createKanikouLogger(config.LOG_LEVEL)
-  const observability = startAxiomObservability(config)
+function createBotDependencies(config: KanikouEnv, client: Client, logger: KanikouLogger) {
   const memory = new MarkdownMemoryStore()
-  const client = new Client({
-    auth: `Bot ${config.KANIKOU_DISCORD_TOKEN}`,
-    gateway: {
-      intents:
-        Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.DIRECT_MESSAGES | Intents.MESSAGE_CONTENT
-    }
-  })
   const mintlifyMcp =
     config.MINTLIFY_MCP_OAUTH_FILE === undefined
       ? undefined
       : new MintlifyMcpToolProvider({
           oauthFile: config.MINTLIFY_MCP_OAUTH_FILE,
-          onError: (error) => logger.error('Mintlify MCP error', error)
+          onError: (error) => logger.error('Mintlify MCP error', { error })
         })
   const responder = new KanikouResponder(
     createKanikouModel(config),
@@ -196,17 +221,39 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     authToken: config.LIBSQL_AUTH_TOKEN
   })
   const moduleStore = new GuildSettingsStore(database.db)
-  const { jumble, jumbleRenderer, jumbleMetadataCache } = createJumbleInfrastructure(
-    config,
+  const jumbleInfrastructure = createJumbleInfrastructure(config, database, client, logger)
+
+  return { database, memory, mintlifyMcp, moduleStore, responder, ...jumbleInfrastructure }
+}
+
+export function createKanikouApp(
+  config: KanikouEnv = loadKanikouEnv(),
+  observability: KanikouObservability = startKanikouObservability(config.observability)
+): KanikouApp {
+  const registry = rosepack.createRegistry({ components: jumbleComponents, slashCommands })
+  const logger = observability.logger
+  const client = new Client({
+    auth: `Bot ${config.KANIKOU_DISCORD_TOKEN}`,
+    gateway: {
+      intents:
+        Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.DIRECT_MESSAGES | Intents.MESSAGE_CONTENT
+    }
+  })
+  const {
     database,
-    client,
-    logger
-  )
+    jumble,
+    jumbleMetadataCache,
+    jumbleRenderer,
+    memory,
+    mintlifyMcp,
+    moduleStore,
+    responder
+  } = createBotDependencies(config, client, logger)
 
   let context: BotContext | undefined
 
   client.once('ready', () => {
-    runTask(logger, async () => {
+    runTask(observability, 'bot.ready_setup', {}, async () => {
       context = await performReadySetup(client, registry, logger, {
         database,
         jumbleMetadataCache,
@@ -221,47 +268,104 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
   })
 
   client.on('interactionCreate', (interaction) => {
-    runTask(logger, async () => {
-      if (context !== undefined) await registry.dispatch({ app: context, interaction })
-    })
+    runTask(
+      observability,
+      'discord.interaction.handle',
+      interactionTraceAttributes(interaction),
+      async () => {
+        if (context !== undefined) await registry.dispatch({ app: context, interaction })
+      }
+    )
   })
 
   client.on('messageCreate', (message) => {
-    runTask(logger, async () => {
-      if (context !== undefined) await handleMessageCreate(context, message)
-    })
+    runTask(
+      observability,
+      'discord.message.handle',
+      {
+        'discord.channel.id': message.channelID,
+        'discord.guild.id': message.guildID ?? 'direct-message',
+        'discord.message.author.id': message.author.id,
+        'discord.message.id': message.id
+      },
+      async () => {
+        if (context !== undefined) await handleMessageCreate(context, message)
+      }
+    )
   })
 
-  client.on('error', (info) => logger.error(info))
-  client.on('warn', (info) => logger.warn(info))
+  client.on('error', (info) => logger.error('discord client error', { error: info }))
+  client.on('warn', (info) => logger.warn('discord client warning', { warning: info }))
 
   return {
     client,
     async start() {
-      await client.connect()
+      await traceOperation('bot.connect', { parent: 'root' }, async () => client.connect())
     },
     async stop() {
-      client.disconnect(false)
-      jumble.stop()
-      database.close()
-      const results = await Promise.allSettled([mintlifyMcp?.close(), observability.shutdown()])
+      await traceOperation('bot.stop', { parent: 'root' }, async () => {
+        client.disconnect(false)
+        jumble.stop()
+        database.close()
+      })
+      const results = await Promise.allSettled([mintlifyMcp?.close()])
       for (const result of results) {
         if (result.status === 'rejected') {
-          logger.error('failed to stop bot dependency', result.reason)
+          logger.error('failed to stop bot dependency', { error: result.reason })
         }
       }
+      await observability.shutdown()
     }
   }
 }
 
-export async function startKanikouBot(config: KanikouEnv = loadKanikouEnv()): Promise<KanikouApp> {
-  const app = createKanikouApp(config)
+export async function startKanikouBot(
+  config: KanikouEnv = loadKanikouEnv(),
+  observability?: KanikouObservability
+): Promise<KanikouApp> {
+  const app = createKanikouApp(config, observability)
   await app.start()
   return app
 }
 
-function runTask(logger: ReturnType<typeof createKanikouLogger>, task: () => Promise<void>): void {
-  void task().catch((error: unknown) => {
-    logger.error('async bot task failed', error)
+function runTask(
+  observability: KanikouObservability,
+  operation: string,
+  attributes: Readonly<Record<string, unknown>>,
+  task: () => Promise<void>
+): void {
+  void traceOperation(operation, { attributes, parent: 'root' }, async () => {
+    try {
+      await task()
+    } catch (error) {
+      observability.logger.error('async bot task failed', { error, operation })
+    }
   })
+}
+
+function interactionTraceAttributes(
+  interaction: AnyInteractionGateway
+): Readonly<Record<string, unknown>> {
+  const common = {
+    'discord.channel.id': interaction.channelID ?? 'unknown',
+    'discord.guild.id': interaction.guildID ?? 'direct-message',
+    'discord.interaction.id': interaction.id,
+    'discord.interaction.type': interaction.type
+  }
+  const kind = match(interaction.type)
+    .with(InteractionTypes.APPLICATION_COMMAND, () => 'command')
+    .with(InteractionTypes.MESSAGE_COMPONENT, () => 'component')
+    .with(InteractionTypes.MODAL_SUBMIT, () => 'modal')
+    .with(InteractionTypes.APPLICATION_COMMAND_AUTOCOMPLETE, () => 'autocomplete')
+    .otherwise(() => 'unknown')
+  const route = ('name' in interaction.data ? interaction.data.name : interaction.data.customID)
+    .split('/')
+    .slice(0, 2)
+    .join('/')
+
+  return {
+    ...common,
+    'discord.interaction.kind': kind,
+    'discord.interaction.route': route
+  }
 }

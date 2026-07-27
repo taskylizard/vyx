@@ -48,7 +48,9 @@ export async function sendInstagramAutoembed(
   const realURL = canonicalInstagramURL(sourceURL)
 
   if (resolution.kind === 'media') {
-    context.logger.info(`instagram autoembed resolved via ${resolution.strategy} fallback`)
+    context.logger.info('instagram autoembed resolved via fallback', {
+      strategy: resolution.strategy
+    })
     await context.client.rest.channels.createMessage(message.channelID, {
       allowedMentions,
       components: instagramMediaComponents(realURL, resolution.media),
@@ -326,7 +328,7 @@ async function fetchInstagramSharerSafely(
   try {
     return await fetchInstagramSharer(sourceURL)
   } catch (error) {
-    context.logger.warn('failed to fetch instagram sharer', error)
+    context.logger.warn('failed to fetch instagram sharer', { error })
     return undefined
   }
 }

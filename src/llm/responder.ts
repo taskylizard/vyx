@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto'
 import type { LanguageModel, ModelMessage, ToolSet } from 'ai'
 import type { CommandInteraction, Message } from 'oceanic.js'
 import { sendResponse, type ResponseTarget } from '../discord/response-target.ts'
@@ -13,6 +12,7 @@ import {
   formatThinkingProgress,
   THINKING_RESPONSE
 } from './tool-progress.ts'
+import { traceOperation } from '../observability/tracing.ts'
 
 export class KanikouResponder {
   readonly #model: LanguageModel
@@ -62,61 +62,75 @@ export class KanikouResponder {
     target: ResponseTarget,
     scope: ToolScope
   ): Promise<void> {
-    const calledTools: string[] = []
-    const generationStartedAt = Date.now()
-    let progressUpdate = Promise.resolve()
-    const traceId = randomUUID()
-    logAgentTrace(context.logger, {
-      event: 'generation.start',
-      messageCount: messages.length,
-      traceId
-    })
+    await traceOperation(
+      'llm.response.generate',
+      {
+        attributes: {
+          'discord.channel.id': scope.channelID,
+          'discord.guild.id': scope.guildID ?? 'direct-message',
+          'gen_ai.input.messages': messages.length,
+          'kanikou.response.target': target.kind
+        },
+        parent: 'active'
+      },
+      async (span) => {
+        const calledTools: string[] = []
+        const generationStartedAt = performance.now()
+        let progressUpdate = Promise.resolve()
+        const traceId = span.spanContext().traceId
+        logAgentTrace(context.logger, {
+          event: 'generation.start',
+          messageCount: messages.length,
+          traceId
+        })
 
-    try {
-      const scoped = (await this.#scopedToolProvider?.resolve(scope)) ?? { tools: {} }
-      const content = await generateKanikouResponse(
-        this.#model,
-        messages,
-        { ...this.#tools, ...scoped.tools },
-        {
-          instructions: scoped.instructions,
-          maxToolIterations: Object.keys(scoped.tools).length === 0 ? undefined : null,
-          onStepEnd: (event) => {
-            logAgentTrace(context.logger, { event: 'step.end', traceId, ...event })
-          },
-          onStepStart: (event) => {
-            logAgentTrace(context.logger, { event: 'step.start', traceId, ...event })
-          },
-          onToolExecutionEnd: (event) => {
-            logAgentTrace(context.logger, { event: 'tool.end', traceId, ...event })
-          },
-          onToolExecutionStart: (event) => {
-            logAgentTrace(context.logger, { event: 'tool.start', traceId, ...event })
-            calledTools.push(event.toolName)
-            const progress = formatThinkingProgress(calledTools)
-            progressUpdate = progressUpdate.then(async () =>
-              sendResponse(context, target, progress)
-            )
-            return progressUpdate
-          }
+        try {
+          const scoped = (await this.#scopedToolProvider?.resolve(scope)) ?? { tools: {} }
+          const content = await generateKanikouResponse(
+            this.#model,
+            messages,
+            { ...this.#tools, ...scoped.tools },
+            {
+              instructions: scoped.instructions,
+              maxToolIterations: Object.keys(scoped.tools).length === 0 ? undefined : null,
+              onStepEnd: (event) => {
+                logAgentTrace(context.logger, { event: 'step.end', traceId, ...event })
+              },
+              onStepStart: (event) => {
+                logAgentTrace(context.logger, { event: 'step.start', traceId, ...event })
+              },
+              onToolExecutionEnd: (event) => {
+                logAgentTrace(context.logger, { event: 'tool.end', traceId, ...event })
+              },
+              onToolExecutionStart: (event) => {
+                logAgentTrace(context.logger, { event: 'tool.start', traceId, ...event })
+                calledTools.push(event.toolName)
+                const progress = formatThinkingProgress(calledTools)
+                progressUpdate = progressUpdate.then(async () =>
+                  sendResponse(context, target, progress)
+                )
+                return progressUpdate
+              }
+            }
+          )
+
+          await progressUpdate
+          await sendResponse(context, target, formatCompletedResponse(content, calledTools))
+          logAgentTrace(context.logger, {
+            durationMs: Math.round((performance.now() - generationStartedAt) * 10) / 10,
+            event: 'generation.end',
+            traceId
+          })
+        } catch (error) {
+          logAgentTrace(context.logger, {
+            durationMs: Math.round((performance.now() - generationStartedAt) * 10) / 10,
+            error: errorMessage(error),
+            event: 'generation.error',
+            traceId
+          })
+          throw error
         }
-      )
-
-      await progressUpdate
-      await sendResponse(context, target, formatCompletedResponse(content, calledTools))
-      logAgentTrace(context.logger, {
-        durationMs: Date.now() - generationStartedAt,
-        event: 'generation.end',
-        traceId
-      })
-    } catch (error) {
-      logAgentTrace(context.logger, {
-        durationMs: Date.now() - generationStartedAt,
-        error: errorMessage(error),
-        event: 'generation.error',
-        traceId
-      })
-      throw error
-    }
+      }
+    )
   }
 }

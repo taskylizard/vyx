@@ -6,10 +6,12 @@ import { isOperationsScope } from '../llm/mintlify-mcp.ts'
 import { handleJumbleMessage } from '../jumble/discord.ts'
 import { componentIds } from '../jumble/components.ts'
 import { modules } from '../modules.ts'
+import { setActiveSpanAttributes } from '../observability/tracing.ts'
 import type { BotContext } from './context.ts'
 
 export async function handleMessageCreate(context: BotContext, message: Message): Promise<void> {
   if (message.author.bot) {
+    setActiveSpanAttributes({ 'kanikou.message.outcome': 'ignored-bot' })
     return
   }
 
@@ -27,10 +29,13 @@ export async function handleMessageCreate(context: BotContext, message: Message)
             module: modules.jumble.id
           })
       })
-      if (handledByJumble) return
+      if (handledByJumble) {
+        setActiveSpanAttributes({ 'kanikou.message.route': 'jumble-guess' })
+        return
+      }
     }
   } catch (error) {
-    context.logger.warn('jumble guess handling failed', error)
+    context.logger.warn('jumble guess handling failed', { error })
   }
 
   if (message.guildID === TASKYLAND_GUILD_ID) {
@@ -38,9 +43,10 @@ export async function handleMessageCreate(context: BotContext, message: Message)
     try {
       await handleAutoembeds(context, message)
     } catch (error) {
-      context.logger.warn('autoembed failed', error)
+      context.logger.warn('autoembed failed', { error })
     }
     if (shouldIgnoreAI) {
+      setActiveSpanAttributes({ 'kanikou.message.route': 'autoembed' })
       return
     }
   }
@@ -55,13 +61,18 @@ export async function handleMessageCreate(context: BotContext, message: Message)
     mentionsBot: message.mentions.users.some((user) => user.id === context.botUserID)
   })
     .with({ isOwnerDirectMessage: true }, async () => {
+      setActiveSpanAttributes({ 'kanikou.message.route': 'ai-owner-direct-message' })
       await context.responder.replyToMessage(context, message)
     })
     .with({ isOperationsChannel: true, mentionsBot: true }, async () => {
+      setActiveSpanAttributes({ 'kanikou.message.route': 'ai-operations-mention' })
       await context.responder.replyToMessage(context, message)
     })
     .with({ isTaskyland: true, mentionsBot: true }, async () => {
+      setActiveSpanAttributes({ 'kanikou.message.route': 'ai-taskyland-mention' })
       await context.responder.replyToMessage(context, message)
     })
-    .otherwise(async () => undefined)
+    .otherwise(async () => {
+      setActiveSpanAttributes({ 'kanikou.message.outcome': 'ignored-unmatched' })
+    })
 }

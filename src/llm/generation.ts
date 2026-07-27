@@ -109,7 +109,9 @@ export async function generateKanikouResponse(
     stopWhen: maxToolIterations === null ? () => false : isStepCount(maxToolIterations),
     temperature: KANIKOU_MODEL_SETTINGS.temperature,
     telemetry: {
-      functionId: 'kanikou.response'
+      functionId: 'kanikou.response',
+      recordInputs: false,
+      recordOutputs: false
     },
     toolChoice: KANIKOU_MODEL_SETTINGS.toolChoice,
     tools,

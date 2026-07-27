@@ -1,9 +1,13 @@
 export { createKanikouApp, startKanikouBot, type KanikouApp } from './bot/app.ts'
-export {
-  startAxiomObservability,
-  type AxiomObservability,
-  type AxiomObservabilityConfig
-} from './observability/axiom.ts'
+export { startAxiomObservability, startKanikouObservability } from './observability/axiom.ts'
+export type {
+  AxiomObservabilityConfig,
+  KanikouLogger,
+  KanikouObservability,
+  KanikouObservabilityConfig,
+  LogFields,
+  LogLevel
+} from './observability/types.ts'
 export {
   buildSlashCommandTree,
   createRosepack,

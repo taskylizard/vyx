@@ -27,7 +27,7 @@ export default slash({
       return
     }
 
-    context.app.logger.error('memory command failed', error)
+    context.app.logger.error('memory command failed', { error })
     await context.editResponse('The memory operation failed. Please try again.')
   },
   subcommands: {

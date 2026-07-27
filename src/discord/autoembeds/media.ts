@@ -32,7 +32,7 @@ export async function downloadAutoembedAssetSafely(
   try {
     return await downloadAutoembedAsset(url, filenameBase)
   } catch (error) {
-    context.logger.warn(`failed to download ${filenameBase}`, error)
+    context.logger.warn('failed to download autoembed asset', { error, filenameBase })
     return undefined
   }
 }

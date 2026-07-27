@@ -386,7 +386,9 @@ test('uses the vendored Instagram-native strategy after rich lookup rate limits'
   const options = createMessage.mock.calls[0]?.[1]
   expect(options?.files).toBeUndefined()
   expect(JSON.stringify(options?.components)).toContain('https://cdn.example/native.mp4')
-  expect(info).toHaveBeenCalledWith('instagram autoembed resolved via native fallback')
+  expect(info).toHaveBeenCalledWith('instagram autoembed resolved via fallback', {
+    strategy: 'native'
+  })
 })
 
 test('uses the vendored SnapSave strategy after native resolution fails', async () => {
@@ -439,7 +441,9 @@ test('uses the vendored SnapSave strategy after native resolution fails', async 
       return requestedURL.includes('cdn.example')
     })
   ).toBe(false)
-  expect(info).toHaveBeenCalledWith('instagram autoembed resolved via snapsave fallback')
+  expect(info).toHaveBeenCalledWith('instagram autoembed resolved via fallback', {
+    strategy: 'snapsave'
+  })
 })
 
 test('falls back to a rewritten Instagram link when public lookup fails', async () => {
@@ -499,7 +503,10 @@ test('falls back to a rewritten Twitter link when component lookup fails', async
     'channel',
     expect.objectContaining({ content: 'https://fixupx.com/alyxia/status/123' })
   )
-  expect(warn).toHaveBeenCalledWith('twitter component autoembed failed', expect.any(Error))
+  expect(warn).toHaveBeenCalledWith('component autoembed failed', {
+    error: expect.any(Error),
+    service: 'twitter'
+  })
 })
 
 test('replies with rewritten links and suppresses the original embed', async () => {

@@ -16,7 +16,7 @@ export default slash({
   contexts: ['guild'],
   installations: ['guild'],
   async onError(context, error) {
-    context.app.logger.warn('jumble command failed', error)
+    context.app.logger.error('jumble command failed', { error })
     await context.editResponse(errorMessage(error))
   },
   subcommands: {
@@ -70,14 +70,16 @@ export default slash({
           result.action
         )
         if (rendered.imageError !== undefined) {
-          context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+          context.app.logger.warn('jumble image could not be rendered', {
+            error: rendered.imageError
+          })
         }
         await context.editResponse(rendered.payload)
         try {
           const original = await context.interaction.getOriginal()
           await context.app.jumble.attachMessage(result.state.session.id, original.id)
         } catch (error) {
-          context.app.logger.warn('jumble message ID could not be saved', error)
+          context.app.logger.warn('jumble message ID could not be saved', { error })
         }
       }
     }),

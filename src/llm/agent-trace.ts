@@ -1,4 +1,6 @@
-import type { Logger } from 'tracix'
+import { match } from 'ts-pattern'
+import { addActiveSpanEvent } from '../observability/tracing.ts'
+import type { KanikouLogger } from '../observability/types.ts'
 
 interface BaseAgentTraceEvent {
   event: string
@@ -37,18 +39,16 @@ export type AgentTraceEvent = BaseAgentTraceEvent &
       }
   )
 
-export function logAgentTrace(logger: Logger, event: AgentTraceEvent): void {
-  const message = `[agent-trace] ${JSON.stringify(event)}`
-  if (event.event === 'generation.error') {
-    logger.error(message)
-    return
-  }
-  if (event.event === 'tool.end' && event.outcome === 'error') {
-    logger.warn(message)
-    return
-  }
+export function logAgentTrace(logger: KanikouLogger, event: AgentTraceEvent): void {
+  const fields = { ...event }
+  addActiveSpanEvent(`agent.${event.event}`, fields)
 
-  logger.debug(message)
+  match(event)
+    .with({ event: 'generation.error' }, () => logger.error('agent generation failed', fields))
+    .with({ event: 'tool.end', outcome: 'error' }, () =>
+      logger.warn('agent tool execution failed', fields)
+    )
+    .otherwise(() => logger.debug('agent trace', fields))
 }
 
 export function errorMessage(error: unknown): string {

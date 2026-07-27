@@ -100,7 +100,9 @@ export const jumbleReplayButton = button({
         result.action
       )
       if (rendered.imageError !== undefined) {
-        context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+        context.app.logger.warn('jumble image could not be rendered', {
+          error: rendered.imageError
+        })
       }
       const message = await createJumbleMessage(
         context.client,
@@ -110,20 +112,24 @@ export const jumbleReplayButton = button({
       try {
         await context.app.jumble.attachMessage(result.state.session.id, message.id)
       } catch (error) {
-        context.app.logger.warn('jumble message ID could not be saved', error)
+        context.app.logger.warn('jumble message ID could not be saved', { error })
       }
     } catch (error) {
       if (startedSessionId !== undefined) {
         try {
           await context.app.jumble.expire(startedSessionId)
         } catch (expiryError) {
-          context.app.logger.warn('failed replay Jumble could not be expired', expiryError)
+          context.app.logger.warn('failed replay Jumble could not be expired', {
+            error: expiryError
+          })
         }
       }
       try {
         await context.update({ components: readyComponents })
       } catch (updateError) {
-        context.app.logger.warn('jumble replay button could not be restored', updateError)
+        context.app.logger.warn('jumble replay button could not be restored', {
+          error: updateError
+        })
       }
       throw error
     } finally {
@@ -162,7 +168,7 @@ async function updateJumbleComponent<TRoute extends string>(
     result.action
   )
   if (rendered.imageError !== undefined) {
-    context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+    context.app.logger.warn('jumble image could not be rendered', { error: rendered.imageError })
   }
   await context.update(rendered.payload)
 }
@@ -184,7 +190,7 @@ async function handleComponentError<TRoute extends string>(
   context: ComponentContext<BotContext, TRoute, 'button', typeof modules>,
   error: unknown
 ): Promise<void> {
-  context.app.logger.warn('jumble component failed', error)
+  context.app.logger.error('jumble component failed', { error })
   const message = match(error)
     .with(P.instanceOf(Error), (value) => value.message)
     .otherwise(() => 'That Jumble action failed.')

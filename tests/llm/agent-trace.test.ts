@@ -1,6 +1,6 @@
-import type { Logger } from 'tracix'
 import { expect, test, vi } from 'vite-plus/test'
 import { errorMessage, logAgentTrace } from '../../src/llm/agent-trace.ts'
+import type { KanikouLogger } from '../../src/observability/types.ts'
 
 test('logs successful trace events at debug level', () => {
   const { debug, error, logger, warn } = createLogger()
@@ -15,7 +15,7 @@ test('logs successful trace events at debug level', () => {
     traceId: 'trace-1'
   })
 
-  expect(debug).toHaveBeenCalledWith(expect.stringContaining('"durationMs":42'))
+  expect(debug).toHaveBeenCalledWith('agent trace', expect.objectContaining({ durationMs: 42 }))
   expect(warn).not.toHaveBeenCalled()
   expect(error).not.toHaveBeenCalled()
 })
@@ -48,11 +48,14 @@ test('raises failed tool and generation traces to visible log levels', () => {
 function createLogger() {
   const debug = vi.fn()
   const error = vi.fn()
+  const info = vi.fn()
+  const trace = vi.fn()
   const warn = vi.fn()
+  const logger = { debug, error, info, trace, warn } satisfies KanikouLogger
   return {
     debug,
     error,
-    logger: { debug, error, warn } as unknown as Logger,
+    logger,
     warn
   }
 }
