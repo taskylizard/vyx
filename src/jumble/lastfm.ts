@@ -1,6 +1,9 @@
+import { createHash } from 'node:crypto'
 import { match, P } from 'ts-pattern'
+import { z } from 'zod'
 import { normalizeAnswer } from './answer.ts'
 import { getCandidateImageUrls, mergeJumbleCandidates } from './candidate.ts'
+import type { JumbleMetadataCache } from './metadata-cache.ts'
 import {
   type JumbleMusicProvider,
   type LastFmClientOptions,
@@ -16,6 +19,7 @@ import {
 } from './lastfm-parser.ts'
 import { clamp } from './numbers.ts'
 import { readBoundedJson } from './response.ts'
+import { JumbleCandidateSchema } from './schemas.ts'
 import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './timing.ts'
 import type {
   JumbleAlbumCandidate,
@@ -28,6 +32,30 @@ import type {
 } from './types.ts'
 
 export type { JumbleMusicProvider, LastFmClientOptions } from './lastfm-types.ts'
+
+const RESPONSE_CACHE_TTL_MS = 5 * 60_000
+const TOP_LIST_FRESH_TTL_MS = 15 * 60_000
+const TOP_LIST_STALE_TTL_MS = 24 * 60 * 60 * 1_000
+const STALE_RETRY_TTL_MS = 60_000
+const LastFmCandidateListSchema = z.array(JumbleCandidateSchema).min(1).max(200)
+
+type LastFmMemoryCacheEntry =
+  | { kind: 'response'; expiresAt: number; value: LastFmEnvelope; bytes: number }
+  | {
+      kind: 'candidates'
+      expiresAt: number
+      value: readonly JumbleCandidate[]
+      bytes: number
+    }
+
+interface LastFmCandidateRequest {
+  cacheKey: string
+  method: string
+  params: Record<string, string>
+  kind: JumbleKind
+  username: string
+  limit: number
+}
 
 export class LastFmError extends Error {
   readonly code: string
@@ -64,13 +92,13 @@ export class LastFmClient implements JumbleMusicProvider {
   private readonly cacheEntries: number
   private readonly cacheBytes: number
   private readonly maxResponseBytes: number
+  private readonly persistentCache?: Pick<JumbleMetadataCache, 'get' | 'set'>
   private readonly onTiming?: JumbleTimingSink
-  private readonly cache = new Map<
-    string,
-    { expiresAt: number; value: LastFmEnvelope; bytes: number }
-  >()
+  private readonly onError?: (error: unknown) => void
+  private readonly cache = new Map<string, LastFmMemoryCacheEntry>()
   private cacheSize = 0
   private readonly inflight = new Map<string, Promise<LastFmEnvelope>>()
+  private readonly candidateInflight = new Map<string, Promise<readonly JumbleCandidate[]>>()
 
   constructor(options: LastFmClientOptions) {
     this.options = options
@@ -88,7 +116,9 @@ export class LastFmClient implements JumbleMusicProvider {
       16 * 1024,
       8 * 1024 * 1024
     )
+    this.persistentCache = options.cache
     this.onTiming = options.onTiming
+    this.onError = options.onError
   }
 
   async getCandidates(
@@ -105,18 +135,100 @@ export class LastFmClient implements JumbleMusicProvider {
       .with('album', () => 'user.gettopalbums')
       .with('track', () => 'user.gettoptracks')
       .exhaustive()
-    const payload = await this.request(method, {
+    const safeLimit = clamp(limit, 1, 200)
+    const params = {
       user: safeUsername,
       period: 'overall',
-      limit: String(clamp(limit, 1, 200)),
+      limit: String(safeLimit),
       page: '1'
+    }
+    const usernameKey = createHash('sha256').update(safeUsername.toLowerCase()).digest('hex')
+    const cacheKey = `lastfm:v1:top:${kind}:${safeLimit}:${usernameKey}`
+    const memoryCached = this.readCachedCandidates(cacheKey)
+    if (memoryCached !== undefined) return memoryCached
+    const existing = this.candidateInflight.get(cacheKey)
+    if (existing !== undefined) return existing
+
+    const task = this.loadCandidates({
+      cacheKey,
+      method,
+      params,
+      kind,
+      username: safeUsername,
+      limit: safeLimit
     })
-    const candidates = parseLastFmTopItems(payload, kind)
-    if (candidates.length === 0) {
-      throw new LastFmError(
-        `Last.fm did not return any ${kind} scrobbles for "${safeUsername}".`,
-        'empty-results'
-      )
+    this.candidateInflight.set(cacheKey, task)
+    try {
+      return await task
+    } finally {
+      this.candidateInflight.delete(cacheKey)
+    }
+  }
+
+  private async loadCandidates(
+    request: LastFmCandidateRequest
+  ): Promise<readonly JumbleCandidate[]> {
+    const { cacheKey, method, params, kind, username, limit } = request
+    let staleCandidates: readonly JumbleCandidate[] | undefined
+    if (this.persistentCache !== undefined) {
+      try {
+        const cached = await this.persistentCache.get(cacheKey, LastFmCandidateListSchema)
+        if (
+          cached !== null &&
+          cached.value.length <= limit &&
+          cached.value.every((candidate) => candidate.kind === kind)
+        ) {
+          const ageMs = Math.max(0, Date.now() - cached.fetchedAt)
+          if (ageMs <= TOP_LIST_FRESH_TTL_MS) {
+            this.storeMemory(cacheKey, {
+              kind: 'candidates',
+              expiresAt: cached.fetchedAt + TOP_LIST_FRESH_TTL_MS,
+              value: cached.value,
+              bytes: Buffer.byteLength(JSON.stringify(cached.value), 'utf8')
+            })
+            return cached.value
+          }
+          if (ageMs <= TOP_LIST_STALE_TTL_MS) staleCandidates = cached.value
+        }
+      } catch (error) {
+        this.report(error)
+      }
+    }
+
+    let candidates: readonly JumbleCandidate[]
+    try {
+      const payload = await this.request(method, params)
+      candidates = parseLastFmTopItems(payload, kind)
+      if (candidates.length === 0) {
+        throw new LastFmError(
+          `Last.fm did not return any ${kind} scrobbles for "${username}".`,
+          'empty-results'
+        )
+      }
+    } catch (error) {
+      if (staleCandidates === undefined) throw error
+      this.storeMemory(cacheKey, {
+        kind: 'candidates',
+        expiresAt: Date.now() + STALE_RETRY_TTL_MS,
+        value: staleCandidates,
+        bytes: Buffer.byteLength(JSON.stringify(staleCandidates), 'utf8')
+      })
+      return staleCandidates
+    }
+
+    const bytes = Buffer.byteLength(JSON.stringify(candidates), 'utf8')
+    this.storeMemory(cacheKey, {
+      kind: 'candidates',
+      expiresAt: Date.now() + TOP_LIST_FRESH_TTL_MS,
+      value: candidates,
+      bytes
+    })
+    if (this.persistentCache !== undefined) {
+      try {
+        await this.persistentCache.set(cacheKey, candidates, TOP_LIST_STALE_TTL_MS)
+      } catch (error) {
+        this.report(error)
+      }
     }
     return candidates
   }
@@ -278,17 +390,8 @@ export class LastFmClient implements JumbleMusicProvider {
       ...params
     })
     const url = `${this.baseUrl}?${query.toString()}`
-    const cached = this.cache.get(url)
-    if (cached !== undefined && cached.expiresAt > Date.now()) {
-      this.cache.delete(url)
-      this.cacheSize -= cached.bytes
-      this.cache.set(url, cached)
-      return cached.value
-    }
-    if (cached !== undefined) {
-      this.cache.delete(url)
-      this.cacheSize -= cached.bytes
-    }
+    const cached = this.readCachedResponse(url)
+    if (cached !== undefined) return cached
 
     const existing = this.inflight.get(url)
     if (existing !== undefined) return existing
@@ -328,17 +431,12 @@ export class LastFmClient implements JumbleMusicProvider {
         )
       }
       const bytes = Buffer.byteLength(JSON.stringify(payload), 'utf8')
-      const previous = this.cache.get(url)
-      if (previous !== undefined) this.cacheSize -= previous.bytes
-      this.cache.set(url, { expiresAt: Date.now() + 5 * 60_000, value: payload, bytes })
-      this.cacheSize += bytes
-      while (this.cache.size > this.cacheEntries || this.cacheSize > this.cacheBytes) {
-        const oldest = this.cache.keys().next().value
-        if (oldest === undefined) break
-        const entry = this.cache.get(oldest)
-        this.cache.delete(oldest)
-        this.cacheSize -= entry?.bytes ?? 0
-      }
+      this.storeMemory(url, {
+        kind: 'response',
+        expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
+        value: payload,
+        bytes
+      })
       return payload
     } catch (error) {
       throw match(error)
@@ -357,6 +455,54 @@ export class LastFmClient implements JumbleMusicProvider {
     } finally {
       clearTimeout(timer)
     }
+  }
+
+  private readCachedCandidates(cacheKey: string): readonly JumbleCandidate[] | undefined {
+    return match(this.readMemory(cacheKey))
+      .returnType<readonly JumbleCandidate[] | undefined>()
+      .with({ kind: 'candidates' }, ({ value }) => value)
+      .with({ kind: 'response' }, () => undefined)
+      .with(undefined, () => undefined)
+      .exhaustive()
+  }
+
+  private readCachedResponse(url: string): LastFmEnvelope | undefined {
+    return match(this.readMemory(url))
+      .returnType<LastFmEnvelope | undefined>()
+      .with({ kind: 'response' }, ({ value }) => value)
+      .with({ kind: 'candidates' }, () => undefined)
+      .with(undefined, () => undefined)
+      .exhaustive()
+  }
+
+  private readMemory(cacheKey: string): LastFmMemoryCacheEntry | undefined {
+    const cached = this.cache.get(cacheKey)
+    if (cached === undefined) return undefined
+    this.cache.delete(cacheKey)
+    this.cacheSize -= cached.bytes
+    if (cached.expiresAt <= Date.now()) return undefined
+    this.cache.set(cacheKey, cached)
+    this.cacheSize += cached.bytes
+    return cached
+  }
+
+  private storeMemory(cacheKey: string, entry: LastFmMemoryCacheEntry): void {
+    if (entry.bytes > this.cacheBytes) return
+    const previous = this.cache.get(cacheKey)
+    if (previous !== undefined) this.cacheSize -= previous.bytes
+    this.cache.delete(cacheKey)
+    this.cache.set(cacheKey, entry)
+    this.cacheSize += entry.bytes
+    while (this.cache.size > this.cacheEntries || this.cacheSize > this.cacheBytes) {
+      const oldest = this.cache.entries().next()
+      if (oldest.done) return
+      this.cache.delete(oldest.value[0])
+      this.cacheSize -= oldest.value[1].bytes
+    }
+  }
+
+  private report(error: unknown): void {
+    this.onError?.(error)
   }
 }
 

@@ -71,7 +71,18 @@ function createJumbleInfrastructure(
   const jumbleRenderer = new JumbleImageRenderer({ onTiming })
   const jumbleProvider = match(config.LASTFM_API_KEY)
     .with(undefined, () => new MissingLastFmProvider())
-    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz, discogs, deezer, onTiming }))
+    .otherwise(
+      (apiKey) =>
+        new LastFmClient({
+          apiKey,
+          cache: jumbleMetadataCache,
+          musicBrainz,
+          discogs,
+          deezer,
+          onTiming,
+          onError: (error) => logger.warn('Last.fm candidate cache error', error)
+        })
+    )
   const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
     onTiming,
     onExpired: async (state) => {

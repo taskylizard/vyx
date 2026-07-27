@@ -1,6 +1,7 @@
 import type { MusicBrainzClient } from './musicbrainz.ts'
 import type { DiscogsClient } from './discogs.ts'
 import type { DeezerClient } from './deezer.ts'
+import type { JumbleMetadataCache } from './metadata-cache.ts'
 import type { JumbleCandidate, JumbleHint, JumbleKind } from './types.ts'
 import type { JumbleTimingSink } from './timing.ts'
 
@@ -12,10 +13,12 @@ export interface LastFmClientOptions {
   cacheEntries?: number
   cacheBytes?: number
   maxResponseBytes?: number
+  cache?: Pick<JumbleMetadataCache, 'get' | 'set'>
   musicBrainz?: Pick<MusicBrainzClient, 'enrich'>
   discogs?: Pick<DiscogsClient, 'enrich'>
   deezer?: Pick<DeezerClient, 'enrich'>
   onTiming?: JumbleTimingSink
+  onError?: (error: unknown) => void
 }
 
 export interface JumbleMusicProvider {
