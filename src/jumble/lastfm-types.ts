@@ -1,4 +1,5 @@
 import type { MusicBrainzClient } from './musicbrainz.ts'
+import type { DiscogsClient } from './discogs.ts'
 import type { JumbleCandidate, JumbleHint, JumbleKind } from './types.ts'
 
 export interface LastFmClientOptions {
@@ -10,6 +11,7 @@ export interface LastFmClientOptions {
   cacheBytes?: number
   maxResponseBytes?: number
   musicBrainz?: Pick<MusicBrainzClient, 'enrich'>
+  discogs?: Pick<DiscogsClient, 'enrich'>
 }
 
 export interface JumbleMusicProvider {

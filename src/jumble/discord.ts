@@ -1,5 +1,6 @@
 import type { Client, EditMessageOptions, Message, Permission } from 'oceanic.js'
 import { match } from 'ts-pattern'
+import { mergeImageUrlLists } from './candidate.ts'
 import { JumbleImageRenderer } from './renderer.ts'
 import {
   buildJumblePayload,
@@ -30,12 +31,23 @@ export async function renderJumble(
 ): Promise<RenderedJumble> {
   let image: Buffer | undefined
   let imageError: Error | undefined
-  if (state.session.imageUrl !== null) {
+  const imageUrls = mergeImageUrlLists(
+    state.session.imageUrl === null ? undefined : [state.session.imageUrl],
+    state.session.metadata.candidate.imageUrl === undefined
+      ? undefined
+      : [state.session.metadata.candidate.imageUrl],
+    state.session.metadata.candidate.imageUrls
+  )
+  if (imageUrls.length > 0) {
     try {
       image =
         state.session.endedAt === null
-          ? await renderer.render(state.session.imageUrl, state.session.blurStage)
-          : await renderer.reveal(state.session.imageUrl)
+          ? imageUrls.length === 1
+            ? await renderer.render(imageUrls[0]!, state.session.blurStage)
+            : await renderer.renderWithFallback(imageUrls, state.session.blurStage)
+          : imageUrls.length === 1
+            ? await renderer.reveal(imageUrls[0]!)
+            : await renderer.revealWithFallback(imageUrls)
     } catch (error) {
       imageError = error instanceof Error ? error : new Error(String(error))
     }

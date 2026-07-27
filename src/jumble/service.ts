@@ -1,6 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { match } from 'ts-pattern'
-import { answerMatches, normalizeAnswer, shuffleCharacters } from './answer.ts'
+import { answerMatchesAny, normalizeAnswer, shuffleCharacters } from './answer.ts'
+import { getCandidateImageUrls } from './candidate.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
 import type {
@@ -29,6 +30,8 @@ export const JUMBLE_TIMEOUT_MS: Readonly<Record<JumbleKind, number>> = {
   album: 40_000,
   track: 40_000
 }
+
+const MAX_CANDIDATE_HYDRATION_ATTEMPTS = 8
 
 export class JumbleError extends Error {
   readonly code:
@@ -127,8 +130,9 @@ export class JumbleService {
         )
       }
 
-      let candidates = [...(await this.provider.getCandidates(input.kind, username, 100))]
-      candidates = candidates.filter((candidate) => isPlayableCandidate(candidate, input.kind))
+      const candidates = [...(await this.provider.getCandidates(input.kind, username, 100))].filter(
+        (candidate) => isCandidateIdentityValid(candidate, input.kind)
+      )
       if (candidates.length === 0)
         throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
 
@@ -140,8 +144,28 @@ export class JumbleService {
         (candidate) => !recentKeys.has(candidateKey(candidate.answer, candidate.artistName))
       )
       const pool = unseen.length > 0 ? unseen : candidates
-      let candidate = pool[this.randomIndex(pool.length)]!
-      if (this.provider.hydrate !== undefined) candidate = await this.provider.hydrate(candidate)
+      const startIndex = this.randomIndex(pool.length)
+      const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
+      let candidate: JumbleCandidate | undefined
+      for (let offset = 0; offset < attempts; offset += 1) {
+        const original = pool[(startIndex + offset) % pool.length]!
+        let hydrated = original
+        if (this.provider.hydrate !== undefined) {
+          try {
+            hydrated = await this.provider.hydrate(original)
+          } catch {
+            // tasky: one broken provider lookup must not make the whole profile unplayable.
+          }
+        }
+        if (isPlayableCandidate(hydrated, input.kind)) {
+          candidate = hydrated
+          break
+        }
+      }
+      if (candidate === undefined) {
+        throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
+      }
+      const imageUrls = getCandidateImageUrls(candidate)
 
       const hints = shuffle([...(await this.provider.getHints(candidate))], this.randomIndex)
       const shuffledAnswer = shuffleJumbleAnswer(candidate.answer, this.randomIndex)
@@ -161,10 +185,11 @@ export class JumbleService {
             .with('album', () => candidate.answer)
             .with('artist', 'track', () => null)
             .exhaustive(),
-        imageUrl: candidate.imageUrl ?? null,
+        imageUrl: imageUrls[0] ?? null,
         metadata: {
           candidate,
           shuffledAnswer,
+          answerVariants: candidate.answerVariants,
           hints
         },
         startedAt: this.now(),
@@ -273,7 +298,11 @@ export class JumbleService {
     const live = await this.ensureActive(sessionId)
     if (live.action !== undefined) return { action: live.action, state: live.state }
     const normalizedAnswer = normalizeAnswer(rawAnswer)
-    const correct = answerMatches(live.state.session.answer, rawAnswer)
+    const answerVariants =
+      live.state.session.metadata.answerVariants ??
+      live.state.session.metadata.candidate.answerVariants ??
+      []
+    const correct = answerMatchesAny([live.state.session.answer, ...answerVariants], rawAnswer)
     await this.repository.recordAnswer({
       sessionId,
       discordUserId,
@@ -373,14 +402,22 @@ export class JumbleService {
   }
 }
 
-function isPlayableCandidate(candidate: JumbleCandidate, kind: JumbleKind): boolean {
+function isCandidateIdentityValid(candidate: JumbleCandidate, kind: JumbleKind): boolean {
   if (
     candidate.kind !== kind ||
     candidate.answer.trim().length < 2 ||
     candidate.answer.length > 120
   )
     return false
-  return candidate.imageUrl !== undefined
+  return true
+}
+
+function isPlayableCandidate(candidate: JumbleCandidate, kind: JumbleKind): boolean {
+  if (!isCandidateIdentityValid(candidate, kind)) return false
+  const hasSemanticAnswer =
+    normalizeAnswer(candidate.answer).length > 0 ||
+    (candidate.answerVariants ?? []).some((variant) => normalizeAnswer(variant.value).length > 0)
+  return hasSemanticAnswer && getCandidateImageUrls(candidate).length > 0
 }
 
 function candidateKey(answer: string, artist: string | null | undefined): string {

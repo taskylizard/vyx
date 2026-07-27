@@ -1,5 +1,6 @@
 import { match } from 'ts-pattern'
 import type { ZodType } from 'zod'
+import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
 import type { JumbleArtistMetadata, JumbleCandidate } from './types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
 import {
@@ -7,6 +8,7 @@ import {
   chooseRecording,
   chooseReleaseGroup,
   firstReleaseId,
+  isMusicBrainzId,
   isMusicBrainzObject,
   mergeMusicBrainzTags,
   mergeRelease,
@@ -67,12 +69,12 @@ export class MusicBrainzClient {
     this.fetchImpl = options.fetchImpl ?? fetch
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/u, '')
     this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT
-    this.timeoutMs = Math.max(500, Math.trunc(options.timeoutMs ?? 8_000))
+    this.timeoutMs = Math.min(Math.max(500, Math.trunc(options.timeoutMs ?? 8_000)), 60_000)
     this.minIntervalMs = Math.max(250, Math.trunc(options.minIntervalMs ?? 1_100))
-    this.maxPending = Math.max(1, Math.trunc(options.maxPending ?? 32))
-    this.maxResponseBytes = Math.max(
-      16 * 1024,
-      Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024)
+    this.maxPending = Math.min(Math.max(1, Math.trunc(options.maxPending ?? 32)), 64)
+    this.maxResponseBytes = Math.min(
+      Math.max(16 * 1024, Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024)),
+      8 * 1024 * 1024
     )
     this.now = options.now ?? Date.now
     this.onError = options.onError
@@ -89,6 +91,10 @@ export class MusicBrainzClient {
           return {
             ...artist,
             artistMetadata: metadata,
+            answerVariants: mergeAnswerVariantLists(
+              artist.answerVariants,
+              createAnswerVariants(metadata.aliases ?? [], 'musicbrainz')
+            ),
             mbid: artist.mbid ?? metadata.mbid,
             disambiguation: artist.disambiguation ?? metadata.disambiguation,
             tags: mergeMusicBrainzTags(artist.tags, metadata.tags),
@@ -106,8 +112,19 @@ export class MusicBrainzClient {
             this.getRelease(album.answer, album.artistName, album.mbid)
           ])
 
+          const imageUrls = mergeImageUrlLists(
+            album.imageUrl === undefined ? undefined : [album.imageUrl],
+            album.imageUrls,
+            releaseMetadata?.imageUrls
+          )
           return {
             ...album,
+            imageUrl: imageUrls[0],
+            imageUrls: imageUrls.length === 0 ? undefined : imageUrls,
+            answerVariants: mergeAnswerVariantLists(
+              album.answerVariants,
+              releaseMetadata?.answerVariants
+            ),
             ...(artistMetadata === undefined ? {} : { artistMetadata }),
             ...(releaseMetadata === undefined
               ? {}
@@ -128,8 +145,19 @@ export class MusicBrainzClient {
             this.getRecording(track.answer, track.artistName, track.mbid)
           ])
 
+          const imageUrls = mergeImageUrlLists(
+            track.imageUrl === undefined ? undefined : [track.imageUrl],
+            track.imageUrls,
+            recordingMetadata?.imageUrls
+          )
           return {
             ...track,
+            imageUrl: imageUrls[0],
+            imageUrls: imageUrls.length === 0 ? undefined : imageUrls,
+            answerVariants: mergeAnswerVariantLists(
+              track.answerVariants,
+              recordingMetadata?.answerVariants
+            ),
             ...(artistMetadata === undefined ? {} : { artistMetadata }),
             ...(recordingMetadata === undefined
               ? {}
@@ -155,10 +183,15 @@ export class MusicBrainzClient {
     const cacheKey = `musicbrainz:artist:${mbid ?? normalizeMusicBrainzKey(name)}`
     const cached = await this.readCache(cacheKey, JumbleArtistMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
+    const staleValue = cached?.found === true ? cached.value : undefined
 
     let result: JumbleArtistMetadata | undefined
-    if (isMbid(mbid)) {
-      const payload = await this.request(`/artist/${encodeURIComponent(mbid)}`)
+    let unavailable = false
+    if (isMusicBrainzId(mbid)) {
+      const payload = await this.request(`/artist/${encodeURIComponent(mbid)}`, {
+        inc: 'aliases+tags'
+      })
+      unavailable ||= payload === null
       result = parseArtist(payload)
     }
     if (result === undefined) {
@@ -166,12 +199,13 @@ export class MusicBrainzClient {
         query: `artist:"${escapeLucene(name)}"`,
         limit: '5'
       })
+      unavailable ||= payload === null
       result = chooseArtist(payload, name)
     }
 
     if (result === undefined) {
-      await this.writeCache(cacheKey, { found: false }, NEGATIVE_TTL_MS)
-      return undefined
+      if (!unavailable) await this.writeCache(cacheKey, { found: false }, NEGATIVE_TTL_MS)
+      return unavailable ? staleValue : undefined
     }
     await this.writeCache(cacheKey, { found: true, value: result }, ARTIST_TTL_MS)
     return result
@@ -185,36 +219,41 @@ export class MusicBrainzClient {
     const cacheKey = `musicbrainz:release:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
     const cached = await this.readCache(cacheKey, ReleaseMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
+    const staleValue = cached?.found === true ? cached.value : undefined
 
     let result: ReleaseMetadata | undefined
-    if (isMbid(mbid)) {
-      result = parseRelease(
-        await this.request(`/release/${encodeURIComponent(mbid)}`, { inc: 'release-groups+labels' })
-      )
+    let unavailable = false
+    if (isMusicBrainzId(mbid)) {
+      const payload = await this.request(`/release/${encodeURIComponent(mbid)}`, {
+        inc: 'release-groups+labels+aliases'
+      })
+      unavailable ||= payload === null
+      result = parseRelease(payload)
     }
     if (result === undefined) {
       const payload = await this.request('/release-group/', {
         query: `releasegroup:"${escapeLucene(name)}"${artistName === undefined ? '' : ` AND artist:"${escapeLucene(artistName)}"`}`,
         limit: '5'
       })
+      unavailable ||= payload === null
       const group = chooseReleaseGroup(payload, name, artistName)
       if (group !== undefined) {
         result = parseReleaseGroup(group)
         const releaseId = firstReleaseId(group)
         if (releaseId !== undefined) {
-          const release = parseRelease(
-            await this.request(`/release/${encodeURIComponent(releaseId)}`, {
-              inc: 'release-groups+labels'
-            })
-          )
+          const releasePayload = await this.request(`/release/${encodeURIComponent(releaseId)}`, {
+            inc: 'release-groups+labels+aliases'
+          })
+          unavailable ||= releasePayload === null
+          const release = parseRelease(releasePayload)
           result = mergeRelease(result, release)
         }
       }
     }
 
     if (result === undefined) {
-      await this.writeCache(cacheKey, { found: false }, NEGATIVE_TTL_MS)
-      return undefined
+      if (!unavailable) await this.writeCache(cacheKey, { found: false }, NEGATIVE_TTL_MS)
+      return unavailable ? staleValue : undefined
     }
     await this.writeCache(cacheKey, { found: true, value: result }, RELEASE_TTL_MS)
     return result
@@ -228,25 +267,41 @@ export class MusicBrainzClient {
     const cacheKey = `musicbrainz:recording:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
     const cached = await this.readCache(cacheKey, RecordingMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
+    const staleValue = cached?.found === true ? cached.value : undefined
 
     let result: RecordingMetadata | undefined
-    if (isMbid(mbid)) {
-      result = parseRecording(
-        await this.request(`/recording/${encodeURIComponent(mbid)}`, { inc: 'releases' })
-      )
+    let unavailable = false
+    if (isMusicBrainzId(mbid)) {
+      const payload = await this.request(`/recording/${encodeURIComponent(mbid)}`, {
+        inc: 'releases+aliases'
+      })
+      unavailable ||= payload === null
+      result = parseRecording(payload)
     }
     if (result === undefined) {
       const payload = await this.request('/recording/', {
         query: `recording:"${escapeLucene(name)}"${artistName === undefined ? '' : ` AND artist:"${escapeLucene(artistName)}"`}`,
         limit: '10'
       })
+      unavailable ||= payload === null
       const recording = chooseRecording(payload, name, artistName)
-      result = parseRecording(recording)
+      const recordingId =
+        recording === null || typeof recording.id !== 'string' ? undefined : recording.id
+      if (recordingId === undefined) {
+        result = parseRecording(recording)
+      } else {
+        const recordingPayload = await this.request(
+          `/recording/${encodeURIComponent(recordingId)}`,
+          { inc: 'releases+aliases' }
+        )
+        unavailable ||= recordingPayload === null
+        result = parseRecording(recordingPayload) ?? parseRecording(recording)
+      }
     }
 
     if (result === undefined) {
-      await this.writeCache(cacheKey, { found: false }, NEGATIVE_TTL_MS)
-      return undefined
+      if (!unavailable) await this.writeCache(cacheKey, { found: false }, NEGATIVE_TTL_MS)
+      return unavailable ? staleValue : undefined
     }
     await this.writeCache(cacheKey, { found: true, value: result }, RELEASE_TTL_MS)
     return result
@@ -338,13 +393,6 @@ export class MusicBrainzClient {
   private report(error: unknown): void {
     this.onError?.(error)
   }
-}
-
-function isMbid(value: string | undefined): value is string {
-  return (
-    value !== undefined &&
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value)
-  )
 }
 
 function escapeLucene(value: string): string {

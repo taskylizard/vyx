@@ -69,11 +69,13 @@ export {
 export { modules } from './modules.ts'
 export {
   answerMatches,
+  answerMatchesAny,
   levenshteinDistance,
   normalizeAnswer,
   removeEditionSuffix,
   shuffleCharacters
 } from './jumble/answer.ts'
+export { DiscogsClient, type DiscogsClientOptions } from './jumble/discogs.ts'
 export {
   LastFmClient,
   LastFmError,
@@ -106,6 +108,8 @@ export type {
 export {
   JUMBLE_KINDS,
   isJumbleKind,
+  type JumbleAnswerSource,
+  type JumbleAnswerVariant,
   type JumbleArtistMetadata,
   type JumbleCandidate,
   type JumbleHint,

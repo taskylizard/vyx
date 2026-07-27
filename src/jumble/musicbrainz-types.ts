@@ -23,14 +23,27 @@ export const ReleaseMetadataSchema = z.object({
   releaseType: z.string().optional(),
   label: z.string().optional(),
   disambiguation: z.string().optional(),
-  mbid: z.string().optional()
+  mbid: z.string().optional(),
+  releaseGroupMbid: z.string().optional(),
+  answerVariants: z
+    .array(
+      z.object({
+        value: z.string(),
+        source: z.enum(['lastfm', 'musicbrainz', 'discogs', 'transliteration', 'manual']),
+        locale: z.string().optional()
+      })
+    )
+    .max(16)
+    .optional(),
+  imageUrls: z.array(z.string()).max(8).optional()
 })
 
 export type ReleaseMetadata = z.infer<typeof ReleaseMetadataSchema>
 
 export const RecordingMetadataSchema = ReleaseMetadataSchema.extend({
   durationMs: z.number().optional(),
-  albumName: z.string().optional()
+  albumName: z.string().optional(),
+  releaseMbid: z.string().optional()
 })
 
 export type RecordingMetadata = z.infer<typeof RecordingMetadataSchema>

@@ -16,6 +16,7 @@ import { startAxiomObservability } from '../observability/axiom.ts'
 import { componentIds, jumbleComponents } from '../jumble/components.ts'
 import { editJumbleMessage, renderJumble } from '../jumble/discord.ts'
 import { LastFmClient, MissingLastFmProvider } from '../jumble/lastfm.ts'
+import { DiscogsClient } from '../jumble/discogs.ts'
 import { JumbleMetadataCache } from '../jumble/metadata-cache.ts'
 import { MusicBrainzClient } from '../jumble/musicbrainz.ts'
 import { JumbleImageRenderer } from '../jumble/renderer.ts'
@@ -86,10 +87,15 @@ export function createKanikouApp(config: KanikouEnv = loadKanikouEnv()): Kanikou
     cache: jumbleMetadataCache,
     onError: (error) => logger.warn('MusicBrainz enrichment error', error)
   })
+  const discogs = new DiscogsClient({
+    token: config.DISCOGS_TOKEN,
+    cache: jumbleMetadataCache,
+    onError: (error) => logger.warn('Discogs enrichment error', error)
+  })
   const jumbleRenderer = new JumbleImageRenderer()
   const jumbleProvider = match(config.LASTFM_API_KEY)
     .with(undefined, () => new MissingLastFmProvider())
-    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz }))
+    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz, discogs }))
   const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
     onExpired: async (state) => {
       if (state.session.messageId === null) return

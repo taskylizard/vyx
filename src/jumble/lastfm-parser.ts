@@ -1,5 +1,6 @@
-import { match } from 'ts-pattern'
+import { match, P } from 'ts-pattern'
 import { normalizeAnswer } from './answer.ts'
+import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
 import type { LastFmEnvelope, LastFmImage } from './lastfm-types.ts'
 import type { JumbleArtistMetadata, JumbleCandidate, JumbleKind } from './types.ts'
 
@@ -42,8 +43,27 @@ export function mergeLastFmDetails(
       : undefined)
   const duration = parseLastFmNumber(root.duration)
   const stats = isLastFmObject(root.stats) ? root.stats : undefined
+  const nestedAlbumImages = match(candidate)
+    .returnType<string[]>()
+    .with({ kind: 'track' }, () =>
+      isLastFmObject(root.album) ? firstImages(root.album.image) : []
+    )
+    .with({ kind: P.union('artist', 'album') }, () => [])
+    .exhaustive()
+  const imageUrls = mergeImageUrlLists(
+    candidate.imageUrl === undefined ? undefined : [candidate.imageUrl],
+    candidate.imageUrls,
+    firstImages(root.image),
+    nestedAlbumImages
+  )
+  const answerVariants = mergeAnswerVariantLists(
+    candidate.answerVariants,
+    createAnswerVariants(parseAliasValues(root.aliases), 'lastfm')
+  )
   const common = {
-    imageUrl: candidate.imageUrl ?? firstImage(root.image),
+    imageUrl: imageUrls[0],
+    imageUrls: imageUrls.length === 0 ? undefined : imageUrls,
+    answerVariants,
     mbid: candidate.mbid ?? parseLastFmString(root.mbid),
     playcount:
       candidate.playcount ??
@@ -87,16 +107,19 @@ export function mergeLastFmArtistDetails(
   if (!isLastFmObject(root)) return candidate
   const tags = parseTags(root.tags)
   const stats = isLastFmObject(root.stats) ? root.stats : undefined
+  const aliases = parseAliasValues(root.aliases)
   const metadata: JumbleArtistMetadata = {
     mbid: parseLastFmString(root.mbid),
     tags,
     summary: isLastFmObject(root.bio) ? parseLastFmString(root.bio.summary) : undefined,
-    countryCode: undefined
+    countryCode: undefined,
+    ...(aliases.length === 0 ? {} : { aliases })
   }
   const artistMetadata = {
     ...candidate.artistMetadata,
     ...metadata,
     tags: mergeTagValues(candidate.artistMetadata?.tags, tags),
+    aliases: mergeTagValues(candidate.artistMetadata?.aliases, aliases),
     summary: candidate.artistMetadata?.summary ?? metadata.summary
   }
 
@@ -146,6 +169,11 @@ function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
     ? parseLastFmString(value.artist.name)
     : parseLastFmString(value.artist)
   const listedAlbum = isLastFmObject(value.album) ? parseLastFmString(value.album.name) : undefined
+  const directImages = firstImages(value.image)
+  const listedImages = mergeImageUrlLists(
+    directImages,
+    isLastFmObject(value.album) ? firstImages(value.album.image) : undefined
+  )
   const common = {
     answer: answer.trim(),
     playcount: parseLastFmNumber(value.playcount),
@@ -160,14 +188,16 @@ function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
       .with('artist', () => ({
         ...common,
         kind: 'artist',
-        imageUrl: firstImage(value.image)
+        imageUrl: directImages[0],
+        imageUrls: directImages
       }))
       .with('album', () => ({
         ...common,
         kind: 'album',
         albumName: answer.trim(),
         artistName: listedArtist,
-        imageUrl: firstImage(value.image),
+        imageUrl: directImages[0],
+        imageUrls: directImages,
         releaseDate: parseLastFmString(value.releasedate) ?? parseLastFmString(value.date),
         releaseType: parseLastFmString(value.type)
       }))
@@ -177,9 +207,8 @@ function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
         albumName: listedAlbum,
         artistName: listedArtist,
         durationMs: parseLastFmNumber(value.duration),
-        imageUrl:
-          firstImage(value.image) ??
-          (isLastFmObject(value.album) ? firstImage(value.album.image) : undefined),
+        imageUrl: listedImages[0],
+        imageUrls: listedImages,
         releaseDate: parseLastFmString(value.releasedate) ?? parseLastFmString(value.date)
       }))
       .exhaustive()
@@ -205,11 +234,12 @@ function mergeTagValues(
   return unique.length === 0 ? undefined : unique.slice(0, 8)
 }
 
-function firstImage(value: unknown): string | undefined {
-  if (!Array.isArray(value)) return undefined
+function firstImages(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
   const ranked = value
     .filter((entry): entry is LastFmImage => isLastFmObject(entry))
     .sort((first, second) => imageRank(String(second.size)) - imageRank(String(first.size)))
+  const urls: string[] = []
   for (const entry of ranked) {
     const url = parseLastFmString(entry['#text'])
     if (
@@ -217,9 +247,20 @@ function firstImage(value: unknown): string | undefined {
       url.startsWith('http') &&
       !url.includes('2a96cbd8b46e442fc41c2b86b821562f')
     )
-      return url
+      if (!urls.includes(url)) urls.push(url)
+    if (urls.length >= 8) break
   }
-  return undefined
+  return urls
+}
+
+function parseAliasValues(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 16).flatMap((entry) => {
+    if (typeof entry === 'string') return [entry]
+    if (!isLastFmObject(entry)) return []
+    const name = parseLastFmString(entry.name)
+    return name === undefined ? [] : [name]
+  })
 }
 
 function imageRank(size: string): number {

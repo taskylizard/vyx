@@ -1,5 +1,11 @@
 import { expect, test } from 'vite-plus/test'
-import { chooseArtist, parseRecording } from '../../src/jumble/musicbrainz-parser.ts'
+import {
+  chooseArtist,
+  chooseRecording,
+  chooseReleaseGroup,
+  parseRecording
+} from '../../src/jumble/musicbrainz-parser.ts'
+import { MusicBrainzClient } from '../../src/jumble/musicbrainz.ts'
 
 test('chooses an exact MusicBrainz artist match before score order', () => {
   expect(
@@ -21,6 +27,69 @@ test('chooses an exact MusicBrainz artist match before score order', () => {
     startDate: undefined,
     endDate: undefined
   })
+})
+
+test('does not use fuzzy MusicBrainz artist results as accepted aliases', () => {
+  expect(
+    chooseArtist(
+      {
+        artists: [{ id: 'tribute', name: 'Björk tribute', score: 100 }]
+      },
+      'Björk'
+    )
+  ).toBeUndefined()
+})
+
+test('matches exact MusicBrainz aliases for romanized artist and release names', () => {
+  expect(
+    chooseArtist(
+      {
+        artists: [
+          {
+            aliases: [{ locale: 'en', name: 'Hikaru Utada' }],
+            id: 'artist',
+            name: '宇多田ヒカル',
+            score: 100
+          }
+        ]
+      },
+      'Hikaru Utada'
+    )
+  ).toMatchObject({ aliases: ['Hikaru Utada'], mbid: 'artist' })
+
+  expect(
+    chooseReleaseGroup(
+      {
+        'release-groups': [
+          {
+            aliases: [{ name: 'First Love' }],
+            'artist-credit': [{ artist: { aliases: [{ name: 'Hikaru Utada' }] } }],
+            id: 'release-group',
+            title: 'First Love (ファースト・ラブ)'
+          }
+        ]
+      },
+      'First Love',
+      'Hikaru Utada'
+    )
+  ).toMatchObject({ id: 'release-group' })
+
+  expect(
+    chooseRecording(
+      {
+        recordings: [
+          {
+            aliases: [{ name: 'Automatic' }],
+            'artist-credit': [{ artist: { aliases: [{ name: 'Hikaru Utada' }] } }],
+            id: 'recording',
+            title: 'Automatic (オートマティック)'
+          }
+        ]
+      },
+      'Automatic',
+      'Hikaru Utada'
+    )
+  ).toMatchObject({ id: 'recording' })
 })
 
 test('parses recording metadata from its preferred dated release', () => {
@@ -50,6 +119,119 @@ test('parses recording metadata from its preferred dated release', () => {
     disambiguation: 'studio recording',
     durationMs: 240_000,
     mbid: 'recording',
+    releaseMbid: 'official-release',
     releaseDate: '1997-09-20'
   })
 })
+
+test('parses MusicBrainz artist aliases', () => {
+  expect(
+    chooseArtist(
+      {
+        artists: [
+          {
+            id: 'artist',
+            name: '宇多田ヒカル',
+            aliases: [{ name: 'Hikaru Utada' }, { name: 'Utada Hikaru' }]
+          }
+        ]
+      },
+      '宇多田ヒカル'
+    )
+  ).toMatchObject({ aliases: ['Hikaru Utada', 'Utada Hikaru'] })
+})
+
+test('adds a Cover Art Archive fallback for a resolved release', async () => {
+  const releaseId = '12345678-1234-4234-8234-123456789abc'
+  const client = new MusicBrainzClient({
+    fetchImpl: async (input) => {
+      const url =
+        input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
+      if (url.pathname.endsWith('/release-group/')) {
+        return jsonResponse({
+          'release-groups': [
+            {
+              id: '87654321-4321-4321-8321-cba987654321',
+              title: 'Homogenic',
+              score: 100,
+              releases: [{ id: releaseId }],
+              'artist-credit': [{ name: 'Björk' }]
+            }
+          ]
+        })
+      }
+      return jsonResponse({
+        id: releaseId,
+        title: 'Homogenic',
+        date: '1997-09-22',
+        'release-group': { title: 'Homogenic', 'primary-type': 'Album' }
+      })
+    },
+    minIntervalMs: 0
+  })
+
+  await expect(
+    client.enrich({ kind: 'album', answer: 'Homogenic', artistName: 'Björk' })
+  ).resolves.toMatchObject({
+    imageUrl: `https://coverartarchive.org/release/${releaseId}/front-500`,
+    imageUrls: [
+      `https://coverartarchive.org/release/${releaseId}/front-500`,
+      'https://coverartarchive.org/release-group/87654321-4321-4321-8321-cba987654321/front-500'
+    ]
+  })
+})
+
+test('uses a release-group Cover Art Archive fallback when no release is resolved', async () => {
+  const releaseGroupId = '87654321-4321-4321-8321-cba987654321'
+  const client = new MusicBrainzClient({
+    fetchImpl: async () =>
+      jsonResponse({
+        'release-groups': [
+          {
+            id: releaseGroupId,
+            title: 'Homogenic',
+            score: 100,
+            'artist-credit': [{ name: 'Björk' }]
+          }
+        ]
+      }),
+    minIntervalMs: 0
+  })
+
+  await expect(
+    client.enrich({ kind: 'album', answer: 'Homogenic', artistName: 'Björk' })
+  ).resolves.toMatchObject({
+    imageUrl: `https://coverartarchive.org/release-group/${releaseGroupId}/front-500`,
+    imageUrls: [`https://coverartarchive.org/release-group/${releaseGroupId}/front-500`]
+  })
+})
+
+test('does not negative-cache an unavailable MusicBrainz lookup', async () => {
+  const writes: unknown[] = []
+  const client = new MusicBrainzClient({
+    cache: {
+      async get() {
+        return null
+      },
+      async set(cacheKey, value, ttlMs) {
+        writes.push({ cacheKey, ttlMs, value })
+        return true
+      }
+    },
+    fetchImpl: async () => new Response('unavailable', { status: 503 }),
+    minIntervalMs: 0
+  })
+
+  await expect(client.enrich({ kind: 'artist', answer: 'Björk' })).resolves.toEqual({
+    kind: 'artist',
+    answer: 'Björk'
+  })
+  expect(writes).toEqual([])
+})
+
+function jsonResponse(value: unknown): Response {
+  return new Response(JSON.stringify(value), {
+    status: 200,
+    headers: { 'content-type': 'application/json' }
+  })
+}

@@ -3,6 +3,15 @@ export type JumbleKind = (typeof JUMBLE_KINDS)[number]
 
 export type JumbleOutcome = 'won' | 'gave_up' | 'expired'
 
+/** Provenance for an answer accepted in addition to the displayed title. */
+export type JumbleAnswerSource = 'lastfm' | 'musicbrainz' | 'discogs' | 'transliteration' | 'manual'
+
+export interface JumbleAnswerVariant {
+  value: string
+  source: JumbleAnswerSource
+  locale?: string
+}
+
 export interface JumbleHint {
   kind: string
   content: string
@@ -17,11 +26,14 @@ export interface JumbleArtistMetadata {
   disambiguation?: string
   tags?: readonly string[]
   summary?: string
+  aliases?: readonly string[]
 }
 
-interface JumbleCandidateBase {
+export interface JumbleCandidateBase {
   answer: string
   imageUrl?: string
+  imageUrls?: readonly string[]
+  answerVariants?: readonly JumbleAnswerVariant[]
   playcount?: number
   listeners?: number
   mbid?: string
@@ -46,7 +58,7 @@ export interface JumbleArtistCandidate extends JumbleCandidateBase {
   endDate?: string
 }
 
-interface JumbleReleaseCandidateBase extends JumbleCandidateBase {
+export interface JumbleReleaseCandidateBase extends JumbleCandidateBase {
   artistName?: string
   albumName?: string
   releaseDate?: string
@@ -72,6 +84,7 @@ export type JumbleCandidate = JumbleArtistCandidate | JumbleAlbumCandidate | Jum
 export interface JumbleSessionMetadata {
   candidate: JumbleCandidate
   shuffledAnswer?: string
+  answerVariants?: readonly JumbleAnswerVariant[]
   hints: readonly JumbleHint[]
 }
 

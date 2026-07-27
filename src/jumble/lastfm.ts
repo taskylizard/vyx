@@ -1,5 +1,6 @@
 import { match, P } from 'ts-pattern'
 import { normalizeAnswer } from './answer.ts'
+import { getCandidateImageUrls, mergeJumbleCandidates } from './candidate.ts'
 import {
   type JumbleMusicProvider,
   type LastFmClientOptions,
@@ -14,7 +15,15 @@ import {
   parseLastFmTopItems
 } from './lastfm-parser.ts'
 import { readBoundedJson } from './response.ts'
-import type { JumbleArtistMetadata, JumbleCandidate, JumbleHint, JumbleKind } from './types.ts'
+import type {
+  JumbleAlbumCandidate,
+  JumbleArtistCandidate,
+  JumbleArtistMetadata,
+  JumbleCandidate,
+  JumbleHint,
+  JumbleKind,
+  JumbleTrackCandidate
+} from './types.ts'
 
 export type { JumbleMusicProvider, LastFmClientOptions } from './lastfm-types.ts'
 
@@ -107,72 +116,12 @@ export class LastFmClient implements JumbleMusicProvider {
   }
 
   async getHints(candidate: JumbleCandidate): Promise<readonly JumbleHint[]> {
-    const hints: JumbleHint[] = []
-    if (candidate.kind === 'artist') {
-      if (candidate.playcount !== undefined) {
-        addHint(
-          hints,
-          'playcount',
-          `You have scrobbled this artist ${formatNumber(candidate.playcount)} times.`
-        )
-      }
-      if (candidate.listeners !== undefined) {
-        addHint(
-          hints,
-          'listeners',
-          `Last.fm lists **${formatNumber(candidate.listeners)}** listeners for this artist.`
-        )
-      }
-      addTagHint(hints, candidate.tags, 'artist')
-      addTriviaHint(hints, candidate.summary, candidate.answer)
-      addArtistMetadataHints(hints, candidate, candidate.answer, 'artist')
-      return hints
-    }
-
-    addHint(
-      hints,
-      'type',
-      candidate.kind === 'album'
-        ? `This is ${articleFor(candidate.releaseType ?? 'album')} **${escapeHintValue(candidate.releaseType ?? 'album')}**.`
-        : 'This is a track.'
-    )
-    if (candidate.playcount !== undefined) {
-      addHint(
-        hints,
-        'playcount',
-        `You have scrobbled this ${candidate.kind} ${formatNumber(candidate.playcount)} times.`
-      )
-    }
-    if (candidate.listeners !== undefined) {
-      addHint(
-        hints,
-        'listeners',
-        `Last.fm lists **${formatNumber(candidate.listeners)}** listeners for this ${candidate.kind}.`
-      )
-    }
-    if (candidate.releaseDate !== undefined) {
-      addHint(hints, 'release-date', `Release date: **${escapeHintValue(candidate.releaseDate)}**.`)
-    }
-    if (candidate.releaseType !== undefined && candidate.kind === 'album') {
-      addHint(
-        hints,
-        'release-type',
-        `The release type is **${escapeHintValue(candidate.releaseType)}**.`
-      )
-    }
-    if (candidate.label !== undefined) {
-      addHint(hints, 'label', `The label is **${escapeHintValue(candidate.label)}**.`)
-    }
-    addTagHint(hints, candidate.tags, 'release')
-    addTriviaHint(hints, candidate.summary, candidate.answer, candidate.artistName)
-    if (candidate.kind === 'track' && candidate.albumName !== undefined) {
-      addHint(hints, 'album', `This track appears on **${escapeHintValue(candidate.albumName)}**.`)
-    }
-    if (candidate.durationMs !== undefined) {
-      addHint(hints, 'duration', `Its duration is **${formatDuration(candidate.durationMs)}**.`)
-    }
-    addArtistMetadataHints(hints, candidate.artistMetadata, candidate.artistName, 'artist')
-    return hints
+    return match(candidate)
+      .returnType<readonly JumbleHint[]>()
+      .with({ kind: 'artist' }, buildArtistHints)
+      .with({ kind: 'album' }, buildReleaseHints)
+      .with({ kind: 'track' }, buildReleaseHints)
+      .exhaustive()
   }
 
   async validateUsername(username: string): Promise<string> {
@@ -203,10 +152,14 @@ export class LastFmClient implements JumbleMusicProvider {
         }))
         .exhaustive()
       const detailPromise = this.request(detail.method, detail.params)
-      const artistPromise =
-        candidate.kind === 'artist' || candidate.artistName === undefined
-          ? Promise.resolve(undefined)
-          : this.request('artist.getinfo', { artist: candidate.artistName })
+      const artistPromise = match(candidate)
+        .returnType<Promise<LastFmEnvelope | undefined>>()
+        .with({ kind: 'artist' }, () => Promise.resolve(undefined))
+        .with({ kind: P.union('album', 'track'), artistName: P.string }, ({ artistName }) =>
+          this.request('artist.getinfo', { artist: artistName })
+        )
+        .with({ kind: P.union('album', 'track') }, () => Promise.resolve(undefined))
+        .exhaustive()
       const [detailResult, artistResult] = await Promise.allSettled([detailPromise, artistPromise])
       hydrated = match(detailResult)
         .with({ status: 'fulfilled' }, ({ value }) => mergeLastFmDetails(candidate, value))
@@ -219,13 +172,26 @@ export class LastFmClient implements JumbleMusicProvider {
     } catch {
       // tasky: top-list data is enough to play; detail calls only improve hints.
     }
-    if (this.options.musicBrainz !== undefined) {
-      try {
-        hydrated = await this.options.musicBrainz.enrich(hydrated)
-      } catch {
-        // tasky: MusicBrainz is bonus metadata, never a reason to fail the game.
-      }
-    }
+    const needsDiscogs =
+      this.options.discogs !== undefined &&
+      (getCandidateImageUrls(hydrated).length === 0 ||
+        normalizeAnswer(hydrated.answer).length === 0 ||
+        hasNonLatinLetters(hydrated.answer))
+    const [musicBrainzResult, discogsResult] = await Promise.allSettled([
+      this.options.musicBrainz === undefined
+        ? Promise.resolve(undefined)
+        : this.options.musicBrainz.enrich(hydrated),
+      needsDiscogs && this.options.discogs !== undefined
+        ? this.options.discogs.enrich(hydrated)
+        : Promise.resolve(undefined)
+    ])
+    const musicBrainzCandidate = match(musicBrainzResult)
+      .with({ status: 'fulfilled' }, ({ value }) => value)
+      .otherwise(() => undefined)
+    const discogsCandidate = match(discogsResult)
+      .with({ status: 'fulfilled' }, ({ value }) => value)
+      .otherwise(() => undefined)
+    hydrated = mergeJumbleCandidates(hydrated, musicBrainzCandidate, discogsCandidate)
     return hydrated
   }
 
@@ -317,6 +283,87 @@ export class LastFmClient implements JumbleMusicProvider {
       clearTimeout(timer)
     }
   }
+}
+
+function buildArtistHints(candidate: JumbleArtistCandidate): JumbleHint[] {
+  const hints: JumbleHint[] = []
+  if (candidate.playcount !== undefined) {
+    addHint(
+      hints,
+      'playcount',
+      `You have scrobbled this artist ${formatNumber(candidate.playcount)} times.`
+    )
+  }
+  if (candidate.listeners !== undefined) {
+    addHint(
+      hints,
+      'listeners',
+      `Last.fm lists **${formatNumber(candidate.listeners)}** listeners for this artist.`
+    )
+  }
+  addTagHint(hints, candidate.tags, 'artist')
+  addTriviaHint(hints, candidate.summary, candidate.answer)
+  addArtistMetadataHints(hints, candidate, candidate.answer, 'artist')
+  return hints
+}
+
+function buildReleaseHints(candidate: JumbleAlbumCandidate | JumbleTrackCandidate): JumbleHint[] {
+  const hints: JumbleHint[] = []
+  addHint(
+    hints,
+    'type',
+    match(candidate)
+      .with(
+        { kind: 'album' },
+        (album) =>
+          `This is ${articleFor(album.releaseType ?? 'album')} **${escapeHintValue(album.releaseType ?? 'album')}**.`
+      )
+      .with({ kind: 'track' }, () => 'This is a track.')
+      .exhaustive()
+  )
+  if (candidate.playcount !== undefined) {
+    addHint(
+      hints,
+      'playcount',
+      `You have scrobbled this ${candidate.kind} ${formatNumber(candidate.playcount)} times.`
+    )
+  }
+  if (candidate.listeners !== undefined) {
+    addHint(
+      hints,
+      'listeners',
+      `Last.fm lists **${formatNumber(candidate.listeners)}** listeners for this ${candidate.kind}.`
+    )
+  }
+  if (candidate.releaseDate !== undefined) {
+    addHint(hints, 'release-date', `Release date: **${escapeHintValue(candidate.releaseDate)}**.`)
+  }
+  match(candidate)
+    .with({ kind: 'album' }, (album) => {
+      if (album.releaseType !== undefined) {
+        addHint(
+          hints,
+          'release-type',
+          `The release type is **${escapeHintValue(album.releaseType)}**.`
+        )
+      }
+    })
+    .with({ kind: 'track' }, (track) => {
+      if (track.albumName !== undefined) {
+        addHint(hints, 'album', `This track appears on **${escapeHintValue(track.albumName)}**.`)
+      }
+    })
+    .exhaustive()
+  if (candidate.label !== undefined) {
+    addHint(hints, 'label', `The label is **${escapeHintValue(candidate.label)}**.`)
+  }
+  addTagHint(hints, candidate.tags, 'release')
+  addTriviaHint(hints, candidate.summary, candidate.answer, candidate.artistName)
+  if (candidate.durationMs !== undefined) {
+    addHint(hints, 'duration', `Its duration is **${formatDuration(candidate.durationMs)}**.`)
+  }
+  addArtistMetadataHints(hints, candidate.artistMetadata, candidate.artistName, 'artist')
+  return hints
 }
 
 function addHint(hints: JumbleHint[], kind: string, content: string | undefined): void {
@@ -457,4 +504,10 @@ function countryFlag(value: string): string | undefined {
   const code = value.trim().toUpperCase()
   if (!/^[A-Z]{2}$/u.test(code)) return undefined
   return String.fromCodePoint(...Array.from(code, (letter) => 0x1f1e6 + letter.charCodeAt(0) - 65))
+}
+
+function hasNonLatinLetters(value: string): boolean {
+  return Array.from(value).some(
+    (character) => /\p{Letter}/u.test(character) && !/\p{Script=Latin}/u.test(character)
+  )
 }

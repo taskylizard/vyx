@@ -47,6 +47,10 @@ export function loadKanikouEnv() {
       type: 'string',
       optional: true
     },
+    DISCOGS_TOKEN: {
+      type: 'string',
+      optional: true
+    },
     KANIKOU_DATABASE_URL: {
       type: 'string',
       default: 'file:./data/kanikou.db'

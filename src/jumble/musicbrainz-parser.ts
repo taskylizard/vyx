@@ -1,3 +1,4 @@
+import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
 import type { JumbleArtistMetadata } from './types.ts'
 import type {
   MusicBrainzEnvelope,
@@ -8,6 +9,7 @@ import type {
 export function parseArtist(payload: MusicBrainzEnvelope | null): JumbleArtistMetadata | undefined {
   if (payload === null || typeof payload.id !== 'string') return undefined
   const lifeSpan = isMusicBrainzObject(payload['life-span']) ? payload['life-span'] : undefined
+  const aliases = parseAliasEntries(payload.aliases)
   return {
     mbid: stringValue(payload.id),
     type: stringValue(payload.type),
@@ -15,7 +17,8 @@ export function parseArtist(payload: MusicBrainzEnvelope | null): JumbleArtistMe
     startDate: lifeSpan === undefined ? undefined : stringValue(lifeSpan.begin),
     endDate: lifeSpan === undefined ? undefined : stringValue(lifeSpan.end),
     disambiguation: stringValue(payload.disambiguation),
-    tags: parseNames(payload.tags)
+    tags: parseNames(payload.tags),
+    ...(aliases.length === 0 ? {} : { aliases })
   }
 }
 
@@ -28,10 +31,11 @@ export function chooseArtist(
     .filter(isMusicBrainzObject)
     .filter(
       (artist) =>
-        stringValue(artist.name)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0
+        stringValue(artist.name)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0 ||
+        aliasMatches(artist.aliases, name)
     )
     .sort((first, second) => numberValue(second.score) - numberValue(first.score))[0]
-  return parseArtist(exact ?? artists.find(isMusicBrainzObject) ?? null)
+  return parseArtist(exact ?? null)
 }
 
 export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetadata | undefined {
@@ -42,8 +46,15 @@ export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetada
     labelInfo !== undefined && isMusicBrainzObject(labelInfo.label)
       ? stringValue(labelInfo.label.name)
       : undefined
+  const title = stringValue(payload.title)
+  const aliases = [
+    ...parseAliasEntries(payload.aliases),
+    ...(group === undefined ? [] : parseAliasEntries(group.aliases))
+  ]
+  const mbid = stringValue(payload.id)
   return {
-    mbid: stringValue(payload.id),
+    mbid,
+    releaseGroupMbid: group === undefined ? undefined : stringValue(group.id),
     releaseDate:
       stringValue(payload.date) ??
       (group === undefined ? undefined : stringValue(group['first-release-date'])),
@@ -51,17 +62,30 @@ export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetada
     label,
     disambiguation:
       stringValue(payload.disambiguation) ??
-      (group === undefined ? undefined : stringValue(group.disambiguation))
+      (group === undefined ? undefined : stringValue(group.disambiguation)),
+    answerVariants: mergeAnswerVariantLists(
+      title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
+      createAnswerVariants(aliases, 'musicbrainz')
+    ),
+    imageUrls: coverArtUrls('release', mbid)
   }
 }
 
 export function parseReleaseGroup(group: MusicBrainzEnvelope): ReleaseMetadata | undefined {
   if (typeof group.id !== 'string') return undefined
+  const releaseGroupMbid = stringValue(group.id)
+  const title = stringValue(group.title)
+  const aliases = parseAliasEntries(group.aliases)
   return {
-    mbid: stringValue(group.id),
+    releaseGroupMbid,
     releaseDate: stringValue(group['first-release-date']),
     releaseType: releaseType(group),
-    disambiguation: stringValue(group.disambiguation)
+    disambiguation: stringValue(group.disambiguation),
+    answerVariants: mergeAnswerVariantLists(
+      title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
+      createAnswerVariants(aliases, 'musicbrainz')
+    ),
+    imageUrls: coverArtUrls('release-group', releaseGroupMbid)
   }
 }
 
@@ -74,6 +98,13 @@ export function parseRecording(payload: MusicBrainzEnvelope | null): RecordingMe
       ? firstRelease['release-group']
       : undefined
   const release = firstRelease === undefined ? undefined : parseRelease(firstRelease)
+  const title = stringValue(payload.title)
+  const aliases = parseAliasEntries(payload.aliases)
+  const releaseTitle =
+    firstRelease === undefined
+      ? undefined
+      : (stringValue(firstRelease.title) ??
+        (group === undefined ? undefined : stringValue(group.title)))
   return {
     mbid: stringValue(payload.id),
     releaseDate: stringValue(payload['first-release-date']) ?? release?.releaseDate,
@@ -81,11 +112,16 @@ export function parseRecording(payload: MusicBrainzEnvelope | null): RecordingMe
     label: release?.label,
     disambiguation: stringValue(payload.disambiguation),
     durationMs: numberValue(payload.length),
-    albumName:
-      firstRelease === undefined
-        ? undefined
-        : (stringValue(firstRelease.title) ??
-          (group === undefined ? undefined : stringValue(group.title)))
+    albumName: releaseTitle,
+    releaseMbid:
+      release?.mbid ?? (firstRelease === undefined ? undefined : stringValue(firstRelease.id)),
+    releaseGroupMbid:
+      release?.releaseGroupMbid ?? (group === undefined ? undefined : stringValue(group.id)),
+    answerVariants: mergeAnswerVariantLists(
+      title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
+      createAnswerVariants(aliases, 'musicbrainz')
+    ),
+    imageUrls: release?.imageUrls
   }
 }
 
@@ -98,7 +134,8 @@ export function chooseReleaseGroup(
   return groups
     .filter(
       (group) =>
-        stringValue(group.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0
+        stringValue(group.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0 ||
+        aliasMatches(group.aliases, name)
     )
     .filter(
       (group) => artistName === undefined || artistCreditMatches(group['artist-credit'], artistName)
@@ -117,7 +154,7 @@ export function chooseRecording(
       .filter(
         (recording) =>
           stringValue(recording.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) ===
-          0
+            0 || aliasMatches(recording.aliases, name)
       )
       .filter(
         (recording) =>
@@ -147,11 +184,14 @@ export function mergeRelease(
   if (first === undefined) return second
   if (second === undefined) return first
   return {
-    mbid: first.mbid ?? second.mbid,
+    mbid: second.mbid ?? first.mbid,
+    releaseGroupMbid: first.releaseGroupMbid ?? second.releaseGroupMbid,
     releaseDate: first.releaseDate ?? second.releaseDate,
     releaseType: first.releaseType ?? second.releaseType,
     label: first.label ?? second.label,
-    disambiguation: first.disambiguation ?? second.disambiguation
+    disambiguation: first.disambiguation ?? second.disambiguation,
+    answerVariants: mergeAnswerVariantLists(first.answerVariants, second.answerVariants),
+    imageUrls: mergeImageUrlLists(second.imageUrls, first.imageUrls)
   }
 }
 
@@ -179,6 +219,13 @@ export function normalizeMusicBrainzKey(value: string): string {
     .replace(/\s+/gu, ' ')
 }
 
+export function isMusicBrainzId(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value)
+  )
+}
+
 function chooseEarliestRelease(
   releases: readonly MusicBrainzEnvelope[]
 ): MusicBrainzEnvelope | undefined {
@@ -203,12 +250,21 @@ function releaseType(group: MusicBrainzEnvelope): string | undefined {
 function artistCreditMatches(value: unknown, artistName: string): boolean {
   return arrayValue(value).some((credit) => {
     if (!isMusicBrainzObject(credit)) return false
-    const artist = isMusicBrainzObject(credit.artist) ? stringValue(credit.artist.name) : undefined
+    const artistEntry = isMusicBrainzObject(credit.artist) ? credit.artist : undefined
+    const artist = artistEntry === undefined ? undefined : stringValue(artistEntry.name)
     return (
       stringValue(credit.name)?.localeCompare(artistName, undefined, { sensitivity: 'base' }) ===
-        0 || artist?.localeCompare(artistName, undefined, { sensitivity: 'base' }) === 0
+        0 ||
+      artist?.localeCompare(artistName, undefined, { sensitivity: 'base' }) === 0 ||
+      aliasMatches(artistEntry?.aliases, artistName)
     )
   })
+}
+
+function aliasMatches(value: unknown, expected: string): boolean {
+  return parseAliasEntries(value, 32).some(
+    (alias) => alias.localeCompare(expected, undefined, { sensitivity: 'base' }) === 0
+  )
 }
 
 function parseNames(value: unknown): string[] | undefined {
@@ -217,6 +273,14 @@ function parseNames(value: unknown): string[] | undefined {
     .map((entry) => stringValue(entry.name))
     .filter((name): name is string => name !== undefined)
   return names.length === 0 ? undefined : names.slice(0, 8)
+}
+
+function parseAliasEntries(value: unknown, limit = 8): string[] {
+  return arrayValue(value)
+    .slice(0, Math.max(0, Math.trunc(limit)))
+    .filter(isMusicBrainzObject)
+    .map((entry) => stringValue(entry.name))
+    .filter((name): name is string => name !== undefined)
 }
 
 function arrayValue(value: unknown): unknown[] {
@@ -234,4 +298,12 @@ function numberValue(value: unknown): number {
     if (Number.isFinite(parsed)) return parsed
   }
   return 0
+}
+
+function coverArtUrls(
+  entity: 'release' | 'release-group',
+  mbid: string | undefined
+): string[] | undefined {
+  if (!isMusicBrainzId(mbid)) return undefined
+  return [`https://coverartarchive.org/${entity}/${encodeURIComponent(mbid)}/front-500`]
 }

@@ -20,6 +20,7 @@ export interface JumbleImageRendererOptions {
   cacheEntries?: number
   cacheBytes?: number
   maxConcurrentRenders?: number
+  maxPendingRenders?: number
 }
 
 interface CachedImage {
@@ -59,7 +60,8 @@ export class JumbleImageRenderer {
       MAX_CACHE_BYTES
     )
     this.renderGate = new AsyncGate(
-      Math.min(Math.max(Math.trunc(options.maxConcurrentRenders ?? 2), 1), 8)
+      Math.min(Math.max(Math.trunc(options.maxConcurrentRenders ?? 2), 1), 8),
+      Math.min(Math.max(Math.trunc(options.maxPendingRenders ?? 16), 0), 64)
     )
   }
 
@@ -69,14 +71,25 @@ export class JumbleImageRenderer {
     return this.renderImage(url, level)
   }
 
+  async renderWithFallback(urls: readonly string[], stage = 0): Promise<Buffer> {
+    const level =
+      PIXELATION_LEVELS[Math.min(Math.max(Math.trunc(stage), 0), PIXELATION_LEVELS.length - 1)]!
+    return this.renderFirstAvailable(urls, level)
+  }
+
   async reveal(url: string): Promise<Buffer> {
     return this.renderImage(url)
   }
 
+  async revealWithFallback(urls: readonly string[]): Promise<Buffer> {
+    return this.renderFirstAvailable(urls)
+  }
+
   private async renderImage(url: string, pixelationLevel?: number): Promise<Buffer> {
-    const source = await this.getSource(url)
     const release = await this.renderGate.acquire()
+    if (release === null) throw new JumbleImageError('The cover art renderer is busy.')
     try {
+      const source = await this.getSource(url)
       const image = await loadImage(source)
       if (
         !Number.isFinite(image.width) ||
@@ -112,6 +125,30 @@ export class JumbleImageRenderer {
   clear(): void {
     this.cache.clear()
     this.cacheSize = 0
+  }
+
+  private async renderFirstAvailable(
+    urls: readonly string[],
+    pixelationLevel?: number
+  ): Promise<Buffer> {
+    const candidates = [
+      ...new Set(urls.map((url) => url.trim()).filter((url) => url.length > 0))
+    ].slice(0, 8)
+    if (candidates.length === 0) {
+      throw new JumbleImageError('The music service did not return usable cover art.')
+    }
+    let lastError: JumbleImageError | undefined
+    for (const url of candidates) {
+      try {
+        return await this.renderImage(url, pixelationLevel)
+      } catch (error) {
+        lastError =
+          error instanceof JumbleImageError
+            ? error
+            : new JumbleImageError('Cover art could not be rendered.')
+      }
+    }
+    throw lastError ?? new JumbleImageError('Cover art could not be rendered.')
   }
 
   private async getSource(url: string): Promise<Buffer> {
@@ -200,10 +237,14 @@ class AsyncGate {
   private active = 0
   private readonly waiters: Array<() => void> = []
 
-  constructor(private readonly limit: number) {}
+  constructor(
+    private readonly limit: number,
+    private readonly maxPending: number
+  ) {}
 
-  async acquire(): Promise<() => void> {
+  async acquire(): Promise<(() => void) | null> {
     if (this.active >= this.limit) {
+      if (this.waiters.length >= this.maxPending) return null
       await new Promise<void>((resolve) => this.waiters.push(resolve))
     }
     this.active += 1

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   JUMBLE_KINDS,
   type JumbleArtistMetadata,
+  type JumbleAnswerVariant,
   type JumbleCandidate,
   type JumbleSessionMetadata
 } from './types.ts'
@@ -15,13 +16,22 @@ export const JumbleArtistMetadataSchema: z.ZodType<JumbleArtistMetadata> = z
     endDate: z.string().optional(),
     disambiguation: z.string().optional(),
     tags: z.array(z.string()).optional(),
-    summary: z.string().optional()
+    summary: z.string().optional(),
+    aliases: z.array(z.string()).max(8).optional()
   })
   .passthrough()
+
+const JumbleAnswerVariantSchema: z.ZodType<JumbleAnswerVariant> = z.object({
+  value: z.string(),
+  source: z.enum(['lastfm', 'musicbrainz', 'discogs', 'transliteration', 'manual']),
+  locale: z.string().optional()
+})
 
 const JumbleCandidateBaseSchema = z.object({
   answer: z.string(),
   imageUrl: z.string().optional(),
+  imageUrls: z.array(z.string()).max(8).optional(),
+  answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
   playcount: z.number().optional(),
   listeners: z.number().optional(),
   mbid: z.string().optional(),
@@ -61,6 +71,7 @@ export const JumbleSessionMetadataSchema: z.ZodType<JumbleSessionMetadata> = z
   .object({
     candidate: JumbleCandidateSchema,
     shuffledAnswer: z.string().optional(),
+    answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
     hints: z.array(
       z.object({
         kind: z.string(),

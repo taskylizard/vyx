@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto'
+import type { JumbleAnswerVariant } from './types.ts'
 
 /** Remove the edition suffixes commonly appended to album names by services. */
 export function removeEditionSuffix(value: string): string {
@@ -59,13 +60,37 @@ export function levenshteinDistance(first: string, second: string): number {
 }
 
 export function answerMatches(correctAnswer: string, guess: string): boolean {
-  const expected = normalizeAnswer(correctAnswer)
-  const actual = normalizeAnswer(guess)
-  if (expected.length === 0 || actual.length === 0) return false
-  if (actual === expected || actual.includes(expected)) return true
+  return answerMatchesAny([correctAnswer], guess)
+}
 
-  const distance = levenshteinDistance(actual, expected)
-  return (actual.length > 4 && distance <= 1) || (actual.length > 10 && distance <= 2)
+/** Match a guess against a canonical title and bounded provider-supplied aliases. */
+export function answerMatchesAny(
+  correctAnswers: readonly (string | JumbleAnswerVariant)[],
+  guess: string
+): boolean {
+  const actualRaw = guess.trim()
+  if (actualRaw.length === 0) return false
+  const actual = normalizeAnswer(actualRaw)
+
+  for (const answer of correctAnswers.slice(0, 16)) {
+    const expectedValue = typeof answer === 'string' ? answer : answer.value
+    const expectedRaw = expectedValue.trim()
+    if (expectedRaw.length === 0) continue
+
+    const exactRawMatch =
+      expectedRaw.localeCompare(actualRaw, undefined, { sensitivity: 'base' }) === 0
+    if (exactRawMatch) return true
+
+    const expected = normalizeAnswer(expectedRaw)
+    if (expected.length === 0 || actual.length === 0) continue
+    if (actual === expected || actual.includes(expected)) return true
+
+    const maxDistance = actual.length > 10 ? 2 : actual.length > 4 ? 1 : 0
+    if (maxDistance === 0 || Math.abs(actual.length - expected.length) > maxDistance) continue
+    const distance = levenshteinDistance(actual, expected)
+    if (distance <= maxDistance) return true
+  }
+  return false
 }
 
 export type RandomIndex = (maxExclusive: number) => number

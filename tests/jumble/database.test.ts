@@ -182,6 +182,90 @@ test('reveals hints, advances pixel stages, and allows reshuffles without daily 
   expect(second.action).toBe('started')
 })
 
+test('hydrates candidates before artwork checks and persists accepted aliases', async () => {
+  service.stop()
+  let hydrations = 0
+  service = new JumbleService(
+    repository,
+    {
+      async getCandidates() {
+        return [
+          {
+            kind: 'track',
+            answer: '))))',
+            albumName: '(((((ultraSOUND)))))',
+            artistName: 'The Neighbourhood'
+          }
+        ] satisfies readonly JumbleCandidate[]
+      },
+      async hydrate(candidate) {
+        hydrations += 1
+        return {
+          ...candidate,
+          imageUrl: 'https://example.test/ultrasound.png',
+          answerVariants: [{ value: 'ultrasound', source: 'discogs' }]
+        }
+      },
+      async getHints() {
+        return []
+      }
+    },
+    { now: () => now, randomIndex: () => 0 }
+  )
+
+  const started = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'track',
+    username: 'tasky'
+  })
+
+  expect(hydrations).toBe(1)
+  expect(started.state.session.metadata.answerVariants).toEqual([
+    { value: 'ultrasound', source: 'discogs' }
+  ])
+  await expect(
+    service.submitGuess(started.state.session.id, 'user-2', 'UltraSound')
+  ).resolves.toMatchObject({ action: 'won' })
+})
+
+test('bounds failed candidate hydration attempts', async () => {
+  service.stop()
+  let hydrations = 0
+  service = new JumbleService(
+    repository,
+    {
+      async getCandidates() {
+        return Array.from({ length: 32 }, (_, index) => ({
+          kind: 'track' as const,
+          answer: `Track ${index}`,
+          artistName: 'Artist'
+        }))
+      },
+      async hydrate(candidate) {
+        hydrations += 1
+        return candidate
+      },
+      async getHints() {
+        return []
+      }
+    },
+    { now: () => now, randomIndex: () => 0 }
+  )
+
+  await expect(
+    service.start({
+      starterUserId: 'user-1',
+      guildId: null,
+      channelId: 'channel-1',
+      kind: 'track',
+      username: 'tasky'
+    })
+  ).rejects.toMatchObject({ code: 'no-candidates' })
+  expect(hydrations).toBe(8)
+})
+
 test('expires an active session when its clock passes the kind timeout', async () => {
   const started = await service.start({
     starterUserId: 'user-1',
