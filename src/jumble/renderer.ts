@@ -28,6 +28,7 @@ export interface JumbleImageRendererOptions {
   cacheBytes?: number
   maxConcurrentRenders?: number
   maxPendingRenders?: number
+  fallbackHedgeMs?: number
   onTiming?: JumbleTimingSink
 }
 
@@ -35,6 +36,11 @@ interface CachedImage {
   buffer: Buffer
   bytes: number
 }
+
+type RenderFallbackEvent =
+  | { kind: 'rendered'; index: number; buffer: Buffer }
+  | { kind: 'failed'; index: number; error: JumbleImageError }
+  | { kind: 'hedge' }
 
 const MAX_SOURCE_BYTES = 32 * 1024 * 1024
 const MAX_CACHE_BYTES = 128 * 1024 * 1024
@@ -49,6 +55,7 @@ export class JumbleImageRenderer {
   private readonly size: number
   private readonly cacheEntries: number
   private readonly cacheBytes: number
+  private readonly fallbackHedgeMs: number
   private readonly cache = new Map<string, CachedImage>()
   private cacheSize = 0
   private readonly inflightSources = new Map<string, Promise<Buffer>>()
@@ -70,6 +77,7 @@ export class JumbleImageRenderer {
       this.maxBytes,
       MAX_CACHE_BYTES
     )
+    this.fallbackHedgeMs = clamp(Math.trunc(options.fallbackHedgeMs ?? 250), 0, 5_000)
     this.renderGate = new AsyncGate(
       clamp(Math.trunc(options.maxConcurrentRenders ?? 2), 1, 8),
       clamp(Math.trunc(options.maxPendingRenders ?? 16), 0, 64)
@@ -182,17 +190,77 @@ export class JumbleImageRenderer {
     if (candidates.length === 0) {
       throw new JumbleImageError('The music service did not return usable cover art.')
     }
+    const active = new Map<number, Promise<RenderFallbackEvent>>()
+    let nextIndex = 0
     let lastError: JumbleImageError | undefined
-    for (const url of candidates) {
-      try {
-        // eslint-disable-next-line no-await-in-loop -- tasky: sequential fallback, tries URLs one at a time until a renderable one is found
-        return await this.renderImage(url, pixelationLevel)
-      } catch (error) {
-        lastError =
-          error instanceof JumbleImageError
-            ? error
-            : new JumbleImageError('Cover art could not be rendered.')
-      }
+    let hedgeTimer: ReturnType<typeof setTimeout> | undefined
+    let hedge: Promise<RenderFallbackEvent> | undefined
+
+    const cancelHedge = (): void => {
+      if (hedgeTimer !== undefined) clearTimeout(hedgeTimer)
+      hedgeTimer = undefined
+      hedge = undefined
+    }
+
+    const startNext = (): void => {
+      const index = nextIndex
+      const url = candidates[index]
+      if (url === undefined) return
+      nextIndex += 1
+
+      const task = this.renderImage(url, pixelationLevel).then(
+        (buffer) => ({ kind: 'rendered', index, buffer }) as const,
+        (error: unknown) =>
+          ({
+            kind: 'failed',
+            index,
+            error:
+              error instanceof JumbleImageError
+                ? error
+                : new JumbleImageError('Cover art could not be rendered.')
+          }) as const
+      )
+      active.set(index, task)
+    }
+
+    const scheduleHedge = (): void => {
+      if (hedge !== undefined || active.size !== 1 || nextIndex >= candidates.length) return
+      hedge = new Promise<RenderFallbackEvent>((resolve) => {
+        hedgeTimer = setTimeout(() => {
+          hedgeTimer = undefined
+          resolve({ kind: 'hedge' })
+        }, this.fallbackHedgeMs)
+      })
+    }
+
+    startNext()
+    scheduleHedge()
+    while (active.size > 0) {
+      const contenders = [...active.values()]
+      if (hedge !== undefined) contenders.push(hedge)
+      // eslint-disable-next-line no-await-in-loop -- tasky: each result decides whether the two-slot hedge can start another source
+      const event = await Promise.race(contenders)
+      const rendered = match(event)
+        .returnType<Buffer | undefined>()
+        .with({ kind: 'rendered' }, ({ buffer }) => {
+          cancelHedge()
+          return buffer
+        })
+        .with({ kind: 'failed' }, ({ index, error }) => {
+          active.delete(index)
+          lastError = error
+          cancelHedge()
+          startNext()
+          scheduleHedge()
+          return undefined
+        })
+        .with({ kind: 'hedge' }, () => {
+          hedge = undefined
+          startNext()
+          return undefined
+        })
+        .exhaustive()
+      if (rendered !== undefined) return rendered
     }
     throw lastError ?? new JumbleImageError('Cover art could not be rendered.')
   }

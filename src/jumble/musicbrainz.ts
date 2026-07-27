@@ -56,6 +56,7 @@ export class MusicBrainzClient {
   private readonly userAgent: string
   private readonly timeoutMs: number
   private readonly minIntervalMs: number
+  private readonly maxQueueWaitMs: number
   private readonly maxPending: number
   private readonly maxResponseBytes: number
   private readonly now: () => number
@@ -72,6 +73,7 @@ export class MusicBrainzClient {
     this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT
     this.timeoutMs = clamp(Math.trunc(options.timeoutMs ?? 8_000), 500, 60_000)
     this.minIntervalMs = Math.max(250, Math.trunc(options.minIntervalMs ?? 1_100))
+    this.maxQueueWaitMs = clamp(Math.trunc(options.maxQueueWaitMs ?? 2_500), 0, 60_000)
     this.maxPending = clamp(Math.trunc(options.maxPending ?? 32), 1, 64)
     this.maxResponseBytes = clamp(
       Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024),
@@ -108,8 +110,8 @@ export class MusicBrainzClient {
         })
         .with({ kind: 'album' }, async (album) => {
           const [artistMetadata, releaseMetadata] = await Promise.all([
-            album.artistName === undefined
-              ? Promise.resolve(undefined)
+            album.artistMetadata !== undefined || album.artistName === undefined
+              ? Promise.resolve(album.artistMetadata)
               : this.getArtist(album.artistName),
             this.getRelease(album.answer, album.artistName, album.mbid)
           ])
@@ -141,8 +143,8 @@ export class MusicBrainzClient {
         })
         .with({ kind: 'track' }, async (track) => {
           const [artistMetadata, recordingMetadata] = await Promise.all([
-            track.artistName === undefined
-              ? Promise.resolve(undefined)
+            track.artistMetadata !== undefined || track.artistName === undefined
+              ? Promise.resolve(track.artistMetadata)
               : this.getArtist(track.artistName),
             this.getRecording(track.answer, track.artistName, track.mbid)
           ])
@@ -342,6 +344,7 @@ export class MusicBrainzClient {
     const existing = this.inflight.get(url)
     if (existing !== undefined) return existing
     if (this.pending >= this.maxPending) return null
+    if (this.pending * this.minIntervalMs > this.maxQueueWaitMs) return null
 
     const task = this.enqueue(url)
     this.inflight.set(url, task)

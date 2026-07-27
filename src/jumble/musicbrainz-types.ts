@@ -8,6 +8,7 @@ export interface MusicBrainzClientOptions {
   userAgent?: string
   timeoutMs?: number
   minIntervalMs?: number
+  maxQueueWaitMs?: number
   maxPending?: number
   maxResponseBytes?: number
   now?: () => number

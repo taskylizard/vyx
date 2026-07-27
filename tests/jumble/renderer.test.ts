@@ -1,6 +1,6 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { expect, test } from 'vite-plus/test'
-import { JumbleImageRenderer, pixelate } from '../../src/jumble/renderer.ts'
+import { JumbleImageError, JumbleImageRenderer, pixelate } from '../../src/jumble/renderer.ts'
 import type { JumbleTimingEvent } from '../../src/jumble/timing.ts'
 
 test('averages every pixel in a block', () => {
@@ -98,12 +98,235 @@ test('falls back through bounded artwork sources after a failed URL', async () =
   })
 
   const rendered = await renderer.renderWithFallback(
-    ['https://example.test/missing.png', 'https://example.test/fallback.png'],
+    [
+      '',
+      ' https://example.test/missing.png ',
+      'https://example.test/missing.png',
+      'https://example.test/fallback.png'
+    ],
     0
   )
 
   expect(rendered.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
   expect(fetched).toEqual(['https://example.test/missing.png', 'https://example.test/fallback.png'])
+})
+
+test('does not start a fallback when preferred artwork renders within its head start', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  const fetched: string[] = []
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 20,
+    fetchImpl: async (input) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      fetched.push(url)
+      return new Response(sourceBuffer, { status: 200 })
+    },
+    size: 32
+  })
+
+  await renderer.renderWithFallback([
+    'https://example.test/preferred.png',
+    'https://example.test/fallback.png'
+  ])
+  await delay(30)
+
+  expect(fetched).toEqual(['https://example.test/preferred.png'])
+})
+
+test('starts fallback artwork immediately when the preferred source fails quickly', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  const fetched: string[] = []
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 1_000,
+    fetchImpl: async (input) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      fetched.push(url)
+      return url.endsWith('/preferred.png')
+        ? new Response('missing', { status: 404 })
+        : new Response(sourceBuffer, { status: 200 })
+    },
+    size: 32
+  })
+
+  await renderer.renderWithFallback([
+    'https://example.test/preferred.png',
+    'https://example.test/fallback.png'
+  ])
+
+  expect(fetched).toEqual([
+    'https://example.test/preferred.png',
+    'https://example.test/fallback.png'
+  ])
+}, 500)
+
+test('hedges a slow preferred artwork source after a bounded head start', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  let unblockPreferred!: () => void
+  const preferredBlocked = new Promise<void>((resolve) => {
+    unblockPreferred = resolve
+  })
+  const fetched: string[] = []
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 20,
+    fetchImpl: async (input) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      fetched.push(url)
+      if (url.endsWith('/preferred.png')) await preferredBlocked
+      return new Response(sourceBuffer, { status: 200 })
+    },
+    size: 32
+  })
+
+  const render = renderer.renderWithFallback([
+    'https://example.test/preferred.png',
+    'https://example.test/fallback.png'
+  ])
+  const rendered = await Promise.race([render, delay(100).then(() => null)])
+  unblockPreferred()
+  await render
+
+  expect(rendered).toBeInstanceOf(Buffer)
+  expect(fetched).toEqual([
+    'https://example.test/preferred.png',
+    'https://example.test/fallback.png'
+  ])
+})
+
+test('keeps artwork fallback attempts to two active downloads', async () => {
+  let active = 0
+  let maxActive = 0
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 0,
+    fetchImpl: async () => {
+      active += 1
+      maxActive = Math.max(maxActive, active)
+      await delay(20)
+      active -= 1
+      return new Response('missing', { status: 404 })
+    }
+  })
+
+  await expect(
+    renderer.renderWithFallback(
+      Array.from({ length: 8 }, (_, index) => `https://example.test/${index}.png`)
+    )
+  ).rejects.toThrow('HTTP 404')
+  expect(maxActive).toBe(2)
+})
+
+test('falls back from malformed artwork URLs to Unicode URLs', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  const fetched: string[] = []
+  const renderer = new JumbleImageRenderer({
+    fetchImpl: async (input) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      fetched.push(url)
+      return new Response(sourceBuffer, { status: 200 })
+    },
+    size: 32
+  })
+
+  await expect(
+    renderer.renderWithFallback(['not a URL', 'https://example.test/音楽.png'])
+  ).resolves.toBeInstanceOf(Buffer)
+  expect(fetched).toEqual(['https://example.test/%E9%9F%B3%E6%A5%BD.png'])
+})
+
+test('falls back when artwork announces an oversized response', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  const fetched: string[] = []
+  const renderer = new JumbleImageRenderer({
+    fetchImpl: async (input) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      fetched.push(url)
+      return url.endsWith('/oversized.png')
+        ? new Response('oversized', {
+            status: 200,
+            headers: { 'content-length': String(32 * 1024), 'content-type': 'image/png' }
+          })
+        : new Response(sourceBuffer, { status: 200 })
+    },
+    maxBytes: 16 * 1024,
+    size: 32
+  })
+
+  await expect(
+    renderer.renderWithFallback([
+      'https://example.test/oversized.png',
+      'https://example.test/fallback.png'
+    ])
+  ).resolves.toBeInstanceOf(Buffer)
+  expect(fetched).toEqual([
+    'https://example.test/oversized.png',
+    'https://example.test/fallback.png'
+  ])
+})
+
+test('rejects empty artwork fallback lists without issuing a request', async () => {
+  let fetches = 0
+  const renderer = new JumbleImageRenderer({
+    fetchImpl: async () => {
+      fetches += 1
+      return new Response('unexpected', { status: 500 })
+    }
+  })
+
+  await expect(renderer.renderWithFallback(['', '   '])).rejects.toThrow(
+    'did not return usable cover art'
+  )
+  expect(fetches).toBe(0)
+})
+
+test('fuzzes hostile artwork lists without exceeding fallback resource bounds', async () => {
+  const corpus = [
+    '',
+    '   ',
+    'not a URL',
+    'ftp://example.test/cover.png',
+    'data:image/png;base64,AAAA',
+    'https://example.test/音楽.png',
+    'https://example.test/repeated.png',
+    ' https://example.test/repeated.png ',
+    'https://example.test/%E9%9F%B3%E6%A5%BD.png',
+    'https://example.test/oversized.png'
+  ]
+
+  await Promise.all(
+    Array.from({ length: 64 }, async (_, caseIndex) => {
+      const urls = Array.from(
+        { length: (caseIndex * 17) % 24 },
+        (_, urlIndex) => corpus[(caseIndex * 7 + urlIndex * 11) % corpus.length]!
+      )
+      let active = 0
+      let maxActive = 0
+      let fetches = 0
+      const renderer = new JumbleImageRenderer({
+        fallbackHedgeMs: 0,
+        fetchImpl: async () => {
+          active += 1
+          fetches += 1
+          maxActive = Math.max(maxActive, active)
+          await delay(1)
+          active -= 1
+          return new Response('missing', { status: 404 })
+        }
+      })
+
+      await expect(renderer.renderWithFallback(urls)).rejects.toBeInstanceOf(JumbleImageError)
+      expect(fetches).toBeLessThanOrEqual(8)
+      expect(maxActive).toBeLessThanOrEqual(2)
+    })
+  )
 })
 
 test('attempts at most eight artwork fallbacks', async () => {
@@ -167,4 +390,8 @@ async function imageData(imageBuffer: Buffer): Promise<Uint8ClampedArray> {
   const context = canvas.getContext('2d')
   context.drawImage(image, 0, 0)
   return context.getImageData(0, 0, image.width, image.height).data
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }

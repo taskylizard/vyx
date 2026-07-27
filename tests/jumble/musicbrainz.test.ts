@@ -180,6 +180,51 @@ test('adds a Cover Art Archive fallback for a resolved release', async () => {
   })
 })
 
+test('does not repeat an artist lookup when Last.fm already supplied artist metadata', async () => {
+  const releaseId = '12345678-1234-4234-8234-123456789abc'
+  const requests: string[] = []
+  const client = new MusicBrainzClient({
+    fetchImpl: async (input) => {
+      const url =
+        input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
+      requests.push(url.pathname)
+      if (url.pathname.endsWith('/release-group/')) {
+        return jsonResponse({
+          'release-groups': [
+            {
+              id: '87654321-4321-4321-8321-cba987654321',
+              title: 'Homogenic',
+              score: 100,
+              releases: [{ id: releaseId }],
+              'artist-credit': [{ name: 'Björk' }]
+            }
+          ]
+        })
+      }
+      return jsonResponse({
+        id: releaseId,
+        title: 'Homogenic',
+        'cover-art-archive': { artwork: true, front: true },
+        'release-group': { title: 'Homogenic', 'primary-type': 'Album' }
+      })
+    },
+    minIntervalMs: 0
+  })
+
+  await expect(
+    client.enrich({
+      kind: 'album',
+      answer: 'Homogenic',
+      artistName: 'Björk',
+      artistMetadata: { summary: 'Existing Last.fm artist metadata.' }
+    })
+  ).resolves.toMatchObject({
+    artistMetadata: { summary: 'Existing Last.fm artist metadata.' },
+    imageUrl: `https://coverartarchive.org/release/${releaseId}/front-500`
+  })
+  expect(requests).toEqual(['/ws/2/release-group/', `/ws/2/release/${releaseId}`])
+})
+
 test('uses a release-group Cover Art Archive fallback when no release is resolved', async () => {
   const releaseGroupId = '87654321-4321-4321-8321-cba987654321'
   const client = new MusicBrainzClient({
@@ -226,6 +271,134 @@ test('does not invent Cover Art Archive URLs without positive front-cover eviden
     mbid: '470bce3d-e95e-4d65-8c71-bf8838ea3247',
     imageUrls: undefined
   })
+})
+
+test('bounds unique MusicBrainz lookups before a courtesy queue can dominate game latency', async () => {
+  let unblockFirst!: () => void
+  const firstBlocked = new Promise<void>((resolve) => {
+    unblockFirst = resolve
+  })
+  let firstStarted!: () => void
+  const started = new Promise<void>((resolve) => {
+    firstStarted = resolve
+  })
+  let fetches = 0
+  let virtualNow = 0
+  const client = new MusicBrainzClient({
+    fetchImpl: async () => {
+      fetches += 1
+      if (fetches === 1) {
+        firstStarted()
+        await firstBlocked
+      }
+      return jsonResponse({ artists: [] })
+    },
+    maxQueueWaitMs: 500,
+    minIntervalMs: 250,
+    now: () => {
+      virtualNow += 250
+      return virtualNow
+    }
+  })
+
+  const lookups = Array.from({ length: 8 }, (_, index) =>
+    client.enrich({ kind: 'artist', answer: `Unique Artist ${index}` })
+  )
+  await started
+
+  await expect(lookups[7]).resolves.toEqual({
+    kind: 'artist',
+    answer: 'Unique Artist 7'
+  })
+  expect(fetches).toBe(1)
+
+  unblockFirst()
+  await expect(Promise.all(lookups)).resolves.toHaveLength(8)
+  expect(fetches).toBe(3)
+})
+
+test('shares an in-flight MusicBrainz lookup before applying queue admission limits', async () => {
+  let unblock!: () => void
+  const blocked = new Promise<void>((resolve) => {
+    unblock = resolve
+  })
+  let started!: () => void
+  const requestStarted = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  let fetches = 0
+  const client = new MusicBrainzClient({
+    fetchImpl: async () => {
+      fetches += 1
+      started()
+      await blocked
+      return jsonResponse({ artists: [{ id: 'artist', name: 'Björk' }] })
+    },
+    maxQueueWaitMs: 0,
+    minIntervalMs: 250
+  })
+
+  const first = client.enrich({ kind: 'artist', answer: 'Björk' })
+  await requestStarted
+  const duplicate = client.enrich({ kind: 'artist', answer: 'Björk' })
+  unblock()
+
+  await expect(Promise.all([first, duplicate])).resolves.toEqual([
+    expect.objectContaining({ artistMetadata: expect.objectContaining({ mbid: 'artist' }) }),
+    expect.objectContaining({ artistMetadata: expect.objectContaining({ mbid: 'artist' }) })
+  ])
+  expect(fetches).toBe(1)
+})
+
+test('uses stale MusicBrainz metadata when a new lookup exceeds its queue budget', async () => {
+  let unblock!: () => void
+  const blocked = new Promise<void>((resolve) => {
+    unblock = resolve
+  })
+  let started!: () => void
+  const requestStarted = new Promise<void>((resolve) => {
+    started = resolve
+  })
+  let fetches = 0
+  const client = new MusicBrainzClient({
+    cache: {
+      async get(_cacheKey, schema) {
+        const parsed = schema.safeParse({
+          found: true,
+          value: { summary: 'Stale artist metadata.' }
+        })
+        if (!parsed.success) return null
+        return {
+          value: parsed.data,
+          fetchedAt: 0,
+          expiresAt: 0,
+          fresh: false
+        }
+      },
+      async set() {
+        return true
+      }
+    },
+    fetchImpl: async () => {
+      fetches += 1
+      started()
+      await blocked
+      return jsonResponse({ artists: [] })
+    },
+    maxQueueWaitMs: 0,
+    minIntervalMs: 250
+  })
+
+  const first = client.enrich({ kind: 'artist', answer: 'First Artist' })
+  await requestStarted
+
+  await expect(client.enrich({ kind: 'artist', answer: 'Queued Artist' })).resolves.toMatchObject({
+    artistMetadata: { summary: 'Stale artist metadata.' }
+  })
+  expect(fetches).toBe(1)
+
+  unblock()
+  await first
 })
 
 test('does not negative-cache an unavailable MusicBrainz lookup', async () => {
