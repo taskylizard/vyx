@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite-plus'
+import oxclippyRecommended from './tooling/oxlint/presets/recommended.ts'
 
 export default defineConfig({
   pack: {
@@ -6,6 +7,12 @@ export default defineConfig({
     entry: ['src/run.ts']
   },
   lint: {
+    ignorePatterns: ['rosepack/**'],
+    categories: {
+      perf: 'error'
+    },
+    jsPlugins: ['./tooling/oxlint/plugin.ts'],
+    extends: [oxclippyRecommended],
     options: {
       typeAware: true,
       typeCheck: true
