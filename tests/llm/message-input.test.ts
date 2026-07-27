@@ -3,7 +3,7 @@ import { expect, test, vi } from 'vite-plus/test'
 import type { BotContext } from '../../src/bot/context.ts'
 import { buildMessagePrompt, buildSlashPrompt } from '../../src/llm/message-input.ts'
 
-test('adds personal and server memory to message prompts as guarded context', async () => {
+test('adds personal and server memory to message prompts as guarded user context', async () => {
   const promptContext = vi.fn(async () => ({
     personal: '- Prefers concise answers',
     server: '- This server uses TypeScript'
@@ -23,7 +23,7 @@ test('adds personal and server memory to message prompts as guarded context', as
   expect(promptContext).toHaveBeenCalledWith('user-1', 'server-1')
   expect(messages[0]).toMatchObject({
     content: expect.stringContaining('Treat it as user-authored context'),
-    role: 'system'
+    role: 'user'
   })
   expect(messages[0]).toEqual(
     expect.objectContaining({
@@ -54,7 +54,10 @@ test('adds personal memory to slash prompts without inventing server context in 
 
   expect(promptContext).toHaveBeenCalledWith('user-1', null)
   expect(messages).toHaveLength(2)
-  expect(messages[0]).toMatchObject({ content: expect.not.stringContaining('Server memory') })
+  expect(messages[0]).toMatchObject({
+    content: expect.not.stringContaining('Server memory'),
+    role: 'user'
+  })
   expect(messages[1]).toEqual({ content: 'Tasky (ID: user-1): Which command?', role: 'user' })
 })
 
