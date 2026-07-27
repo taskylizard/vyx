@@ -47,6 +47,15 @@ test('accepts provider aliases and keeps punctuation-only titles exact', () => {
   expect(answerMatches(punctuationOnly, 'ultrasound')).toBe(false)
 })
 
+test('accepts a distinctive title prefix when an album has a trailing subtitle', () => {
+  const answer = "CHAINSAW MAN THE MOVIE: REZE ARC original soundtrack -summer's end-"
+
+  expect(answerMatches(answer, 'chainsaw man the movie: reze arc')).toBe(true)
+  expect(answerMatches(answer, 'chainsaw man the movie: reze arc original soundtrack')).toBe(true)
+  expect(answerMatches(answer, 'chainsaw man the movie: reze arc original soundstrack')).toBe(true)
+  expect(answerMatches('Love Songs', 'Love')).toBe(false)
+})
+
 test('keeps hostile and oversized answer variants bounded and total', () => {
   const variants = Array.from({ length: 128 }, (_, index) => ({
     source: 'manual' as const,

@@ -1,6 +1,6 @@
 import { ButtonStyles, ComponentTypes } from 'oceanic.js'
 import type { InteractionContent, MessageActionRow, TextButton } from 'oceanic.js'
-import { match } from 'ts-pattern'
+import { match, P } from 'ts-pattern'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import type { JumbleAction, JumbleKind, JumbleState } from './types.ts'
 
@@ -61,17 +61,28 @@ function buildContent(state: JumbleState, action: JumbleAction | undefined): str
   const { session } = state
   const name = kindName(session.kind)
   const { endedAt } = session
+  const shownHints = state.hints.filter((hint) => hint.shown)
+  const shownHintLines =
+    shownHints.length === 0
+      ? []
+      : ['', '**Hints**', ...shownHints.map((hint) => `• ${hint.content}`)]
+
   if (endedAt !== null) {
     const outcome = match(session.outcome)
-      .with('won', () => '🎉 Solved!')
-      .with('gave_up', () => '🏳️ Game over.')
-      .otherwise(() => '⏰ Time is up.')
+      .with('won', () => `🎉 Solved! **${name} Jumble**`)
+      .with('gave_up', () => `🏳️ <@${session.starterUserId}> gave up.`)
+      .with(P.union('expired', null), () => `⏰ Time is up. **${name} Jumble**`)
+      .exhaustive()
     const artist =
       session.artistName === null ? '' : `\nArtist: **${safeInline(session.artistName)}**`
     const elapsed = match(session.outcome)
       .with('won', () => `\nSolved in **${((endedAt - session.startedAt) / 1_000).toFixed(1)}s**.`)
-      .otherwise(() => '')
-    return `${outcome} **${name} Jumble**\nAnswer: **${safeInline(session.answer)}**${artist}${elapsed}`
+      .with(P.union('gave_up', 'expired', null), () => '')
+      .exhaustive()
+    return [
+      `${outcome}\nAnswer: **${safeInline(session.answer)}**${artist}${elapsed}`,
+      ...shownHintLines
+    ].join('\n')
   }
 
   const lines = [
@@ -82,12 +93,13 @@ function buildContent(state: JumbleState, action: JumbleAction | undefined): str
   ]
   const actionLines = match(action)
     .with('incorrect', () => ['❌ Not quite — keep guessing!'])
-    .otherwise(() => [])
+    .with(
+      P.union(undefined, 'started', 'updated', 'won', 'gave_up', 'expired', 'unchanged'),
+      () => []
+    )
+    .exhaustive()
   lines.push(...actionLines)
-  const shownHints = state.hints.filter((hint) => hint.shown)
-  if (shownHints.length > 0) {
-    lines.push('', '**Hints**', ...shownHints.map((hint) => `• ${hint.content}`))
-  }
+  lines.push(...shownHintLines)
   const remaining = state.hints.length - shownHints.length
   if (remaining > 0) lines.push('', `You have ${remaining} hint${remaining === 1 ? '' : 's'} left.`)
   return lines.join('\n')

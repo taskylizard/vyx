@@ -144,12 +144,13 @@ test('persists a text-and-art artist session, hints, guesses, and a solved outco
   const solved = await service.submitGuess(started.state.session.id, 'user-2', 'Bjork')
   expect(solved.action).toBe('won')
   expect(solved.state.session.outcome).toBe('won')
-  expect(
-    buildJumblePayload(solved.state, {
-      action: solved.action,
-      componentIds: componentIds(solved.state.session.id)
-    }).content
-  ).toContain('Solved in **1.3s**.')
+  const solvedContent = buildJumblePayload(solved.state, {
+    action: solved.action,
+    componentIds: componentIds(solved.state.session.id)
+  }).content
+  expect(solvedContent).toContain('Solved in **1.3s**.')
+  expect(solvedContent).toContain('**Hints**')
+  expect(solvedContent).toContain('• A hint')
   await expect(service.stats('user-1')).resolves.toMatchObject({ played: 1, won: 0 })
   await expect(service.stats('user-2')).resolves.toMatchObject({ played: 1, won: 1 })
 })
@@ -170,7 +171,15 @@ test('reveals hints, advances pixel stages, and allows reshuffles without daily 
   await expect(service.giveUp(started.state.session.id, 'user-2')).rejects.toMatchObject({
     code: 'forbidden'
   })
-  await service.giveUp(started.state.session.id, 'user-1')
+  const gaveUp = await service.giveUp(started.state.session.id, 'user-1')
+  const gaveUpContent = buildJumblePayload(gaveUp.state, {
+    action: gaveUp.action,
+    componentIds: componentIds(gaveUp.state.session.id)
+  }).content
+  expect(gaveUpContent).toContain('🏳️ <@user-1> gave up.')
+  expect(gaveUpContent).not.toContain('Game over')
+  expect(gaveUpContent).toContain('**Hints**')
+  expect(gaveUpContent).toContain('• A hint')
 
   const second = await service.start({
     starterUserId: 'user-1',

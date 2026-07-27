@@ -21,7 +21,11 @@ export function removeEditionSuffix(value: string): string {
 
 /** Normalize a guess using forgiving rules that work well for music titles. */
 export function normalizeAnswer(value: string): string {
-  const decomposed = removeEditionSuffix(value)
+  return normalizeAnswerText(value).replace(/[^\p{Letter}\p{Number}]+/gu, '')
+}
+
+function normalizeAnswerText(value: string): string {
+  return removeEditionSuffix(value)
     .trim()
     .normalize('NFKD')
     .replace(/[Øø]/gu, 'o')
@@ -34,11 +38,8 @@ export function normalizeAnswer(value: string): string {
     .replace(/[Λλ]/gu, 'a')
     .replace(/&/gu, ' and ')
     .replace(/…/gu, '...')
-
-  return decomposed
     .replace(/[\u0300-\u036f]/gu, '')
     .toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}]+/gu, '')
 }
 
 export function levenshteinDistance(first: string, second: string): number {
@@ -71,6 +72,7 @@ export function answerMatchesAny(
   const actualRaw = guess.trim()
   if (actualRaw.length === 0) return false
   const actual = normalizeAnswer(actualRaw)
+  let actualWords: string[] | undefined
 
   for (const answer of correctAnswers.slice(0, 16)) {
     const expectedValue = typeof answer === 'string' ? answer : answer.value
@@ -85,12 +87,46 @@ export function answerMatchesAny(
     if (expected.length === 0 || actual.length === 0) continue
     if (actual === expected || actual.includes(expected)) return true
 
-    const maxDistance = actual.length > 10 ? 2 : actual.length > 4 ? 1 : 0
-    if (maxDistance === 0 || Math.abs(actual.length - expected.length) > maxDistance) continue
-    const distance = levenshteinDistance(actual, expected)
-    if (distance <= maxDistance) return true
+    const maxDistance = maximumAnswerDistance(actual.length)
+    if (
+      maxDistance > 0 &&
+      Math.abs(actual.length - expected.length) <= maxDistance &&
+      levenshteinDistance(actual, expected) <= maxDistance
+    )
+      return true
+
+    if (expected.length > actual.length) {
+      actualWords ??= normalizedAnswerWords(actualRaw)
+      if (distinctivePrefixMatches(expectedRaw, actual, actualWords)) return true
+    }
   }
   return false
+}
+
+function distinctivePrefixMatches(
+  expectedRaw: string,
+  actual: string,
+  actualWords: readonly string[]
+): boolean {
+  if (actualWords.length < 4 || actual.length < 16) return false
+
+  const expectedWords = normalizedAnswerWords(expectedRaw)
+  if (actualWords.length >= expectedWords.length) return false
+
+  const expectedPrefix = expectedWords.slice(0, actualWords.length).join('')
+  const maxDistance = maximumAnswerDistance(actual.length)
+  return (
+    Math.abs(actual.length - expectedPrefix.length) <= maxDistance &&
+    levenshteinDistance(actual, expectedPrefix) <= maxDistance
+  )
+}
+
+function normalizedAnswerWords(value: string): string[] {
+  return normalizeAnswerText(value).match(/[\p{Letter}\p{Number}]+/gu) ?? []
+}
+
+function maximumAnswerDistance(length: number): number {
+  return length > 10 ? 2 : length > 4 ? 1 : 0
 }
 
 export type RandomIndex = (maxExclusive: number) => number
