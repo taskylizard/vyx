@@ -1,7 +1,8 @@
 import { MessageFlags } from 'oceanic.js'
 import { match, P } from 'ts-pattern'
 import { button } from '../bot/rosepack.ts'
-import { jumblePermissionError, renderJumble } from './discord.ts'
+import { createJumbleMessage, jumblePermissionError, renderJumble } from './discord.ts'
+import { buildJumbleReplayComponents } from './presentation.ts'
 import type { ComponentContext } from 'rosepack'
 import type { BotContext } from '../bot/context.ts'
 import { modules } from '../modules.ts'
@@ -63,19 +64,35 @@ export const jumbleReplayButton = button({
   customID: 'jumble/replay/:kind',
   beforeExecute: assertJumbleEnabled,
   async execute(context) {
-    await context.deferUpdate()
+    const permissionError = jumblePermissionError(context.interaction)
+    if (permissionError !== null) throw new Error(permissionError)
+    const kind = context.params.kind
+    if (!isJumbleKind(kind)) throw new Error('That Jumble type is not supported.')
+
+    const replayCustomID = jumbleReplayButton.buildID({ params: { kind } })
+    const readyComponents = buildJumbleReplayComponents(replayCustomID, { status: 'ready' })
+    const userDisplayName =
+      context.interaction.member?.displayName ??
+      context.interaction.user.globalName ??
+      context.interaction.user.username
+    await context.update({
+      components: buildJumbleReplayComponents(replayCustomID, {
+        status: 'playing',
+        userDisplayName
+      })
+    })
+
     const stopTyping = startJumbleTyping(context.client, context.interaction.channelID)
+    let startedSessionId: string | undefined
     try {
-      const permissionError = jumblePermissionError(context.interaction)
-      if (permissionError !== null) throw new Error(permissionError)
-      if (!isJumbleKind(context.params.kind)) throw new Error('That Jumble type is not supported.')
       const result = await context.app.jumble.start({
         starterUserId: context.interaction.user.id,
         guildId: context.interaction.guildID,
         channelId: context.interaction.channelID,
-        kind: context.params.kind,
+        kind,
         username: (await context.app.jumble.getProfile(context.interaction.user.id)) ?? undefined
       })
+      startedSessionId = result.state.session.id
       const rendered = await renderJumble(
         result.state,
         context.app.jumbleRenderer,
@@ -85,11 +102,30 @@ export const jumbleReplayButton = button({
       if (rendered.imageError !== undefined) {
         context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
       }
-      const message = await context.client.rest.channels.createMessage(
+      const message = await createJumbleMessage(
+        context.client,
         context.interaction.channelID,
         rendered.payload
       )
-      await context.app.jumble.attachMessage(result.state.session.id, message.id)
+      try {
+        await context.app.jumble.attachMessage(result.state.session.id, message.id)
+      } catch (error) {
+        context.app.logger.warn('jumble message ID could not be saved', error)
+      }
+    } catch (error) {
+      if (startedSessionId !== undefined) {
+        try {
+          await context.app.jumble.expire(startedSessionId)
+        } catch (expiryError) {
+          context.app.logger.warn('failed replay Jumble could not be expired', expiryError)
+        }
+      }
+      try {
+        await context.update({ components: readyComponents })
+      } catch (updateError) {
+        context.app.logger.warn('jumble replay button could not be restored', updateError)
+      }
+      throw error
     } finally {
       stopTyping()
     }

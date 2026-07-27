@@ -50,6 +50,25 @@ test('reports every channel permission needed before starting a game', () => {
   expect(jumblePermissionError({ appPermissions: denied, guildID: null })).toBeNull()
 })
 
+test('slash play does not show a typing indicator', async () => {
+  const sendTyping = vi.fn(async () => undefined)
+  const editResponse = vi.fn(async () => undefined)
+
+  await jumbleCommand.subcommands.play.execute({
+    client: {
+      getChannel: vi.fn(() => ({ sendTyping })),
+      rest: { channels: { sendTyping } }
+    },
+    defer: vi.fn(async () => undefined),
+    editResponse,
+    interaction: { channelID: 'channel-1' },
+    options: { kind: 'unsupported' }
+  } as never)
+
+  expect(editResponse).toHaveBeenCalledWith('That Jumble type is not available.')
+  expect(sendTyping).not.toHaveBeenCalled()
+})
+
 test('enabling the Jumble module reconciles its guild command', async () => {
   const createGuildCommand = vi.fn(async () => ({}))
   let enabledModules: readonly string[] = []

@@ -18,6 +18,10 @@ export interface JumblePayloadOptions {
   action?: JumbleAction
 }
 
+export type JumbleReplayButtonState =
+  | { status: 'ready' }
+  | { status: 'playing'; userDisplayName: string }
+
 export function buildJumblePayload(
   state: JumbleState,
   options: JumblePayloadOptions
@@ -37,12 +41,26 @@ export function buildJumblePayload(
     attachments: session.imageUrl === null ? undefined : []
   }
   if (session.endedAt !== null)
-    payload.components = [
-      buildButtonRow([
-        button('Play again', options.componentIds.replay(session.kind), ButtonStyles.SUCCESS)
-      ])
-    ]
+    payload.components = buildJumbleReplayComponents(options.componentIds.replay(session.kind), {
+      status: 'ready'
+    })
   return payload
+}
+
+export function buildJumbleReplayComponents(
+  customID: string,
+  state: JumbleReplayButtonState
+): MessageActionRow[] {
+  const replayButton = match(state)
+    .returnType<TextButton>()
+    .with({ status: 'ready' }, () => button('Play again', customID, ButtonStyles.SUCCESS))
+    .with({ status: 'playing' }, ({ userDisplayName }) => ({
+      ...button(playingButtonLabel(userDisplayName), customID, ButtonStyles.SUCCESS),
+      disabled: true
+    }))
+    .exhaustive()
+
+  return [buildButtonRow([replayButton])]
 }
 
 export function buildJumbleWinnerAnnouncement(state: JumbleState, userId: string): string {
@@ -157,4 +175,18 @@ function safeInline(value: string): string {
     .replace(/[\\`*_~|]/gu, '\\$&')
     .replace(/@/gu, '@\u200b')
     .slice(0, 180)
+}
+
+function playingButtonLabel(userDisplayName: string): string {
+  const suffix = ' is playing!'
+  const availableCodeUnits = 80 - suffix.length
+  const normalized = userDisplayName.replace(/\s+/gu, ' ').trim() || 'Someone'
+  let truncated = ''
+
+  for (const character of normalized) {
+    if (truncated.length + character.length > availableCodeUnits) break
+    truncated += character
+  }
+
+  return `${truncated}${suffix}`
 }

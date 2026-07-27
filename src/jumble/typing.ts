@@ -1,6 +1,7 @@
 import type { Client } from 'oceanic.js'
 
 type TypingClient = {
+  getChannel: Pick<Client, 'getChannel'>['getChannel']
   rest: {
     channels: Pick<Client['rest']['channels'], 'sendTyping'>
   }
@@ -17,7 +18,17 @@ export function startJumbleTyping(
     if (stopped || pending) return
     pending = true
     try {
-      await client.rest.channels.sendTyping(channelId)
+      const channel = client.getChannel(channelId)
+      if (channel !== undefined && 'sendTyping' in channel) {
+        try {
+          await channel.sendTyping()
+          return
+        } catch {
+          await client.rest.channels.sendTyping(channelId)
+        }
+      } else {
+        await client.rest.channels.sendTyping(channelId)
+      }
     } catch {
       stopped = true
       clearInterval(timer)

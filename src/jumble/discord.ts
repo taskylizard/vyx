@@ -1,4 +1,10 @@
-import type { Client, EditMessageOptions, Message, Permission } from 'oceanic.js'
+import type {
+  Client,
+  CreateMessageOptions,
+  EditMessageOptions,
+  Message,
+  Permission
+} from 'oceanic.js'
 import { match } from 'ts-pattern'
 import { mergeImageUrlLists } from './candidate.ts'
 import { JumbleImageRenderer } from './renderer.ts'
@@ -88,17 +94,42 @@ export function jumblePermissionError(interaction: {
   return `Kanikou needs the following permissions in this channel before starting Jumble: **${missing.join(', ')}**.`
 }
 
+export async function createJumbleMessage(
+  client: Pick<Client, 'getChannel' | 'rest'>,
+  channelId: string,
+  options: CreateMessageOptions
+) {
+  const channel = client.getChannel(channelId)
+  if (channel !== undefined && 'createMessage' in channel) {
+    try {
+      return await channel.createMessage(options)
+    } catch {
+      return client.rest.channels.createMessage(channelId, options)
+    }
+  }
+
+  return client.rest.channels.createMessage(channelId, options)
+}
+
 export async function editJumbleMessage(
   client: Client,
   channelId: string,
   messageId: string,
   rendered: RenderedJumble
 ): Promise<void> {
-  await client.rest.channels.editMessage(
-    channelId,
-    messageId,
-    rendered.payload as EditMessageOptions
-  )
+  const options = rendered.payload as EditMessageOptions
+  const channel = client.getChannel(channelId)
+  if (channel !== undefined && 'editMessage' in channel) {
+    try {
+      await channel.editMessage(messageId, options)
+      return
+    } catch {
+      await client.rest.channels.editMessage(channelId, messageId, options)
+      return
+    }
+  }
+
+  await client.rest.channels.editMessage(channelId, messageId, options)
 }
 
 /** Handle free-text guesses while a channel has an active game. */
@@ -129,7 +160,7 @@ export async function handleJumbleMessage(
     .with('incorrect', async () => safeReaction(message, '❌'))
     .with('won', async (action) => {
       await renderFinished(action)
-      await client.rest.channels.createMessage(message.channelID, {
+      await createJumbleMessage(client, message.channelID, {
         allowedMentions: {
           everyone: false,
           repliedUser: false,
