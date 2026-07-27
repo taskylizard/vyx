@@ -77,6 +77,7 @@ export {
 } from './jumble/answer.ts'
 export { DiscogsClient, type DiscogsClientOptions } from './jumble/discogs.ts'
 export { DeezerClient, type DeezerClientOptions } from './jumble/deezer.ts'
+export type { JumbleTimingEvent, JumbleTimingSink } from './jumble/timing.ts'
 export {
   LastFmClient,
   LastFmError,

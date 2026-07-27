@@ -16,6 +16,7 @@ import {
 } from './lastfm-parser.ts'
 import { clamp } from './numbers.ts'
 import { readBoundedJson } from './response.ts'
+import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './timing.ts'
 import type {
   JumbleAlbumCandidate,
   JumbleArtistCandidate,
@@ -63,6 +64,7 @@ export class LastFmClient implements JumbleMusicProvider {
   private readonly cacheEntries: number
   private readonly cacheBytes: number
   private readonly maxResponseBytes: number
+  private readonly onTiming?: JumbleTimingSink
   private readonly cache = new Map<
     string,
     { expiresAt: number; value: LastFmEnvelope; bytes: number }
@@ -86,6 +88,7 @@ export class LastFmClient implements JumbleMusicProvider {
       16 * 1024,
       8 * 1024 * 1024
     )
+    this.onTiming = options.onTiming
   }
 
   async getCandidates(
@@ -139,6 +142,8 @@ export class LastFmClient implements JumbleMusicProvider {
   /** Enriches one selected item without making the whole top-list request expensive. */
   async hydrate(candidate: JumbleCandidate): Promise<JumbleCandidate> {
     let hydrated = candidate
+    const detailStartedAt = performance.now()
+    let detailOutcome: 'success' | 'partial' | 'failed' = 'failed'
     try {
       const detail = match(candidate.kind)
         .with('artist', () => ({
@@ -164,6 +169,15 @@ export class LastFmClient implements JumbleMusicProvider {
         .with({ kind: P.union('album', 'track') }, () => Promise.resolve(undefined))
         .exhaustive()
       const [detailResult, artistResult] = await Promise.allSettled([detailPromise, artistPromise])
+      const artistRequested = candidate.kind !== 'artist' && candidate.artistName !== undefined
+      detailOutcome = match({
+        detail: detailResult.status,
+        artist: artistRequested ? artistResult.status : 'skipped'
+      })
+        .returnType<'success' | 'partial' | 'failed'>()
+        .with({ detail: 'fulfilled', artist: P.union('fulfilled', 'skipped') }, () => 'success')
+        .with({ detail: 'rejected', artist: P.union('rejected', 'skipped') }, () => 'failed')
+        .otherwise(() => 'partial')
       hydrated = match(detailResult)
         .with({ status: 'fulfilled' }, ({ value }) => mergeLastFmDetails(candidate, value))
         .otherwise(() => hydrated)
@@ -174,6 +188,16 @@ export class LastFmClient implements JumbleMusicProvider {
         .otherwise(() => hydrated)
     } catch {
       // tasky: top-list data is enough to play; detail calls only improve hints.
+    } finally {
+      emitJumbleTiming(this.onTiming, {
+        type: 'provider',
+        provider: 'lastfm',
+        operation: 'details',
+        kind: candidate.kind,
+        outcome: detailOutcome,
+        durationMs: jumbleDurationMs(detailStartedAt),
+        imageCount: getCandidateImageUrls(hydrated).length
+      })
     }
     const needsDiscogs =
       this.options.discogs !== undefined &&
@@ -182,15 +206,18 @@ export class LastFmClient implements JumbleMusicProvider {
         hasNonLatinLetters(hydrated.answer))
     const needsDeezer =
       this.options.deezer !== undefined && getCandidateImageUrls(hydrated).length === 0
+    const musicBrainz = this.options.musicBrainz
+    const discogs = this.options.discogs
+    const deezer = this.options.deezer
     const [musicBrainzResult, discogsResult, deezerResult] = await Promise.allSettled([
-      this.options.musicBrainz === undefined
+      musicBrainz === undefined
         ? Promise.resolve(undefined)
-        : this.options.musicBrainz.enrich(hydrated),
-      needsDiscogs && this.options.discogs !== undefined
-        ? this.options.discogs.enrich(hydrated)
+        : this.measureEnrichment('musicbrainz', hydrated, () => musicBrainz.enrich(hydrated)),
+      needsDiscogs && discogs !== undefined
+        ? this.measureEnrichment('discogs', hydrated, () => discogs.enrich(hydrated))
         : Promise.resolve(undefined),
-      needsDeezer && this.options.deezer !== undefined
-        ? this.options.deezer.enrich(hydrated)
+      needsDeezer && deezer !== undefined
+        ? this.measureEnrichment('deezer', hydrated, () => deezer.enrich(hydrated))
         : Promise.resolve(undefined)
     ])
     const musicBrainzCandidate = match(musicBrainzResult)
@@ -209,6 +236,38 @@ export class LastFmClient implements JumbleMusicProvider {
       discogsCandidate
     )
     return hydrated
+  }
+
+  private async measureEnrichment(
+    provider: 'musicbrainz' | 'discogs' | 'deezer',
+    candidate: JumbleCandidate,
+    task: () => Promise<JumbleCandidate>
+  ): Promise<JumbleCandidate> {
+    const startedAt = performance.now()
+    try {
+      const enriched = await task()
+      emitJumbleTiming(this.onTiming, {
+        type: 'provider',
+        provider,
+        operation: 'enrichment',
+        kind: candidate.kind,
+        outcome: enriched === candidate ? 'unchanged' : 'success',
+        durationMs: jumbleDurationMs(startedAt),
+        imageCount: getCandidateImageUrls(enriched).length
+      })
+      return enriched
+    } catch (error) {
+      emitJumbleTiming(this.onTiming, {
+        type: 'provider',
+        provider,
+        operation: 'enrichment',
+        kind: candidate.kind,
+        outcome: 'failed',
+        durationMs: jumbleDurationMs(startedAt),
+        imageCount: getCandidateImageUrls(candidate).length
+      })
+      throw error
+    }
   }
 
   private async request(method: string, params: Record<string, string>): Promise<LastFmEnvelope> {

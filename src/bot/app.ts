@@ -24,6 +24,7 @@ import { MusicBrainzClient } from '../jumble/musicbrainz.ts'
 import { JumbleImageRenderer } from '../jumble/renderer.ts'
 import { JumbleRepository } from '../jumble/repository.ts'
 import { JumbleService } from '../jumble/service.ts'
+import type { JumbleTimingSink } from '../jumble/timing.ts'
 import { createKanikouDatabase, type KanikouDatabase } from '../database/database.ts'
 import { GuildSettingsStore } from '../database/guild-settings.ts'
 import { handleMessageCreate } from './messages.ts'
@@ -51,6 +52,9 @@ function createJumbleInfrastructure(
   const jumbleMetadataCache = new JumbleMetadataCache(database.db, {
     onError: (error) => logger.warn('jumble metadata cache error', error)
   })
+  const onTiming: JumbleTimingSink = (event) => {
+    logger.info(`jumble timing ${JSON.stringify(event)}`)
+  }
   const musicBrainz = new MusicBrainzClient({
     cache: jumbleMetadataCache,
     onError: (error) => logger.warn('MusicBrainz enrichment error', error)
@@ -64,11 +68,12 @@ function createJumbleInfrastructure(
     cache: jumbleMetadataCache,
     onError: (error) => logger.warn('Deezer enrichment error', error)
   })
-  const jumbleRenderer = new JumbleImageRenderer()
+  const jumbleRenderer = new JumbleImageRenderer({ onTiming })
   const jumbleProvider = match(config.LASTFM_API_KEY)
     .with(undefined, () => new MissingLastFmProvider())
-    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz, discogs, deezer }))
+    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz, discogs, deezer, onTiming }))
   const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
+    onTiming,
     onExpired: async (state) => {
       if (state.session.messageId === null) return
       const rendered = await renderJumble(

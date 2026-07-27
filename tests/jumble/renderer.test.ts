@@ -1,6 +1,7 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { expect, test } from 'vite-plus/test'
 import { JumbleImageRenderer, pixelate } from '../../src/jumble/renderer.ts'
+import type { JumbleTimingEvent } from '../../src/jumble/timing.ts'
 
 test('averages every pixel in a block', () => {
   const data = new Uint8ClampedArray(4 * 4 * 4)
@@ -26,6 +27,7 @@ test('downloads and renders a bounded cover with the fast napi canvas backend', 
   sourceContext.fillRect(0, 0, 8, 8)
   const sourceBuffer = source.toBuffer('image/png')
   let fetches = 0
+  const timing: JumbleTimingEvent[] = []
   const renderer = new JumbleImageRenderer({
     fetchImpl: async () => {
       fetches += 1
@@ -34,6 +36,7 @@ test('downloads and renders a bounded cover with the fast napi canvas backend', 
         headers: { 'content-length': String(sourceBuffer.length) }
       })
     },
+    onTiming: (event) => timing.push(event),
     size: 32
   })
   const first = await renderer.render('https://example.test/cover.png', 0)
@@ -41,6 +44,22 @@ test('downloads and renders a bounded cover with the fast napi canvas backend', 
   expect(first.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
   expect(second.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a')
   expect(fetches).toBe(1)
+  expect(timing).toEqual([
+    expect.objectContaining({
+      type: 'render',
+      mode: 'pixelated',
+      outcome: 'success',
+      sourceCount: 1,
+      stage: 0
+    }),
+    expect.objectContaining({
+      type: 'render',
+      mode: 'pixelated',
+      outcome: 'success',
+      sourceCount: 1,
+      stage: 6
+    })
+  ])
 })
 
 test('reveals the unpixelated cover when a game ends', async () => {
@@ -89,11 +108,13 @@ test('falls back through bounded artwork sources after a failed URL', async () =
 
 test('attempts at most eight artwork fallbacks', async () => {
   let fetches = 0
+  const timing: JumbleTimingEvent[] = []
   const renderer = new JumbleImageRenderer({
     fetchImpl: async () => {
       fetches += 1
       return new Response('missing', { status: 404 })
-    }
+    },
+    onTiming: (event) => timing.push(event)
   })
 
   await expect(
@@ -102,6 +123,14 @@ test('attempts at most eight artwork fallbacks', async () => {
     )
   ).rejects.toThrow('HTTP 404')
   expect(fetches).toBe(8)
+  expect(timing).toEqual([
+    expect.objectContaining({
+      type: 'render',
+      mode: 'pixelated',
+      outcome: 'failed',
+      sourceCount: 8
+    })
+  ])
 })
 
 test('bounds queued downloads and renders', async () => {

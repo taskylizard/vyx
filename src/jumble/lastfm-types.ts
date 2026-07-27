@@ -2,6 +2,7 @@ import type { MusicBrainzClient } from './musicbrainz.ts'
 import type { DiscogsClient } from './discogs.ts'
 import type { DeezerClient } from './deezer.ts'
 import type { JumbleCandidate, JumbleHint, JumbleKind } from './types.ts'
+import type { JumbleTimingSink } from './timing.ts'
 
 export interface LastFmClientOptions {
   apiKey: string
@@ -14,6 +15,7 @@ export interface LastFmClientOptions {
   musicBrainz?: Pick<MusicBrainzClient, 'enrich'>
   discogs?: Pick<DiscogsClient, 'enrich'>
   deezer?: Pick<DeezerClient, 'enrich'>
+  onTiming?: JumbleTimingSink
 }
 
 export interface JumbleMusicProvider {

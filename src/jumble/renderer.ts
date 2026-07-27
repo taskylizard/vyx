@@ -2,6 +2,12 @@ import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { match, P } from 'ts-pattern'
 import { clamp } from './numbers.ts'
 import { readBoundedBytes } from './response.ts'
+import {
+  emitJumbleTiming,
+  jumbleDurationMs,
+  type JumbleTimingEvent,
+  type JumbleTimingSink
+} from './timing.ts'
 
 /** Pixel block sizes used by Jumble, from hardest to clearest. */
 export const PIXELATION_LEVELS = [0.125, 0.085, 0.05, 0.03, 0.02, 0.015, 0.01] as const
@@ -22,6 +28,7 @@ export interface JumbleImageRendererOptions {
   cacheBytes?: number
   maxConcurrentRenders?: number
   maxPendingRenders?: number
+  onTiming?: JumbleTimingSink
 }
 
 interface CachedImage {
@@ -46,6 +53,7 @@ export class JumbleImageRenderer {
   private cacheSize = 0
   private readonly inflightSources = new Map<string, Promise<Buffer>>()
   private readonly renderGate: AsyncGate
+  private readonly onTiming?: JumbleTimingSink
 
   constructor(options: JumbleImageRendererOptions = {}) {
     this.fetchImpl = options.fetchImpl ?? fetch
@@ -66,24 +74,63 @@ export class JumbleImageRenderer {
       clamp(Math.trunc(options.maxConcurrentRenders ?? 2), 1, 8),
       clamp(Math.trunc(options.maxPendingRenders ?? 16), 0, 64)
     )
+    this.onTiming = options.onTiming
   }
 
   async render(url: string, stage = 0): Promise<Buffer> {
-    const level = PIXELATION_LEVELS[clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)]!
-    return this.renderImage(url, level)
+    const normalizedStage = clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)
+    const level = PIXELATION_LEVELS[normalizedStage]!
+    return this.measureRender('pixelated', 1, normalizedStage, () => this.renderImage(url, level))
   }
 
   async renderWithFallback(urls: readonly string[], stage = 0): Promise<Buffer> {
-    const level = PIXELATION_LEVELS[clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)]!
-    return this.renderFirstAvailable(urls, level)
+    const normalizedStage = clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)
+    const level = PIXELATION_LEVELS[normalizedStage]!
+    const candidates = boundedArtworkUrls(urls)
+    return this.measureRender('pixelated', candidates.length, normalizedStage, () =>
+      this.renderFirstAvailable(candidates, level)
+    )
   }
 
   async reveal(url: string): Promise<Buffer> {
-    return this.renderImage(url)
+    return this.measureRender('revealed', 1, 0, () => this.renderImage(url))
   }
 
   async revealWithFallback(urls: readonly string[]): Promise<Buffer> {
-    return this.renderFirstAvailable(urls)
+    const candidates = boundedArtworkUrls(urls)
+    return this.measureRender('revealed', candidates.length, 0, () =>
+      this.renderFirstAvailable(candidates)
+    )
+  }
+
+  private async measureRender(
+    mode: 'pixelated' | 'revealed',
+    sourceCount: number,
+    stage: number,
+    task: () => Promise<Buffer>
+  ): Promise<Buffer> {
+    const startedAt = performance.now()
+    let outcome: 'success' | 'failed' = 'failed'
+    try {
+      const rendered = await task()
+      outcome = 'success'
+      return rendered
+    } finally {
+      const common = {
+        type: 'render' as const,
+        outcome,
+        durationMs: jumbleDurationMs(startedAt),
+        sourceCount
+      }
+      emitJumbleTiming(
+        this.onTiming,
+        match(mode)
+          .returnType<JumbleTimingEvent>()
+          .with('pixelated', () => ({ ...common, mode: 'pixelated', stage }))
+          .with('revealed', () => ({ ...common, mode: 'revealed' }))
+          .exhaustive()
+      )
+    }
   }
 
   private async renderImage(url: string, pixelationLevel?: number): Promise<Buffer> {
@@ -129,12 +176,9 @@ export class JumbleImageRenderer {
   }
 
   private async renderFirstAvailable(
-    urls: readonly string[],
+    candidates: readonly string[],
     pixelationLevel?: number
   ): Promise<Buffer> {
-    const candidates = [
-      ...new Set(urls.map((url) => url.trim()).filter((url) => url.length > 0))
-    ].slice(0, 8)
     if (candidates.length === 0) {
       throw new JumbleImageError('The music service did not return usable cover art.')
     }
@@ -233,6 +277,10 @@ export class JumbleImageRenderer {
       this.cacheSize -= oldest.value[1].bytes
     }
   }
+}
+
+function boundedArtworkUrls(urls: readonly string[]): string[] {
+  return [...new Set(urls.map((url) => url.trim()).filter((url) => url.length > 0))].slice(0, 8)
 }
 
 class AsyncGate {

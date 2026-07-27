@@ -8,6 +8,7 @@ import type {
   JumbleAction,
   JumbleActionResult,
   JumbleCandidate,
+  JumbleHint,
   JumbleKind,
   JumbleSession,
   JumbleServiceOptions,
@@ -16,6 +17,7 @@ import type {
   StartJumbleInput
 } from './types.ts'
 import { LastFmError, type JumbleMusicProvider } from './lastfm.ts'
+import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './timing.ts'
 
 export type {
   JumbleAction,
@@ -73,6 +75,7 @@ export class JumbleService {
   private readonly now: () => number
   private readonly randomIndex: (maxExclusive: number) => number
   private readonly onExpired?: (state: JumbleState) => void | Promise<void>
+  private readonly onTiming?: JumbleTimingSink
   private readonly startingChannels = new Set<string>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -86,6 +89,7 @@ export class JumbleService {
     this.now = options.now ?? Date.now
     this.randomIndex = options.randomIndex ?? ((maxExclusive) => randomInt(maxExclusive))
     this.onExpired = options.onExpired
+    this.onTiming = options.onTiming
   }
 
   async setProfile(discordUserId: string, username: string): Promise<string> {
@@ -108,51 +112,95 @@ export class JumbleService {
     if (this.startingChannels.has(input.channelId))
       throw new JumbleError('A Jumble is already starting in this channel.', 'busy')
     this.startingChannels.add(input.channelId)
+    const startedAt = performance.now()
+    let setupMs = 0
+    let selectionMs = 0
+    let hintsMs = 0
+    let persistenceMs = 0
+    let hintCount = 0
+    let imageCount = 0
+    let outcome: 'success' | 'failed' = 'failed'
     try {
-      await this.clearActiveChannel(input.channelId)
-      const username = await this.resolveStartUsername(input)
-      const candidate = await this.selectPlayableCandidate(
-        input.kind,
-        input.starterUserId,
-        username
-      )
-      const imageUrls = getCandidateImageUrls(candidate)
+      const setupStartedAt = performance.now()
+      let username: string
+      try {
+        await this.clearActiveChannel(input.channelId)
+        username = await this.resolveStartUsername(input)
+      } finally {
+        setupMs = jumbleDurationMs(setupStartedAt)
+      }
 
-      const hints = shuffle([...(await this.provider.getHints(candidate))], this.randomIndex)
+      const selectionStartedAt = performance.now()
+      let candidate: JumbleCandidate
+      try {
+        candidate = await this.selectPlayableCandidate(input.kind, input.starterUserId, username)
+      } finally {
+        selectionMs = jumbleDurationMs(selectionStartedAt)
+      }
+      const imageUrls = getCandidateImageUrls(candidate)
+      imageCount = imageUrls.length
+
+      const hintsStartedAt = performance.now()
+      let hints: JumbleHint[]
+      try {
+        hints = shuffle([...(await this.provider.getHints(candidate))], this.randomIndex)
+        hintCount = hints.length
+      } finally {
+        hintsMs = jumbleDurationMs(hintsStartedAt)
+      }
       const shuffledAnswer = shuffleJumbleAnswer(candidate.answer, this.randomIndex)
       const id = randomUUID()
-      const state = await this.repository.createSession({
-        id,
-        starterUserId: input.starterUserId,
-        guildId: input.guildId,
-        channelId: input.channelId,
-        kind: input.kind,
-        sourceUsername: username,
-        answer: candidate.answer,
-        artistName: candidate.artistName ?? null,
-        albumName:
-          candidate.albumName ??
-          match(input.kind)
-            .with('album', () => candidate.answer)
-            .with('artist', 'track', () => null)
-            .exhaustive(),
-        imageUrl: imageUrls[0] ?? null,
-        metadata: {
-          candidate,
-          shuffledAnswer,
-          answerVariants: candidate.answerVariants,
-          hints
-        },
-        startedAt: this.now(),
-        blurStage: 0
-      })
-      await this.repository.addHints(id, hints, Math.min(3, hints.length))
-      const complete = await this.getState(state.id)
+      const persistenceStartedAt = performance.now()
+      let complete: JumbleState
+      try {
+        const state = await this.repository.createSession({
+          id,
+          starterUserId: input.starterUserId,
+          guildId: input.guildId,
+          channelId: input.channelId,
+          kind: input.kind,
+          sourceUsername: username,
+          answer: candidate.answer,
+          artistName: candidate.artistName ?? null,
+          albumName:
+            candidate.albumName ??
+            match(input.kind)
+              .with('album', () => candidate.answer)
+              .with('artist', 'track', () => null)
+              .exhaustive(),
+          imageUrl: imageUrls[0] ?? null,
+          metadata: {
+            candidate,
+            shuffledAnswer,
+            answerVariants: candidate.answerVariants,
+            hints
+          },
+          startedAt: this.now(),
+          blurStage: 0
+        })
+        await this.repository.addHints(id, hints, Math.min(3, hints.length))
+        complete = await this.getState(state.id)
+      } finally {
+        persistenceMs = jumbleDurationMs(persistenceStartedAt)
+      }
       this.scheduleExpiry(complete.session)
+      outcome = 'success'
       return { action: 'started', state: complete }
     } catch (error) {
       this.rethrowStartError(error)
     } finally {
+      emitJumbleTiming(this.onTiming, {
+        type: 'start',
+        kind: input.kind,
+        outcome,
+        durationMs: jumbleDurationMs(startedAt),
+        setupMs,
+        selectionMs,
+        hintsMs,
+        persistenceMs,
+        hintCount,
+        imageCount
+      })
       this.startingChannels.delete(input.channelId)
     }
   }
@@ -342,37 +390,85 @@ export class JumbleService {
     starterUserId: string,
     username: string
   ): Promise<JumbleCandidate> {
-    const candidates = [...(await this.provider.getCandidates(kind, username, 100))].filter(
-      (candidate) => isCandidateIdentityValid(candidate, kind)
-    )
-    if (candidates.length === 0)
-      throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
+    const startedAt = performance.now()
+    let candidateFetchMs = 0
+    let recentLookupMs = 0
+    let hydrationMs = 0
+    let candidateCount = 0
+    let attemptedCount = 0
+    let outcome: 'success' | 'failed' = 'failed'
+    try {
+      const candidateFetchStartedAt = performance.now()
+      let candidates: JumbleCandidate[]
+      try {
+        candidates = [...(await this.provider.getCandidates(kind, username, 100))].filter(
+          (candidate) => isCandidateIdentityValid(candidate, kind)
+        )
+      } finally {
+        candidateFetchMs = jumbleDurationMs(candidateFetchStartedAt)
+      }
+      candidateCount = candidates.length
+      if (candidates.length === 0)
+        throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
 
-    const recent = await this.repository.listRecentForUser(starterUserId, kind, 80)
-    const recentKeys = new Set(
-      recent.map((session) => candidateKey(session.answer, session.artistName))
-    )
-    const unseen = candidates.filter(
-      (candidate) => !recentKeys.has(candidateKey(candidate.answer, candidate.artistName))
-    )
-    const pool = unseen.length > 0 ? unseen : candidates
-    const startIndex = this.randomIndex(pool.length)
-    const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
+      const recentLookupStartedAt = performance.now()
+      let recent: readonly JumbleSession[]
+      try {
+        recent = await this.repository.listRecentForUser(starterUserId, kind, 80)
+      } finally {
+        recentLookupMs = jumbleDurationMs(recentLookupStartedAt)
+      }
+      const recentKeys = new Set(
+        recent.map((session) => candidateKey(session.answer, session.artistName))
+      )
+      const unseen = candidates.filter(
+        (candidate) => !recentKeys.has(candidateKey(candidate.answer, candidate.artistName))
+      )
+      const pool = unseen.length > 0 ? unseen : candidates
+      const startIndex = this.randomIndex(pool.length)
+      const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
+      let selected: JumbleCandidate | undefined
 
-    for (let offset = 0; offset < attempts; offset += 1) {
-      const original = pool[(startIndex + offset) % pool.length]!
-      let hydrated = original
-      if (this.provider.hydrate !== undefined) {
+      for (let offset = 0; offset < attempts; offset += 1) {
+        attemptedCount += 1
+        const original = pool[(startIndex + offset) % pool.length]!
+        let hydrated = original
+        const hydrationStartedAt = performance.now()
         try {
-          // eslint-disable-next-line no-await-in-loop -- tasky: sequential hydration, tries candidates one at a time until a playable one is found
-          hydrated = await this.provider.hydrate(original)
-        } catch {
-          // tasky: one broken provider lookup must not make the whole profile unplayable.
+          if (this.provider.hydrate !== undefined) {
+            try {
+              // eslint-disable-next-line no-await-in-loop -- tasky: sequential hydration, tries candidates one at a time until a playable one is found
+              hydrated = await this.provider.hydrate(original)
+            } catch {
+              // tasky: one broken provider lookup must not make the whole profile unplayable.
+            }
+          }
+        } finally {
+          hydrationMs += jumbleDurationMs(hydrationStartedAt)
+        }
+        if (isPlayableCandidate(hydrated, kind)) {
+          selected = hydrated
+          break
         }
       }
-      if (isPlayableCandidate(hydrated, kind)) return hydrated
+
+      if (selected === undefined)
+        throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
+      outcome = 'success'
+      return selected
+    } finally {
+      emitJumbleTiming(this.onTiming, {
+        type: 'selection',
+        kind,
+        outcome,
+        durationMs: jumbleDurationMs(startedAt),
+        candidateFetchMs,
+        recentLookupMs,
+        hydrationMs,
+        candidateCount,
+        attempts: attemptedCount
+      })
     }
-    throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
   }
 
   private rethrowStartError(error: unknown): never {

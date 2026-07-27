@@ -12,6 +12,7 @@ import { buildJumblePayload } from '../../src/jumble/presentation.ts'
 import { JumbleRepository } from '../../src/jumble/repository.ts'
 import type { JumbleImageRenderer } from '../../src/jumble/renderer.ts'
 import { JumbleError, JumbleService } from '../../src/jumble/service.ts'
+import type { JumbleTimingEvent } from '../../src/jumble/timing.ts'
 import type { JumbleCandidate, JumbleHint, JumbleKind } from '../../src/jumble/types.ts'
 
 let database: ReturnType<typeof createKanikouDatabase>
@@ -242,6 +243,7 @@ test('hydrates candidates before artwork checks and persists accepted aliases', 
 test('bounds failed candidate hydration attempts', async () => {
   service.stop()
   let hydrations = 0
+  const timing: JumbleTimingEvent[] = []
   service = new JumbleService(
     repository,
     {
@@ -260,7 +262,7 @@ test('bounds failed candidate hydration attempts', async () => {
         return []
       }
     },
-    { now: () => now, randomIndex: () => 0 }
+    { now: () => now, randomIndex: () => 0, onTiming: (event) => timing.push(event) }
   )
 
   await expect(
@@ -273,6 +275,22 @@ test('bounds failed candidate hydration attempts', async () => {
     })
   ).rejects.toMatchObject({ code: 'no-candidates' })
   expect(hydrations).toBe(8)
+  expect(timing).toEqual([
+    expect.objectContaining({
+      type: 'selection',
+      kind: 'track',
+      outcome: 'failed',
+      candidateCount: 32,
+      attempts: 8
+    }),
+    expect.objectContaining({
+      type: 'start',
+      kind: 'track',
+      outcome: 'failed',
+      imageCount: 0,
+      hintCount: 0
+    })
+  ])
 })
 
 test('expires an active session when its clock passes the kind timeout', async () => {

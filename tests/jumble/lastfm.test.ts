@@ -1,6 +1,7 @@
 import { expect, test } from 'vite-plus/test'
 import { DeezerClient } from '../../src/jumble/deezer.ts'
 import { LastFmClient } from '../../src/jumble/lastfm.ts'
+import type { JumbleTimingEvent } from '../../src/jumble/timing.ts'
 
 test('parses Last.fm top albums and uses the largest non-placeholder image', async () => {
   const calls: string[] = []
@@ -96,6 +97,7 @@ test('hydrates a top track before requiring its nested album artwork', async () 
 })
 
 test('uses Deezer artwork for Cloudy Hollow when Last.fm and MusicBrainz have no cover', async () => {
+  const timing: JumbleTimingEvent[] = []
   const deezer = new DeezerClient({
     fetchImpl: async () =>
       jsonResponse({
@@ -118,6 +120,7 @@ test('uses Deezer artwork for Cloudy Hollow when Last.fm and MusicBrainz have no
     apiKey: 'test-key',
     deezer,
     musicBrainz: { enrich: async (candidate) => candidate },
+    onTiming: (event) => timing.push(event),
     fetchImpl: async (input) => {
       const url =
         input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
@@ -146,6 +149,33 @@ test('uses Deezer artwork for Cloudy Hollow when Last.fm and MusicBrainz have no
     imageUrl: 'https://images.example.test/cloudy-hollow.jpg',
     playcount: 66
   })
+  expect(timing).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        type: 'provider',
+        provider: 'lastfm',
+        operation: 'details',
+        kind: 'track',
+        outcome: 'success',
+        imageCount: 0
+      }),
+      expect.objectContaining({
+        type: 'provider',
+        provider: 'musicbrainz',
+        operation: 'enrichment',
+        outcome: 'unchanged'
+      }),
+      expect.objectContaining({
+        type: 'provider',
+        provider: 'deezer',
+        operation: 'enrichment',
+        outcome: 'success',
+        imageCount: 1
+      })
+    ])
+  )
+  expect(JSON.stringify(timing)).not.toContain('Cloudy Hollow')
+  expect(JSON.stringify(timing)).not.toContain('Pretty Patterns')
 })
 
 function jsonResponse(value: unknown): Response {
