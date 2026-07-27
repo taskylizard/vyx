@@ -182,7 +182,7 @@ export class MusicBrainzClient {
   }
 
   private async getArtist(name: string, mbid?: string): Promise<JumbleArtistMetadata | undefined> {
-    const cacheKey = `musicbrainz:artist:${mbid ?? normalizeMusicBrainzKey(name)}`
+    const cacheKey = `musicbrainz:v2:artist:${mbid ?? normalizeMusicBrainzKey(name)}`
     const cached = await this.readCache(cacheKey, JumbleArtistMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
     const staleValue = cached?.found ? cached.value : undefined
@@ -218,7 +218,7 @@ export class MusicBrainzClient {
     artistName: string | undefined,
     mbid?: string
   ): Promise<ReleaseMetadata | undefined> {
-    const cacheKey = `musicbrainz:release:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
+    const cacheKey = `musicbrainz:v2:release:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
     const cached = await this.readCache(cacheKey, ReleaseMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
     const staleValue = cached?.found ? cached.value : undefined
@@ -266,7 +266,7 @@ export class MusicBrainzClient {
     artistName: string | undefined,
     mbid?: string
   ): Promise<RecordingMetadata | undefined> {
-    const cacheKey = `musicbrainz:recording:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
+    const cacheKey = `musicbrainz:v2:recording:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
     const cached = await this.readCache(cacheKey, RecordingMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
     const staleValue = cached?.found ? cached.value : undefined

@@ -10,6 +10,7 @@ import type { JumbleCandidate, JumbleKind, JumbleState } from '../../src/jumble/
 test('play again creates and attaches a new game message without editing the completed one', async () => {
   const state = jumbleState('track', false)
   const createMessage = vi.fn(async () => ({ id: 'new-message' }))
+  const sendTyping = vi.fn(async () => undefined)
   const attachMessage = vi.fn(async () => state)
   const update = vi.fn(async () => undefined)
   const context = {
@@ -22,7 +23,7 @@ test('play again creates and attaches a new game message without editing the com
       jumbleRenderer: {},
       logger: { warn: vi.fn() }
     },
-    client: { rest: { channels: { createMessage } } },
+    client: { rest: { channels: { createMessage, sendTyping } } },
     deferUpdate: vi.fn(async () => undefined),
     interaction: {
       appPermissions: { has: vi.fn(() => true) },
@@ -38,6 +39,7 @@ test('play again creates and attaches a new game message without editing the com
   await jumbleReplayButton.execute(context as never)
 
   expect(context.deferUpdate).toHaveBeenCalledOnce()
+  expect(sendTyping).toHaveBeenCalledWith('channel-1')
   expect(createMessage).toHaveBeenCalledWith(
     'channel-1',
     expect.objectContaining({ content: expect.stringContaining('**Track Jumble**') })

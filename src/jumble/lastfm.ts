@@ -180,12 +180,17 @@ export class LastFmClient implements JumbleMusicProvider {
       (getCandidateImageUrls(hydrated).length === 0 ||
         normalizeAnswer(hydrated.answer).length === 0 ||
         hasNonLatinLetters(hydrated.answer))
-    const [musicBrainzResult, discogsResult] = await Promise.allSettled([
+    const needsDeezer =
+      this.options.deezer !== undefined && getCandidateImageUrls(hydrated).length === 0
+    const [musicBrainzResult, discogsResult, deezerResult] = await Promise.allSettled([
       this.options.musicBrainz === undefined
         ? Promise.resolve(undefined)
         : this.options.musicBrainz.enrich(hydrated),
       needsDiscogs && this.options.discogs !== undefined
         ? this.options.discogs.enrich(hydrated)
+        : Promise.resolve(undefined),
+      needsDeezer && this.options.deezer !== undefined
+        ? this.options.deezer.enrich(hydrated)
         : Promise.resolve(undefined)
     ])
     const musicBrainzCandidate = match(musicBrainzResult)
@@ -194,7 +199,15 @@ export class LastFmClient implements JumbleMusicProvider {
     const discogsCandidate = match(discogsResult)
       .with({ status: 'fulfilled' }, ({ value }) => value)
       .otherwise(() => undefined)
-    hydrated = mergeJumbleCandidates(hydrated, musicBrainzCandidate, discogsCandidate)
+    const deezerCandidate = match(deezerResult)
+      .with({ status: 'fulfilled' }, ({ value }) => value)
+      .otherwise(() => undefined)
+    hydrated = mergeJumbleCandidates(
+      hydrated,
+      deezerCandidate,
+      musicBrainzCandidate,
+      discogsCandidate
+    )
     return hydrated
   }
 

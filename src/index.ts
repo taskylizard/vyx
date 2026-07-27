@@ -76,6 +76,7 @@ export {
   shuffleCharacters
 } from './jumble/answer.ts'
 export { DiscogsClient, type DiscogsClientOptions } from './jumble/discogs.ts'
+export { DeezerClient, type DeezerClientOptions } from './jumble/deezer.ts'
 export {
   LastFmClient,
   LastFmError,

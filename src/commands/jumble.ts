@@ -5,6 +5,7 @@ import { jumblePermissionError, renderJumble } from '../jumble/discord.ts'
 import { JumbleImageError } from '../jumble/renderer.ts'
 import { LastFmError } from '../jumble/lastfm.ts'
 import { componentIds } from '../jumble/components.ts'
+import { startJumbleTyping } from '../jumble/typing.ts'
 import { modules } from '../modules.ts'
 import jumbleProfileSubcommand from './jumble-profile.ts'
 import jumbleStatsSubcommand from './jumble-stats.ts'
@@ -40,44 +41,49 @@ export default slash({
       },
       async execute(context) {
         await context.defer()
-        const { username } = context.options
-        const requestedKind = context.options.kind ?? 'album'
-        const kind = match(requestedKind)
-          .with('artist', 'album', 'track', (value) => value)
-          .otherwise(() => undefined)
-        if (kind === undefined) {
-          await context.editResponse('That Jumble type is not available.')
-          return
-        }
-        const permissionError = jumblePermissionError(context.interaction)
-        if (permissionError !== null) {
-          await context.editResponse(permissionError)
-          return
-        }
-        if (username !== undefined)
-          await context.app.jumble.setProfile(context.interaction.user.id, username)
-        const result = await context.app.jumble.start({
-          starterUserId: context.interaction.user.id,
-          guildId: context.interaction.guildID,
-          channelId: context.interaction.channelID,
-          kind,
-          username
-        })
-        const rendered = await renderJumble(
-          result.state,
-          context.app.jumbleRenderer,
-          componentIds(result.state.session.id),
-          result.action
-        )
-        if (rendered.imageError !== undefined) {
-          context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
-        }
-        await context.editResponse(rendered.payload)
+        const stopTyping = startJumbleTyping(context.client, context.interaction.channelID)
         try {
-          const original = await context.interaction.getOriginal()
-          await context.app.jumble.attachMessage(result.state.session.id, original.id)
-        } catch (error) {
-          context.app.logger.warn('jumble message ID could not be saved', error)
+          const { username } = context.options
+          const requestedKind = context.options.kind ?? 'album'
+          const kind = match(requestedKind)
+            .with('artist', 'album', 'track', (value) => value)
+            .otherwise(() => undefined)
+          if (kind === undefined) {
+            await context.editResponse('That Jumble type is not available.')
+            return
+          }
+          const permissionError = jumblePermissionError(context.interaction)
+          if (permissionError !== null) {
+            await context.editResponse(permissionError)
+            return
+          }
+          if (username !== undefined)
+            await context.app.jumble.setProfile(context.interaction.user.id, username)
+          const result = await context.app.jumble.start({
+            starterUserId: context.interaction.user.id,
+            guildId: context.interaction.guildID,
+            channelId: context.interaction.channelID,
+            kind,
+            username
+          })
+          const rendered = await renderJumble(
+            result.state,
+            context.app.jumbleRenderer,
+            componentIds(result.state.session.id),
+            result.action
+          )
+          if (rendered.imageError !== undefined) {
+            context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+          }
+          await context.editResponse(rendered.payload)
+          try {
+            const original = await context.interaction.getOriginal()
+            await context.app.jumble.attachMessage(result.state.session.id, original.id)
+          } catch (error) {
+            context.app.logger.warn('jumble message ID could not be saved', error)
+          }
+        } finally {
+          stopTyping()
         }
       }
     }),

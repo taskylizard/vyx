@@ -18,6 +18,7 @@ import { componentIds, jumbleComponents } from '../jumble/components.ts'
 import { editJumbleMessage, renderJumble } from '../jumble/discord.ts'
 import { LastFmClient, MissingLastFmProvider } from '../jumble/lastfm.ts'
 import { DiscogsClient } from '../jumble/discogs.ts'
+import { DeezerClient } from '../jumble/deezer.ts'
 import { JumbleMetadataCache } from '../jumble/metadata-cache.ts'
 import { MusicBrainzClient } from '../jumble/musicbrainz.ts'
 import { JumbleImageRenderer } from '../jumble/renderer.ts'
@@ -59,10 +60,14 @@ function createJumbleInfrastructure(
     cache: jumbleMetadataCache,
     onError: (error) => logger.warn('Discogs enrichment error', error)
   })
+  const deezer = new DeezerClient({
+    cache: jumbleMetadataCache,
+    onError: (error) => logger.warn('Deezer enrichment error', error)
+  })
   const jumbleRenderer = new JumbleImageRenderer()
   const jumbleProvider = match(config.LASTFM_API_KEY)
     .with(undefined, () => new MissingLastFmProvider())
-    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz, discogs }))
+    .otherwise((apiKey) => new LastFmClient({ apiKey, musicBrainz, discogs, deezer }))
   const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
     onExpired: async (state) => {
       if (state.session.messageId === null) return

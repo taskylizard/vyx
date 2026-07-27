@@ -67,7 +67,7 @@ export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetada
       title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
       createAnswerVariants(aliases, 'musicbrainz')
     ),
-    imageUrls: coverArtUrls('release', mbid)
+    imageUrls: coverArtUrls('release', mbid, hasFrontCover(payload))
   }
 }
 
@@ -85,7 +85,7 @@ export function parseReleaseGroup(group: MusicBrainzEnvelope): ReleaseMetadata |
       title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
       createAnswerVariants(aliases, 'musicbrainz')
     ),
-    imageUrls: coverArtUrls('release-group', releaseGroupMbid)
+    imageUrls: coverArtUrls('release-group', releaseGroupMbid, hasFrontCover(group))
   }
 }
 
@@ -302,8 +302,14 @@ function numberValue(value: unknown): number {
 
 function coverArtUrls(
   entity: 'release' | 'release-group',
-  mbid: string | undefined
+  mbid: string | undefined,
+  frontAvailable: boolean
 ): string[] | undefined {
-  if (!isMusicBrainzId(mbid)) return undefined
+  if (!frontAvailable || !isMusicBrainzId(mbid)) return undefined
   return [`https://coverartarchive.org/${entity}/${encodeURIComponent(mbid)}/front-500`]
+}
+
+function hasFrontCover(payload: MusicBrainzEnvelope): boolean {
+  const archive = payload['cover-art-archive']
+  return isMusicBrainzObject(archive) && typeof archive.front === 'boolean' && archive.front
 }

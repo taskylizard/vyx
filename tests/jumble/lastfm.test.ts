@@ -1,4 +1,5 @@
 import { expect, test } from 'vite-plus/test'
+import { DeezerClient } from '../../src/jumble/deezer.ts'
 import { LastFmClient } from '../../src/jumble/lastfm.ts'
 
 test('parses Last.fm top albums and uses the largest non-placeholder image', async () => {
@@ -91,6 +92,59 @@ test('hydrates a top track before requiring its nested album artwork', async () 
     albumName: '(((((ultraSOUND)))))',
     imageUrl: 'https://example.test/large.png',
     imageUrls: ['https://example.test/large.png', 'https://example.test/medium.png']
+  })
+})
+
+test('uses Deezer artwork for Cloudy Hollow when Last.fm and MusicBrainz have no cover', async () => {
+  const deezer = new DeezerClient({
+    fetchImpl: async () =>
+      jsonResponse({
+        data: [
+          {
+            id: 1_256_287_182,
+            title: 'Cloudy Hollow',
+            duration: 264,
+            artist: { id: 77_236_572, name: 'Pretty Patterns' },
+            album: {
+              id: 210_439_932,
+              title: 'Cloudy Hollow',
+              cover_xl: 'https://images.example.test/cloudy-hollow.jpg'
+            }
+          }
+        ]
+      })
+  })
+  const client = new LastFmClient({
+    apiKey: 'test-key',
+    deezer,
+    musicBrainz: { enrich: async (candidate) => candidate },
+    fetchImpl: async (input) => {
+      const url =
+        input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
+      const method = url.searchParams.get('method')
+      if (method === 'track.getinfo') {
+        return jsonResponse({
+          track: {
+            name: 'Cloudy Hollow',
+            artist: { name: 'Pretty Patterns' },
+            album: { title: 'Cloudy Hollow', image: [] }
+          }
+        })
+      }
+      return jsonResponse({ artist: { name: 'Pretty Patterns' } })
+    }
+  })
+
+  await expect(
+    client.hydrate({
+      kind: 'track',
+      answer: 'Cloudy Hollow',
+      artistName: 'Pretty Patterns',
+      playcount: 66
+    })
+  ).resolves.toMatchObject({
+    imageUrl: 'https://images.example.test/cloudy-hollow.jpg',
+    playcount: 66
   })
 })
 

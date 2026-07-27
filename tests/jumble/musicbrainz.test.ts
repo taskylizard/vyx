@@ -3,7 +3,8 @@ import {
   chooseArtist,
   chooseRecording,
   chooseReleaseGroup,
-  parseRecording
+  parseRecording,
+  parseRelease
 } from '../../src/jumble/musicbrainz-parser.ts'
 import { MusicBrainzClient } from '../../src/jumble/musicbrainz.ts'
 
@@ -164,6 +165,7 @@ test('adds a Cover Art Archive fallback for a resolved release', async () => {
         id: releaseId,
         title: 'Homogenic',
         date: '1997-09-22',
+        'cover-art-archive': { artwork: true, front: true },
         'release-group': { title: 'Homogenic', 'primary-type': 'Album' }
       })
     },
@@ -174,10 +176,7 @@ test('adds a Cover Art Archive fallback for a resolved release', async () => {
     client.enrich({ kind: 'album', answer: 'Homogenic', artistName: 'Björk' })
   ).resolves.toMatchObject({
     imageUrl: `https://coverartarchive.org/release/${releaseId}/front-500`,
-    imageUrls: [
-      `https://coverartarchive.org/release/${releaseId}/front-500`,
-      'https://coverartarchive.org/release-group/87654321-4321-4321-8321-cba987654321/front-500'
-    ]
+    imageUrls: [`https://coverartarchive.org/release/${releaseId}/front-500`]
   })
 })
 
@@ -191,6 +190,7 @@ test('uses a release-group Cover Art Archive fallback when no release is resolve
             id: releaseGroupId,
             title: 'Homogenic',
             score: 100,
+            'cover-art-archive': { artwork: true, front: true },
             'artist-credit': [{ name: 'Björk' }]
           }
         ]
@@ -203,6 +203,28 @@ test('uses a release-group Cover Art Archive fallback when no release is resolve
   ).resolves.toMatchObject({
     imageUrl: `https://coverartarchive.org/release-group/${releaseGroupId}/front-500`,
     imageUrls: [`https://coverartarchive.org/release-group/${releaseGroupId}/front-500`]
+  })
+})
+
+test('does not invent Cover Art Archive URLs without positive front-cover evidence', () => {
+  expect(
+    parseRelease({
+      id: '470bce3d-e95e-4d65-8c71-bf8838ea3247',
+      title: 'Cloudy Hollow',
+      date: '2021-02-25',
+      'cover-art-archive': {
+        artwork: false,
+        front: false,
+        count: 0
+      },
+      'release-group': {
+        id: '41f20921-8f30-488b-8246-6cd10bbf5e8e',
+        title: 'Cloudy Hollow'
+      }
+    })
+  ).toMatchObject({
+    mbid: '470bce3d-e95e-4d65-8c71-bf8838ea3247',
+    imageUrls: undefined
   })
 })
 

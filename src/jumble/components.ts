@@ -6,6 +6,7 @@ import type { ComponentContext } from 'rosepack'
 import type { BotContext } from '../bot/context.ts'
 import { modules } from '../modules.ts'
 import { isJumbleKind, type JumbleActionResult } from './types.ts'
+import { startJumbleTyping } from './typing.ts'
 
 export const jumbleHintButton = button({
   customID: 'jumble/hint/:sessionId',
@@ -63,30 +64,35 @@ export const jumbleReplayButton = button({
   beforeExecute: assertJumbleEnabled,
   async execute(context) {
     await context.deferUpdate()
-    const permissionError = jumblePermissionError(context.interaction)
-    if (permissionError !== null) throw new Error(permissionError)
-    if (!isJumbleKind(context.params.kind)) throw new Error('That Jumble type is not supported.')
-    const result = await context.app.jumble.start({
-      starterUserId: context.interaction.user.id,
-      guildId: context.interaction.guildID,
-      channelId: context.interaction.channelID,
-      kind: context.params.kind,
-      username: (await context.app.jumble.getProfile(context.interaction.user.id)) ?? undefined
-    })
-    const rendered = await renderJumble(
-      result.state,
-      context.app.jumbleRenderer,
-      componentIds(result.state.session.id),
-      result.action
-    )
-    if (rendered.imageError !== undefined) {
-      context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+    const stopTyping = startJumbleTyping(context.client, context.interaction.channelID)
+    try {
+      const permissionError = jumblePermissionError(context.interaction)
+      if (permissionError !== null) throw new Error(permissionError)
+      if (!isJumbleKind(context.params.kind)) throw new Error('That Jumble type is not supported.')
+      const result = await context.app.jumble.start({
+        starterUserId: context.interaction.user.id,
+        guildId: context.interaction.guildID,
+        channelId: context.interaction.channelID,
+        kind: context.params.kind,
+        username: (await context.app.jumble.getProfile(context.interaction.user.id)) ?? undefined
+      })
+      const rendered = await renderJumble(
+        result.state,
+        context.app.jumbleRenderer,
+        componentIds(result.state.session.id),
+        result.action
+      )
+      if (rendered.imageError !== undefined) {
+        context.app.logger.warn('jumble image could not be rendered', rendered.imageError)
+      }
+      const message = await context.client.rest.channels.createMessage(
+        context.interaction.channelID,
+        rendered.payload
+      )
+      await context.app.jumble.attachMessage(result.state.session.id, message.id)
+    } finally {
+      stopTyping()
     }
-    const message = await context.client.rest.channels.createMessage(
-      context.interaction.channelID,
-      rendered.payload
-    )
-    await context.app.jumble.attachMessage(result.state.session.id, message.id)
   },
   onError: handleComponentError
 })

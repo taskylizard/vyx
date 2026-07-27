@@ -1,5 +1,6 @@
 import type { MusicBrainzClient } from './musicbrainz.ts'
 import type { DiscogsClient } from './discogs.ts'
+import type { DeezerClient } from './deezer.ts'
 import type { JumbleCandidate, JumbleHint, JumbleKind } from './types.ts'
 
 export interface LastFmClientOptions {
@@ -12,6 +13,7 @@ export interface LastFmClientOptions {
   maxResponseBytes?: number
   musicBrainz?: Pick<MusicBrainzClient, 'enrich'>
   discogs?: Pick<DiscogsClient, 'enrich'>
+  deezer?: Pick<DeezerClient, 'enrich'>
 }
 
 export interface JumbleMusicProvider {
