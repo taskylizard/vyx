@@ -84,6 +84,10 @@ function buildContent(state: JumbleState, action: JumbleAction | undefined): str
     shownHints.length === 0
       ? []
       : ['', '**Hints**', ...shownHints.map((hint) => `• ${hint.content}`)]
+  const scrambledLine =
+    session.metadata.shuffledAnswer === undefined
+      ? undefined
+      : `Unscramble: **${safeInline(session.metadata.shuffledAnswer)}**`
 
   if (endedAt !== null) {
     const outcome = match(session.outcome)
@@ -99,15 +103,14 @@ function buildContent(state: JumbleState, action: JumbleAction | undefined): str
       .exhaustive()
     return [
       `${outcome}\nAnswer: **${safeInline(session.answer)}**${artist}${elapsed}`,
+      ...(scrambledLine === undefined ? [] : ['', scrambledLine]),
       ...shownHintLines
     ].join('\n')
   }
 
   const lines = [
     `**${name} Jumble**`,
-    session.metadata.shuffledAnswer !== undefined
-      ? `Unscramble: **${safeInline(session.metadata.shuffledAnswer)}**`
-      : `What ${session.kind} is hidden in the pixels and scrambled text?`
+    scrambledLine ?? `What ${session.kind} is hidden in the pixels and scrambled text?`
   ]
   const actionLines = match(action)
     .with('incorrect', () => ['❌ Not quite — keep guessing!'])

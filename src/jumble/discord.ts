@@ -157,7 +157,6 @@ export async function handleJumbleMessage(
     }
   }
   await match(result.action)
-    .with('incorrect', async () => safeReaction(message, '❌'))
     .with('won', async (action) => {
       await renderFinished(action)
       await createJumbleMessage(client, message.channelID, {
@@ -178,7 +177,7 @@ export async function handleJumbleMessage(
       await safeReaction(message, '✅')
     })
     .with('expired', 'gave_up', renderFinished)
-    .with('started', 'updated', 'unchanged', async () => undefined)
+    .with('incorrect', 'started', 'updated', 'unchanged', async () => undefined)
     .exhaustive()
   return true
 }

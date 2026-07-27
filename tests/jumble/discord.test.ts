@@ -255,7 +255,7 @@ test.each([
   }
 )
 
-test('does not send a winner reply for an incorrect guess', async () => {
+test('does not reply or react to an incorrect guess', async () => {
   const state = jumbleState('track', false)
   const createMessage = vi.fn(async () => ({}))
   const createReaction = vi.fn(async () => undefined)
@@ -289,7 +289,7 @@ test('does not send a winner reply for an incorrect guess', async () => {
   })
 
   expect(createMessage).not.toHaveBeenCalled()
-  expect(createReaction).toHaveBeenCalledWith('❌')
+  expect(createReaction).not.toHaveBeenCalled()
 })
 
 function jumbleState(

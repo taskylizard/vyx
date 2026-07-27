@@ -150,6 +150,7 @@ test('persists a text-and-art artist session, hints, guesses, and a solved outco
     componentIds: componentIds(solved.state.session.id)
   }).content
   expect(solvedContent).toContain('Solved in **1.3s**.')
+  expect(solvedContent).toContain(`Unscramble: **${solved.state.session.metadata.shuffledAnswer}**`)
   expect(solvedContent).toContain('**Hints**')
   expect(solvedContent).toContain('• A hint')
   await expect(service.stats('user-1')).resolves.toMatchObject({ played: 1, won: 0 })
@@ -178,6 +179,7 @@ test('reveals hints, advances pixel stages, and allows reshuffles without daily 
     componentIds: componentIds(gaveUp.state.session.id)
   }).content
   expect(gaveUpContent).toContain('🏳️ <@user-1> gave up.')
+  expect(gaveUpContent).toContain(`Unscramble: **${gaveUp.state.session.metadata.shuffledAnswer}**`)
   expect(gaveUpContent).not.toContain('Game over')
   expect(gaveUpContent).toContain('**Hints**')
   expect(gaveUpContent).toContain('• A hint')
