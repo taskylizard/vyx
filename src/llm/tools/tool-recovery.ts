@@ -29,6 +29,7 @@ export function withToolRecovery(tool: Tool, config: ToolRecoveryConfig = {}): T
     execute: async (input, options) => {
       for (let attempt = 0; ; attempt += 1) {
         try {
+          // eslint-disable-next-line no-await-in-loop -- tasky: sequential retry, each attempt must observe the previous failure
           return await execute(input, options)
         } catch (error) {
           if (attempt >= maxRetries || !isTransientToolError(error)) {
@@ -36,6 +37,7 @@ export function withToolRecovery(tool: Tool, config: ToolRecoveryConfig = {}): T
           }
 
           const sleep = config.sleep ?? defaultSleep
+          // eslint-disable-next-line no-await-in-loop -- tasky: sequential retry, backoff delay before the next attempt
           await sleep(retryDelayMs * 2 ** attempt)
         }
       }

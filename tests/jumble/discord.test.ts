@@ -71,13 +71,11 @@ test.each([
       submitGuess: vi.fn(async () => ({ action: 'won', state }))
     } as unknown as JumbleService
 
-    const handled = await handleJumbleMessage(
-      client,
-      message,
+    const handled = await handleJumbleMessage(client, message, {
       service,
-      {} as JumbleImageRenderer,
-      () => ({ giveUp: '', hint: '', replay: () => '', reshuffle: '', unblur: '' })
-    )
+      renderer: {} as JumbleImageRenderer,
+      idsFor: () => ({ giveUp: '', hint: '', replay: () => '', reshuffle: '', unblur: '' })
+    })
 
     expect(handled).toBe(true)
     expect(editMessage).toHaveBeenCalledWith(
@@ -124,13 +122,17 @@ test('does not send a winner reply for an incorrect guess', async () => {
     submitGuess: vi.fn(async () => ({ action: 'incorrect', state }))
   } as unknown as JumbleService
 
-  await handleJumbleMessage(client, message, service, {} as JumbleImageRenderer, () => ({
-    giveUp: '',
-    hint: '',
-    replay: () => '',
-    reshuffle: '',
-    unblur: ''
-  }))
+  await handleJumbleMessage(client, message, {
+    service,
+    renderer: {} as JumbleImageRenderer,
+    idsFor: () => ({
+      giveUp: '',
+      hint: '',
+      replay: () => '',
+      reshuffle: '',
+      unblur: ''
+    })
+  })
 
   expect(createMessage).not.toHaveBeenCalled()
   expect(createReaction).toHaveBeenCalledWith('❌')

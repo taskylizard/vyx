@@ -56,6 +56,7 @@ export class GuildSettingsStore {
     module
   }: GuildModuleMutation): Promise<GuildModuleMutationResult> {
     for (let attempt = 0; attempt < MAX_MUTATION_ATTEMPTS; attempt += 1) {
+      // eslint-disable-next-line no-await-in-loop -- tasky: sequential optimistic retry, each attempt re-reads current state before mutating
       const row = await this.find(applicationID, guildID)
       const rawModules = row?.enabledModules ?? '[]'
       const current = parseStringArray(rawModules)
@@ -70,6 +71,7 @@ export class GuildSettingsStore {
       const encoded = JSON.stringify(next)
 
       if (row === undefined) {
+        // eslint-disable-next-line no-await-in-loop -- tasky: sequential optimistic retry, insert then re-read on conflict
         await this.db
           .insert(guildSettings)
           .values({
@@ -84,6 +86,7 @@ export class GuildSettingsStore {
         continue
       }
 
+      // eslint-disable-next-line no-await-in-loop -- tasky: sequential optimistic retry, update then check rowsAffected
       const result = await this.db
         .update(guildSettings)
         .set({ enabledModules: encoded, updatedAt: Date.now() })

@@ -113,7 +113,7 @@ export default slash({
               await context.editResponse('Server memory can only be used inside a Discord server.')
               return
             }
-            if (context.interaction.memberPermissions?.has('MANAGE_GUILD') !== true) {
+            if (!context.interaction.memberPermissions?.has('MANAGE_GUILD')) {
               await context.editResponse(
                 'You need the Manage Server permission to change server memory.'
               )
@@ -150,7 +150,7 @@ export default slash({
               await context.editResponse('Server memory can only be used inside a Discord server.')
               return
             }
-            if (context.interaction.memberPermissions?.has('MANAGE_GUILD') !== true) {
+            if (!context.interaction.memberPermissions?.has('MANAGE_GUILD')) {
               await context.editResponse(
                 'You need the Manage Server permission to change server memory.'
               )
@@ -192,7 +192,7 @@ export default slash({
               await context.editResponse('Server memory can only be used inside a Discord server.')
               return
             }
-            if (context.interaction.memberPermissions?.has('MANAGE_GUILD') !== true) {
+            if (!context.interaction.memberPermissions?.has('MANAGE_GUILD')) {
               await context.editResponse(
                 'You need the Manage Server permission to change server memory.'
               )

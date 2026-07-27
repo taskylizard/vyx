@@ -175,6 +175,7 @@ async function tryHTMLEmbed(
   signal?: AbortSignal
 ): Promise<Record<string, unknown> | undefined> {
   for (const suffix of ['/embed/captioned/', '/embed/']) {
+    // eslint-disable-next-line no-await-in-loop -- tasky: sequential fallback, tries embed endpoints one at a time
     const response = await fetch(`https://www.instagram.com/p/${postID}${suffix}`, {
       headers: EMBED_HEADERS,
       signal
@@ -182,6 +183,7 @@ async function tryHTMLEmbed(
     if (!response?.ok) {
       continue
     }
+    // eslint-disable-next-line no-await-in-loop -- tasky: sequential fallback, reads the response body before trying the next endpoint
     const html = await response.text()
     const context = parseEmbedContext(html)
     if (context) {

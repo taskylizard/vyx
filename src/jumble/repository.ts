@@ -254,12 +254,11 @@ export class JumbleRepository {
   async recentAnswersForSession(
     sessionId: string
   ): Promise<Array<{ userId: string; correct: boolean }>> {
-    const rows = await this.db
+    return this.db
       .select({ userId: jumbleAnswers.discordUserId, correct: jumbleAnswers.correct })
       .from(jumbleAnswers)
       .where(eq(jumbleAnswers.sessionId, sessionId))
       .orderBy(asc(jumbleAnswers.answeredAt))
-    return rows
   }
 
   async statsForUser(discordUserId: string, kind?: JumbleKind): Promise<JumbleStats> {

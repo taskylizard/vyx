@@ -119,6 +119,7 @@ async function fetchWithRetry(
   let lastError: unknown
   for (let attempt = 0; attempt < retries; attempt += 1) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- tasky: sequential retry with backoff, each attempt must observe the previous failure
       const response = await fetch(input, init)
       if (response.ok || attempt === retries - 1) {
         return response
@@ -129,6 +130,7 @@ async function fetchWithRetry(
         throw error
       }
     }
+    // eslint-disable-next-line no-await-in-loop -- tasky: sequential retry with backoff, delay before the next attempt
     await abortableDelay(retryDelay, init.signal)
   }
   throw lastError instanceof Error ? lastError : new Error('SnapSave request failed')

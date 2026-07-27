@@ -1,5 +1,6 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { match, P } from 'ts-pattern'
+import { clamp } from './numbers.ts'
 import { readBoundedBytes } from './response.ts'
 
 /** Pixel block sizes used by Jumble, from hardest to clearest. */
@@ -49,31 +50,31 @@ export class JumbleImageRenderer {
   constructor(options: JumbleImageRendererOptions = {}) {
     this.fetchImpl = options.fetchImpl ?? fetch
     this.timeoutMs = options.timeoutMs ?? 8_000
-    this.maxBytes = Math.min(
-      Math.max(Math.trunc(options.maxBytes ?? 8 * 1024 * 1024), 16 * 1024),
+    this.maxBytes = clamp(
+      Math.trunc(options.maxBytes ?? 8 * 1024 * 1024),
+      16 * 1024,
       MAX_SOURCE_BYTES
     )
-    this.size = Math.min(Math.max(Math.trunc(options.size ?? 512), 16), MAX_RENDER_SIZE)
-    this.cacheEntries = Math.min(Math.max(Math.trunc(options.cacheEntries ?? 64), 1), 512)
-    this.cacheBytes = Math.min(
-      Math.max(Math.trunc(options.cacheBytes ?? 32 * 1024 * 1024), this.maxBytes),
+    this.size = clamp(Math.trunc(options.size ?? 512), 16, MAX_RENDER_SIZE)
+    this.cacheEntries = clamp(Math.trunc(options.cacheEntries ?? 64), 1, 512)
+    this.cacheBytes = clamp(
+      Math.trunc(options.cacheBytes ?? 32 * 1024 * 1024),
+      this.maxBytes,
       MAX_CACHE_BYTES
     )
     this.renderGate = new AsyncGate(
-      Math.min(Math.max(Math.trunc(options.maxConcurrentRenders ?? 2), 1), 8),
-      Math.min(Math.max(Math.trunc(options.maxPendingRenders ?? 16), 0), 64)
+      clamp(Math.trunc(options.maxConcurrentRenders ?? 2), 1, 8),
+      clamp(Math.trunc(options.maxPendingRenders ?? 16), 0, 64)
     )
   }
 
   async render(url: string, stage = 0): Promise<Buffer> {
-    const level =
-      PIXELATION_LEVELS[Math.min(Math.max(Math.trunc(stage), 0), PIXELATION_LEVELS.length - 1)]!
+    const level = PIXELATION_LEVELS[clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)]!
     return this.renderImage(url, level)
   }
 
   async renderWithFallback(urls: readonly string[], stage = 0): Promise<Buffer> {
-    const level =
-      PIXELATION_LEVELS[Math.min(Math.max(Math.trunc(stage), 0), PIXELATION_LEVELS.length - 1)]!
+    const level = PIXELATION_LEVELS[clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)]!
     return this.renderFirstAvailable(urls, level)
   }
 
@@ -140,6 +141,7 @@ export class JumbleImageRenderer {
     let lastError: JumbleImageError | undefined
     for (const url of candidates) {
       try {
+        // eslint-disable-next-line no-await-in-loop -- tasky: sequential fallback, tries URLs one at a time until a renderable one is found
         return await this.renderImage(url, pixelationLevel)
       } catch (error) {
         lastError =

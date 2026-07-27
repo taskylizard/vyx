@@ -1,6 +1,7 @@
 import { match } from 'ts-pattern'
 import { normalizeAnswer, removeEditionSuffix } from './answer.ts'
 import { createAnswerVariants, mergeImageUrlLists, mergeJumbleCandidates } from './candidate.ts'
+import { clamp } from './numbers.ts'
 import {
   discogsTitleVariants,
   parseDiscogsArtist,
@@ -59,14 +60,15 @@ export class DiscogsClient {
     this.fetchImpl = options.fetchImpl ?? fetch
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/u, '')
     this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT
-    this.timeoutMs = Math.min(Math.max(500, Math.trunc(options.timeoutMs ?? 8_000)), 60_000)
+    this.timeoutMs = clamp(Math.trunc(options.timeoutMs ?? 8_000), 500, 60_000)
     this.minIntervalMs = Math.max(
       0,
       Math.trunc(options.minIntervalMs ?? (this.token === undefined ? 2_500 : 1_000))
     )
-    this.maxPending = Math.min(Math.max(1, Math.trunc(options.maxPending ?? 8)), 32)
-    this.maxResponseBytes = Math.min(
-      Math.max(16 * 1024, Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024)),
+    this.maxPending = clamp(Math.trunc(options.maxPending ?? 8), 1, 32)
+    this.maxResponseBytes = clamp(
+      Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024),
+      16 * 1024,
       8 * 1024 * 1024
     )
     this.now = options.now ?? Date.now
@@ -170,6 +172,7 @@ export class DiscogsClient {
       .slice(0, 2)
     let unavailable = false
     for (const term of terms) {
+      // eslint-disable-next-line no-await-in-loop -- tasky: sequential search, tries query terms in priority order, returning the first match
       const search = await this.request('/database/search', {
         type: 'release',
         q: term,

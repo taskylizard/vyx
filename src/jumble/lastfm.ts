@@ -14,6 +14,7 @@ import {
   parseLastFmString,
   parseLastFmTopItems
 } from './lastfm-parser.ts'
+import { clamp } from './numbers.ts'
 import { readBoundedJson } from './response.ts'
 import type {
   JumbleAlbumCandidate,
@@ -74,13 +75,15 @@ export class LastFmClient implements JumbleMusicProvider {
     this.fetchImpl = options.fetchImpl ?? fetch
     this.baseUrl = options.baseUrl ?? 'https://ws.audioscrobbler.com/2.0/'
     this.timeoutMs = options.timeoutMs ?? 10_000
-    this.cacheEntries = Math.min(Math.max(Math.trunc(options.cacheEntries ?? 128), 1), 512)
-    this.cacheBytes = Math.min(
-      Math.max(Math.trunc(options.cacheBytes ?? 8 * 1024 * 1024), 64 * 1024),
+    this.cacheEntries = clamp(Math.trunc(options.cacheEntries ?? 128), 1, 512)
+    this.cacheBytes = clamp(
+      Math.trunc(options.cacheBytes ?? 8 * 1024 * 1024),
+      64 * 1024,
       64 * 1024 * 1024
     )
-    this.maxResponseBytes = Math.min(
-      Math.max(Math.trunc(options.maxResponseBytes ?? 1 * 1024 * 1024), 16 * 1024),
+    this.maxResponseBytes = clamp(
+      Math.trunc(options.maxResponseBytes ?? 1024 * 1024),
+      16 * 1024,
       8 * 1024 * 1024
     )
   }
@@ -102,7 +105,7 @@ export class LastFmClient implements JumbleMusicProvider {
     const payload = await this.request(method, {
       user: safeUsername,
       period: 'overall',
-      limit: String(Math.min(Math.max(limit, 1), 200)),
+      limit: String(clamp(limit, 1, 200)),
       page: '1'
     })
     const candidates = parseLastFmTopItems(payload, kind)

@@ -16,10 +16,12 @@ export async function readBoundedBytes(response: Response, maxBytes: number): Pr
   let total = 0
   try {
     while (true) {
+      // eslint-disable-next-line no-await-in-loop -- tasky: sequential stream consumption, chunks must be read in order from the reader
       const next = await reader.read()
       if (next.done) break
       total += next.value.byteLength
       if (total > limit) {
+        // eslint-disable-next-line no-await-in-loop -- tasky: cancel the stream before throwing the limit error
         await reader.cancel().catch(() => undefined)
         throw new Error('Response exceeded the safety limit.')
       }

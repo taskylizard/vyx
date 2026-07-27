@@ -109,62 +109,13 @@ export class JumbleService {
       throw new JumbleError('A Jumble is already starting in this channel.', 'busy')
     this.startingChannels.add(input.channelId)
     try {
-      const active = await this.repository.findActiveForChannel(input.channelId)
-      if (active !== null) {
-        if (this.isExpired(active)) {
-          const ended = await this.repository.endSession(active.id, 'expired', this.now())
-          this.cancelExpiry(active.id)
-          if (ended !== null) await this.notifyExpired(ended)
-        } else {
-          throw new JumbleError('There is already a Jumble running in this channel.', 'busy')
-        }
-      }
-
-      const username = (
-        input.username ?? (await this.repository.getProfile(input.starterUserId))
-      )?.trim()
-      if (username === undefined || username.length === 0) {
-        throw new JumbleError(
-          'Set your Last.fm username with `/jumble profile` or pass one to this command.',
-          'profile-missing'
-        )
-      }
-
-      const candidates = [...(await this.provider.getCandidates(input.kind, username, 100))].filter(
-        (candidate) => isCandidateIdentityValid(candidate, input.kind)
+      await this.clearActiveChannel(input.channelId)
+      const username = await this.resolveStartUsername(input)
+      const candidate = await this.selectPlayableCandidate(
+        input.kind,
+        input.starterUserId,
+        username
       )
-      if (candidates.length === 0)
-        throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
-
-      const recent = await this.repository.listRecentForUser(input.starterUserId, input.kind, 80)
-      const recentKeys = new Set(
-        recent.map((session) => candidateKey(session.answer, session.artistName))
-      )
-      const unseen = candidates.filter(
-        (candidate) => !recentKeys.has(candidateKey(candidate.answer, candidate.artistName))
-      )
-      const pool = unseen.length > 0 ? unseen : candidates
-      const startIndex = this.randomIndex(pool.length)
-      const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
-      let candidate: JumbleCandidate | undefined
-      for (let offset = 0; offset < attempts; offset += 1) {
-        const original = pool[(startIndex + offset) % pool.length]!
-        let hydrated = original
-        if (this.provider.hydrate !== undefined) {
-          try {
-            hydrated = await this.provider.hydrate(original)
-          } catch {
-            // tasky: one broken provider lookup must not make the whole profile unplayable.
-          }
-        }
-        if (isPlayableCandidate(hydrated, input.kind)) {
-          candidate = hydrated
-          break
-        }
-      }
-      if (candidate === undefined) {
-        throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
-      }
       const imageUrls = getCandidateImageUrls(candidate)
 
       const hints = shuffle([...(await this.provider.getHints(candidate))], this.randomIndex)
@@ -200,21 +151,7 @@ export class JumbleService {
       this.scheduleExpiry(complete.session)
       return { action: 'started', state: complete }
     } catch (error) {
-      if (error instanceof LastFmError) {
-        const code = match(error.code)
-          .returnType<JumbleError['code']>()
-          .with('invalid-username', () => 'profile-missing')
-          .with('empty-results', () => 'no-candidates')
-          .otherwise(() => 'configuration')
-        throw new JumbleError(error.message, code)
-      }
-      if (
-        error instanceof Error &&
-        error.message.includes('jumble_sessions_one_active_channel_idx')
-      ) {
-        throw new JumbleError('There is already a Jumble running in this channel.', 'busy')
-      }
-      throw error
+      this.rethrowStartError(error)
     } finally {
       this.startingChannels.delete(input.channelId)
     }
@@ -340,13 +277,16 @@ export class JumbleService {
   }
 
   async restoreActive(): Promise<void> {
-    for (const session of await this.repository.listActive()) {
-      if (this.isExpired(session)) {
-        await this.expire(session.id)
-      } else {
-        this.scheduleExpiry(session)
-      }
-    }
+    const sessions = await this.repository.listActive()
+    await Promise.all(
+      sessions.map(async (session) => {
+        if (this.isExpired(session)) {
+          await this.expire(session.id)
+        } else {
+          this.scheduleExpiry(session)
+        }
+      })
+    )
   }
 
   async stats(discordUserId: string, kind?: JumbleKind): Promise<JumbleStats> {
@@ -370,6 +310,87 @@ export class JumbleService {
     this.cancelExpiry(sessionId)
     if (ended !== null) await this.notifyExpired(ended)
     return { state: await this.getState(sessionId), action: 'expired' }
+  }
+
+  private async clearActiveChannel(channelId: string): Promise<void> {
+    const active = await this.repository.findActiveForChannel(channelId)
+    if (active === null) return
+    if (this.isExpired(active)) {
+      const ended = await this.repository.endSession(active.id, 'expired', this.now())
+      this.cancelExpiry(active.id)
+      if (ended !== null) await this.notifyExpired(ended)
+    } else {
+      throw new JumbleError('There is already a Jumble running in this channel.', 'busy')
+    }
+  }
+
+  private async resolveStartUsername(input: StartJumbleInput): Promise<string> {
+    const username = (
+      input.username ?? (await this.repository.getProfile(input.starterUserId))
+    )?.trim()
+    if (username === undefined || username.length === 0) {
+      throw new JumbleError(
+        'Set your Last.fm username with `/jumble profile` or pass one to this command.',
+        'profile-missing'
+      )
+    }
+    return username
+  }
+
+  private async selectPlayableCandidate(
+    kind: JumbleKind,
+    starterUserId: string,
+    username: string
+  ): Promise<JumbleCandidate> {
+    const candidates = [...(await this.provider.getCandidates(kind, username, 100))].filter(
+      (candidate) => isCandidateIdentityValid(candidate, kind)
+    )
+    if (candidates.length === 0)
+      throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
+
+    const recent = await this.repository.listRecentForUser(starterUserId, kind, 80)
+    const recentKeys = new Set(
+      recent.map((session) => candidateKey(session.answer, session.artistName))
+    )
+    const unseen = candidates.filter(
+      (candidate) => !recentKeys.has(candidateKey(candidate.answer, candidate.artistName))
+    )
+    const pool = unseen.length > 0 ? unseen : candidates
+    const startIndex = this.randomIndex(pool.length)
+    const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
+
+    for (let offset = 0; offset < attempts; offset += 1) {
+      const original = pool[(startIndex + offset) % pool.length]!
+      let hydrated = original
+      if (this.provider.hydrate !== undefined) {
+        try {
+          // eslint-disable-next-line no-await-in-loop -- tasky: sequential hydration, tries candidates one at a time until a playable one is found
+          hydrated = await this.provider.hydrate(original)
+        } catch {
+          // tasky: one broken provider lookup must not make the whole profile unplayable.
+        }
+      }
+      if (isPlayableCandidate(hydrated, kind)) return hydrated
+    }
+    throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
+  }
+
+  private rethrowStartError(error: unknown): never {
+    if (error instanceof LastFmError) {
+      const code = match(error.code)
+        .returnType<JumbleError['code']>()
+        .with('invalid-username', () => 'profile-missing')
+        .with('empty-results', () => 'no-candidates')
+        .otherwise(() => 'configuration')
+      throw new JumbleError(error.message, code)
+    }
+    if (
+      error instanceof Error &&
+      error.message.includes('jumble_sessions_one_active_channel_idx')
+    ) {
+      throw new JumbleError('There is already a Jumble running in this channel.', 'busy')
+    }
+    throw error
   }
 
   private isExpired(session: JumbleSession): boolean {

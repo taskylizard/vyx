@@ -16,26 +16,28 @@ export async function handleAutoembeds(context: BotContext, message: Message): P
     return
   }
 
-  for (const link of links) {
-    await match(link.service)
-      .returnType<Promise<void>>()
-      .with({ type: 'reddit' }, () => sendTextReply(context, message, link.rewritten))
-      .with({ type: 'twitter' }, { type: 'instagram' }, async (service) => {
-        try {
-          await match(service)
-            .returnType<Promise<void>>()
-            .with({ type: 'twitter' }, ({ statusID }) =>
-              sendTwitterAutoembed(context, message, link.url, statusID)
-            )
-            .with({ type: 'instagram' }, () => sendInstagramAutoembed(context, message, link.url))
-            .exhaustive()
-        } catch (error) {
-          context.logger.warn(`${service.type} component autoembed failed`, error)
-          await sendTextReply(context, message, link.rewritten)
-        }
-      })
-      .exhaustive()
-  }
+  await Promise.all(
+    links.map((link) =>
+      match(link.service)
+        .returnType<Promise<void>>()
+        .with({ type: 'reddit' }, () => sendTextReply(context, message, link.rewritten))
+        .with({ type: 'twitter' }, { type: 'instagram' }, async (service) => {
+          try {
+            await match(service)
+              .returnType<Promise<void>>()
+              .with({ type: 'twitter' }, ({ statusID }) =>
+                sendTwitterAutoembed(context, message, link.url, statusID)
+              )
+              .with({ type: 'instagram' }, () => sendInstagramAutoembed(context, message, link.url))
+              .exhaustive()
+          } catch (error) {
+            context.logger.warn(`${service.type} component autoembed failed`, error)
+            await sendTextReply(context, message, link.rewritten)
+          }
+        })
+        .exhaustive()
+    )
+  )
 
   await suppressOriginalEmbed(context, message)
 }

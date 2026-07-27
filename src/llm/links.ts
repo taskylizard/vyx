@@ -16,21 +16,16 @@ export function suppressLinkEmbeds(text: string): string {
 
     while (urlEnd > 0) {
       const finalCharacter = link.charAt(urlEnd - 1)
-      if (TRAILING_SENTENCE_PUNCTUATION_PATTERN.test(finalCharacter)) {
-        urlEnd -= 1
-        continue
-      }
-
       const openingDelimiter = OPENING_DELIMITER_BY_CLOSING.get(finalCharacter)
       if (
-        openingDelimiter !== undefined &&
-        hasUnmatchedClosingDelimiter(link.slice(0, urlEnd), openingDelimiter, finalCharacter)
+        TRAILING_SENTENCE_PUNCTUATION_PATTERN.test(finalCharacter) ||
+        (openingDelimiter !== undefined &&
+          hasUnmatchedClosingDelimiter(link.slice(0, urlEnd), openingDelimiter, finalCharacter))
       ) {
         urlEnd -= 1
-        continue
+      } else {
+        break
       }
-
-      break
     }
 
     return `<${link.slice(0, urlEnd)}>${link.slice(urlEnd)}`

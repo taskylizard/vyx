@@ -245,9 +245,10 @@ function firstImages(value: unknown): string[] {
     if (
       url !== undefined &&
       url.startsWith('http') &&
-      !url.includes('2a96cbd8b46e442fc41c2b86b821562f')
+      !url.includes('2a96cbd8b46e442fc41c2b86b821562f') &&
+      !urls.includes(url)
     )
-      if (!urls.includes(url)) urls.push(url)
+      urls.push(url)
     if (urls.length >= 8) break
   }
   return urls

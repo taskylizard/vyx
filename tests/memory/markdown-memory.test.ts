@@ -95,9 +95,11 @@ test('bounds recalled prompt memory independently of stored Markdown size', asyn
   let index = 0
   const store = await createStore(() => memoryID(index++))
   const scope = { id: 'user-1', kind: 'user' } as const
-  for (let memoryIndex = 0; memoryIndex < 5; memoryIndex += 1) {
-    await store.remember(scope, `${memoryIndex}:${'x'.repeat(990)}`, `call-${memoryIndex}`)
-  }
+  await store.remember(scope, `0:${'x'.repeat(990)}`, 'call-0')
+  await store.remember(scope, `1:${'x'.repeat(990)}`, 'call-1')
+  await store.remember(scope, `2:${'x'.repeat(990)}`, 'call-2')
+  await store.remember(scope, `3:${'x'.repeat(990)}`, 'call-3')
+  await store.remember(scope, `4:${'x'.repeat(990)}`, 'call-4')
 
   const context = await store.promptContext(scope.id, null)
   expect(context.personal?.length).toBeLessThanOrEqual(MEMORY_PROMPT_SCOPE_MAX_LENGTH)

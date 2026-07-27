@@ -134,6 +134,7 @@ async function replyChain(context: BotContext, source: Message): Promise<Message
   let current = source
 
   for (let index = 0; index < MAX_REPLY_CHAIN_MESSAGES; index += 1) {
+    // eslint-disable-next-line no-await-in-loop -- tasky: sequential chain walk, each message's reference resolves the next
     const referenced = await referencedMessage(context, current)
     if (referenced === undefined) {
       break

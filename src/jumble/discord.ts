@@ -23,6 +23,13 @@ export interface RenderedJumble {
   imageError?: Error
 }
 
+export interface HandleJumbleMessageOptions {
+  service: JumbleService
+  renderer: JumbleImageRenderer
+  idsFor: (state: JumbleState) => JumbleComponentIds
+  isEnabled?: () => Promise<boolean>
+}
+
 export async function renderJumble(
   state: JumbleState,
   renderer: JumbleImageRenderer,
@@ -98,11 +105,9 @@ export async function editJumbleMessage(
 export async function handleJumbleMessage(
   client: Client,
   message: Message,
-  service: JumbleService,
-  renderer: JumbleImageRenderer,
-  idsFor: (state: JumbleState) => JumbleComponentIds,
-  isEnabled?: () => Promise<boolean>
+  options: HandleJumbleMessageOptions
 ): Promise<boolean> {
+  const { service, renderer, idsFor, isEnabled } = options
   if (message.author.bot || message.content.trim().length === 0) return false
   const active = await service.activeForChannel(message.channelID)
   if (active === null) return false

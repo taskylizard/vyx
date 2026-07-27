@@ -102,6 +102,7 @@ async function waitForTranscript(
 
   const deadline = now() + timeoutMs
   while (true) {
+    // eslint-disable-next-line no-await-in-loop -- tasky: sequential polling, each poll depends on elapsed time and prior job status
     const job = await client.transcript.getJobStatus(jobId)
     if (job.status === 'completed') {
       if (job.result === null || job.result === undefined) {
@@ -118,6 +119,7 @@ async function waitForTranscript(
     if (remainingMs <= 0) {
       throw new Error(`Supadata transcript job ${jobId} timed out after ${timeoutMs}ms.`)
     }
+    // eslint-disable-next-line no-await-in-loop -- tasky: sequential polling, sleep before the next status check
     await sleep(Math.min(pollIntervalMs, remainingMs))
   }
 }

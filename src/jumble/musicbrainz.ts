@@ -1,6 +1,7 @@
 import { match } from 'ts-pattern'
 import type { ZodType } from 'zod'
 import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
+import { clamp } from './numbers.ts'
 import type { JumbleArtistMetadata, JumbleCandidate } from './types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
 import {
@@ -69,11 +70,12 @@ export class MusicBrainzClient {
     this.fetchImpl = options.fetchImpl ?? fetch
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/u, '')
     this.userAgent = options.userAgent ?? DEFAULT_USER_AGENT
-    this.timeoutMs = Math.min(Math.max(500, Math.trunc(options.timeoutMs ?? 8_000)), 60_000)
+    this.timeoutMs = clamp(Math.trunc(options.timeoutMs ?? 8_000), 500, 60_000)
     this.minIntervalMs = Math.max(250, Math.trunc(options.minIntervalMs ?? 1_100))
-    this.maxPending = Math.min(Math.max(1, Math.trunc(options.maxPending ?? 32)), 64)
-    this.maxResponseBytes = Math.min(
-      Math.max(16 * 1024, Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024)),
+    this.maxPending = clamp(Math.trunc(options.maxPending ?? 32), 1, 64)
+    this.maxResponseBytes = clamp(
+      Math.trunc(options.maxResponseBytes ?? 1_024 * 1_024),
+      16 * 1024,
       8 * 1024 * 1024
     )
     this.now = options.now ?? Date.now
@@ -183,7 +185,7 @@ export class MusicBrainzClient {
     const cacheKey = `musicbrainz:artist:${mbid ?? normalizeMusicBrainzKey(name)}`
     const cached = await this.readCache(cacheKey, JumbleArtistMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
-    const staleValue = cached?.found === true ? cached.value : undefined
+    const staleValue = cached?.found ? cached.value : undefined
 
     let result: JumbleArtistMetadata | undefined
     let unavailable = false
@@ -219,7 +221,7 @@ export class MusicBrainzClient {
     const cacheKey = `musicbrainz:release:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
     const cached = await this.readCache(cacheKey, ReleaseMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
-    const staleValue = cached?.found === true ? cached.value : undefined
+    const staleValue = cached?.found ? cached.value : undefined
 
     let result: ReleaseMetadata | undefined
     let unavailable = false
@@ -267,7 +269,7 @@ export class MusicBrainzClient {
     const cacheKey = `musicbrainz:recording:${mbid ?? `${normalizeMusicBrainzKey(artistName ?? '')}:${normalizeMusicBrainzKey(name)}`}`
     const cached = await this.readCache(cacheKey, RecordingMetadataSchema)
     if (cached?.fresh) return cached.found ? cached.value : undefined
-    const staleValue = cached?.found === true ? cached.value : undefined
+    const staleValue = cached?.found ? cached.value : undefined
 
     let result: RecordingMetadata | undefined
     let unavailable = false

@@ -141,16 +141,28 @@ async function createMintlifyClient(config: MintlifyMcpConfig): Promise<MCPClien
 }
 
 async function namespaceTools(tools: ToolSet): Promise<ToolSet> {
+  const entries = Object.entries(tools)
+  const resolved = await Promise.all(
+    entries.map(async ([name, mcpTool]) => {
+      const toolName = `docs_${name.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}`
+      const inputSchema = asSchema(mcpTool.inputSchema)
+      return {
+        toolName,
+        mcpTool,
+        inputSchema,
+        resolvedSchema: await inputSchema.jsonSchema
+      }
+    })
+  )
+
   const namespaced: ToolSet = {}
-  for (const [name, mcpTool] of Object.entries(tools)) {
-    const toolName = `docs_${name.replaceAll(/[^a-zA-Z0-9_-]/g, '_')}`
+  for (const { toolName, mcpTool, inputSchema, resolvedSchema } of resolved) {
     if (namespaced[toolName] !== undefined) {
       throw new Error(`Mintlify MCP tool name collision for ${toolName}.`)
     }
-    const inputSchema = asSchema(mcpTool.inputSchema)
     namespaced[toolName] = {
       ...mcpTool,
-      inputSchema: jsonSchema(geminiCompatibleSchema(await inputSchema.jsonSchema), {
+      inputSchema: jsonSchema(geminiCompatibleSchema(resolvedSchema), {
         validate: inputSchema.validate
       })
     }

@@ -2,6 +2,7 @@ import { asc, count, eq, inArray, lt } from 'drizzle-orm'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
 import type { ZodType } from 'zod'
 import { jumbleMetadataCache, jumbleSchema } from '../database/schemas/jumble.ts'
+import { clamp } from './numbers.ts'
 
 const MAX_CACHE_ENTRIES = 65_536
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024
@@ -41,12 +42,10 @@ export class JumbleMetadataCache {
 
   constructor(db: JumbleMetadataDatabase, options: JumbleMetadataCacheOptions = {}) {
     this.db = db
-    this.maxEntries = Math.min(
-      Math.max(1, Math.trunc(options.maxEntries ?? 4096)),
-      MAX_CACHE_ENTRIES
-    )
-    this.maxPayloadBytes = Math.min(
-      Math.max(1024, Math.trunc(options.maxPayloadBytes ?? 64 * 1024)),
+    this.maxEntries = clamp(Math.trunc(options.maxEntries ?? 4096), 1, MAX_CACHE_ENTRIES)
+    this.maxPayloadBytes = clamp(
+      Math.trunc(options.maxPayloadBytes ?? 64 * 1024),
+      1024,
       MAX_PAYLOAD_BYTES
     )
     this.pruneEveryWrites = Math.max(1, Math.trunc(options.pruneEveryWrites ?? 32))
@@ -146,6 +145,7 @@ export class JumbleMetadataCache {
       let remaining = Math.max(0, Number(rows[0]?.total ?? 0) - this.maxEntries)
       for (let pass = 0; pass < 8 && remaining > 0; pass += 1) {
         const batchSize = Math.min(remaining, 512)
+        // eslint-disable-next-line no-await-in-loop -- tasky: sequential batch pruning, each pass evicts the next oldest batch after the prior deletion
         const oldest = await this.db
           .select({ cacheKey: jumbleMetadataCache.cacheKey })
           .from(jumbleMetadataCache)
@@ -153,6 +153,7 @@ export class JumbleMetadataCache {
           .limit(batchSize)
         const keys = oldest.map((row) => row.cacheKey)
         if (keys.length === 0) break
+        // eslint-disable-next-line no-await-in-loop -- tasky: sequential batch pruning, delete before selecting the next batch
         await this.db.delete(jumbleMetadataCache).where(inArray(jumbleMetadataCache.cacheKey, keys))
         remaining -= keys.length
       }
