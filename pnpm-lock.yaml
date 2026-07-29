@@ -285,6 +285,9 @@ importers:
       oceanic.js:
         specifier: 1.14.0
         version: 1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
+      radashi:
+        specifier: ^12.9.1
+        version: 12.9.1
       rosepack:
         specifier: 0.3.0
         version: 0.3.0(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(oceanic.js@1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2))
@@ -3513,6 +3516,10 @@ packages:
 
   quansync@1.0.0:
     resolution: {integrity: sha512-5xZacEEufv3HSTPQuchrvV6soaiACMFnq1H8wkVioctoH3TRha9Sz66lOxRwPK/qZj7HPiSveih9yAyh98gvqA==}
+
+  radashi@12.9.1:
+    resolution: {integrity: sha512-HCvrL1Ag7qnyH11UiSWQaEIiizJ7kldHjBw63aELoum7C8nQrSLqotLDuKKvoRPtO0w8azCzUQcL3yrU3lBksw==}
+    engines: {node: '>=16.0.0'}
 
   rc9@3.0.1:
     resolution: {integrity: sha512-gMDyleLWVE+i6Sgtc0QbbY6pEKqYs97NGi6isHQPqYlLemPoO8dxQ3uGi0f4NiP98c+jMW6cG1Kx9dDwfvqARQ==}
@@ -6985,6 +6992,8 @@ snapshots:
       long: 5.3.2
 
   quansync@1.0.0: {}
+
+  radashi@12.9.1: {}
 
   rc9@3.0.1:
     dependencies:
