@@ -72,6 +72,11 @@ export const JumbleSessionMetadataSchema: z.ZodType<JumbleSessionMetadata> = z
     candidate: JumbleCandidateSchema,
     shuffledAnswer: z.string().optional(),
     answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
+    continuousSession: z
+      .object({
+        id: z.string().uuid()
+      })
+      .optional(),
     hints: z.array(
       z.object({
         kind: z.string(),

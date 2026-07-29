@@ -28,7 +28,7 @@ test('keeps Jumble out of global registration until its guild module is enabled'
   expect(slashCommandToDiscord(jumbleCommand)).toMatchObject({
     options: [{ name: 'play' }, { name: 'profile' }, { name: 'stats' }]
   })
-  expect(registry.components).toHaveLength(5)
+  expect(registry.components).toHaveLength(6)
 })
 
 test('reports every channel permission needed before starting a game', () => {
@@ -156,4 +156,5 @@ test('builds compact routed IDs for every game control', () => {
   expect(ids.reshuffle).toContain('jumble/reshuffle/')
   expect(ids.giveUp).toContain('jumble/give-up/')
   expect(ids.replay('track')).toBe('jumble/replay/track')
+  expect(ids.startSession).toBe('jumble/session/12345678-1234-4234-8234-123456789abc')
 })

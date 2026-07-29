@@ -1,5 +1,5 @@
 import { randomInt, randomUUID } from 'node:crypto'
-import { match } from 'ts-pattern'
+import { match, P } from 'ts-pattern'
 import { answerMatchesAny, normalizeAnswer, shuffleCharacters } from './answer.ts'
 import { getCandidateImageUrls } from './candidate.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
@@ -108,7 +108,7 @@ export class JumbleService {
     return this.repository.getProfile(discordUserId)
   }
 
-  async start(input: StartJumbleInput): Promise<JumbleActionResult> {
+  async start(input: StartJumbleInput): Promise<JumbleActionResult<'started'>> {
     if (this.startingChannels.has(input.channelId))
       throw new JumbleError('A Jumble is already starting in this channel.', 'busy')
     this.startingChannels.add(input.channelId)
@@ -173,7 +173,8 @@ export class JumbleService {
             candidate,
             shuffledAnswer,
             answerVariants: candidate.answerVariants,
-            hints
+            hints,
+            continuousSession: input.continuousSession
           },
           startedAt: this.now(),
           blurStage: 0
@@ -302,9 +303,53 @@ export class JumbleService {
     return { action: 'won', state: await this.getState(ended?.id ?? sessionId) }
   }
 
+  async startContinuousSession(completedSessionId: string): Promise<JumbleActionResult<'started'>> {
+    const completed = await this.getState(completedSessionId)
+    return match({
+      continuousSession: completed.session.metadata.continuousSession,
+      endedAt: completed.session.endedAt,
+      outcome: completed.session.outcome
+    })
+      .with({ continuousSession: undefined, endedAt: P.nonNullable, outcome: 'won' }, () =>
+        this.startNextContinuousGame(completed, { id: randomUUID() })
+      )
+      .otherwise(() => {
+        throw new JumbleError('Start a session from a solved standalone Jumble.', 'not-supported')
+      })
+  }
+
+  async continueContinuousSession(
+    completedSessionId: string
+  ): Promise<JumbleActionResult<'started'> | null> {
+    const completed = await this.getState(completedSessionId)
+    return match({
+      continuousSession: completed.session.metadata.continuousSession,
+      outcome: completed.session.outcome
+    })
+      .with({ continuousSession: P.nonNullable, outcome: 'won' }, ({ continuousSession }) =>
+        this.startNextContinuousGame(completed, continuousSession)
+      )
+      .otherwise(() => null)
+  }
+
+  async cancelContinuousSession(sessionId: string): Promise<JumbleActionResult> {
+    const live = await this.ensureActive(sessionId)
+    if (live.action !== undefined) return { action: live.action, state: live.state }
+    if (live.state.session.metadata.continuousSession === undefined) {
+      throw new JumbleError('There is no active Jumble session to cancel.', 'not-supported')
+    }
+
+    await this.repository.endSession(sessionId, 'cancelled', this.now())
+    this.cancelExpiry(sessionId)
+    return { action: 'cancelled', state: await this.getState(sessionId) }
+  }
+
   async giveUp(sessionId: string, requesterUserId: string): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
     if (live.action !== undefined) return { action: live.action, state: live.state }
+    if (live.state.session.metadata.continuousSession !== undefined) {
+      throw new JumbleError('Say "cancel" to stop this Jumble session.', 'not-supported')
+    }
     if (live.state.session.starterUserId !== requesterUserId) {
       throw new JumbleError('Only the person who started this Jumble can give up.', 'forbidden')
     }
@@ -383,6 +428,32 @@ export class JumbleService {
       )
     }
     return username
+  }
+
+  private async startNextContinuousGame(
+    completed: JumbleState,
+    continuousSession: NonNullable<JumbleSession['metadata']['continuousSession']>
+  ): Promise<JumbleActionResult<'started'>> {
+    const winnerUserId = await this.repository.winningUserId(completed.session.id)
+    if (winnerUserId === null) {
+      throw new JumbleError('The winner could not be determined for that Jumble.', 'not-found')
+    }
+    const username = await this.repository.getProfile(winnerUserId)
+    if (username === null || username.trim().length === 0) {
+      throw new JumbleError(
+        'The winner needs to save a Last.fm username with `/jumble profile` before the session can continue.',
+        'profile-missing'
+      )
+    }
+
+    return this.start({
+      starterUserId: winnerUserId,
+      guildId: completed.session.guildId,
+      channelId: completed.session.channelId,
+      kind: completed.session.kind,
+      username,
+      continuousSession
+    })
   }
 
   private async selectPlayableCandidate(

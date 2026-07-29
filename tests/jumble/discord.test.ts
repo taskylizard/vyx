@@ -1,13 +1,17 @@
 import { ComponentTypes, type Client, type Message } from 'oceanic.js'
 import { match } from 'ts-pattern'
 import { expect, test, vi } from 'vite-plus/test'
-import { jumbleReplayButton } from '../../src/jumble/components.ts'
+import {
+  componentIds,
+  jumbleReplayButton,
+  jumbleStartSessionButton
+} from '../../src/jumble/components.ts'
 import {
   createJumbleMessage,
   editJumbleMessage,
   handleJumbleMessage
 } from '../../src/jumble/discord.ts'
-import { buildJumbleReplayComponents } from '../../src/jumble/presentation.ts'
+import { buildJumblePayload, buildJumbleReplayComponents } from '../../src/jumble/presentation.ts'
 import type { JumbleImageRenderer } from '../../src/jumble/renderer.ts'
 import type { JumbleService } from '../../src/jumble/service.ts'
 import type { JumbleCandidate, JumbleKind, JumbleState } from '../../src/jumble/types.ts'
@@ -44,7 +48,7 @@ test('play again disables the completed button and uses the cached channel for t
       channelID: 'channel-1',
       guildID: 'guild-1',
       member: { displayName: 'Tasky' },
-      message: { id: 'completed-message' },
+      message: { components: [], id: 'completed-message' },
       user: { globalName: 'tasky', id: 'user-1', username: 'tasky' }
     },
     params: { kind: 'track' },
@@ -68,6 +72,93 @@ test('play again disables the completed button and uses the cached channel for t
   expect(restCreateMessage).not.toHaveBeenCalled()
   expect(attachMessage).toHaveBeenCalledWith('session-track', 'new-message')
   expect(update).toHaveBeenCalledOnce()
+})
+
+test('solved standalone games offer a continuous session with the required subtext', () => {
+  const state = jumbleState('track', true)
+  const payload = buildJumblePayload(state, { componentIds: componentIds(state.session.id) })
+
+  expect(payload.components).toEqual([
+    expect.objectContaining({
+      components: [
+        expect.objectContaining({ label: 'Play again' }),
+        expect.objectContaining({ label: 'Start session' })
+      ]
+    })
+  ])
+  expect(payload.content).toMatch(
+    /-# Start a session to keep new Jumbles coming until inactivity or someone says "cancel"\.$/u
+  )
+})
+
+test('start session disables the completed controls and sends the first continuous game', async () => {
+  const completed = jumbleState('track', true)
+  const next = continuousJumbleState('track', false)
+  const createMessage = vi.fn(async () => ({ id: 'continuous-message' }))
+  const sendTyping = vi.fn(async () => undefined)
+  const attachMessage = vi.fn(async () => next)
+  const startContinuousSession = vi.fn(async () => ({ action: 'started' as const, state: next }))
+  const update = vi.fn(async (_payload: unknown) => undefined)
+  const context = {
+    app: {
+      jumble: {
+        attachMessage,
+        expire: vi.fn(async () => ({ action: 'expired', state: next })),
+        getState: vi.fn(async () => completed),
+        startContinuousSession
+      },
+      jumbleRenderer: {},
+      logger: { warn: vi.fn() }
+    },
+    client: {
+      getChannel: vi.fn(() => ({ createMessage, sendTyping })),
+      rest: {
+        channels: {
+          createMessage: vi.fn(async () => ({ id: 'rest-message' })),
+          sendTyping: vi.fn(async () => undefined)
+        }
+      }
+    },
+    interaction: {
+      appPermissions: { has: vi.fn(() => true) },
+      channelID: 'channel-1',
+      guildID: 'guild-1',
+      member: { displayName: 'Tasky' },
+      message: {
+        components: buildJumbleReplayComponents(
+          'jumble/replay/track',
+          'jumble/session/session-track',
+          { status: 'ready' }
+        ),
+        id: 'game-message'
+      },
+      user: { globalName: 'Tasky', id: 'button-user', username: 'tasky' }
+    },
+    params: { sessionId: 'session-track' },
+    update
+  }
+
+  await jumbleStartSessionButton.execute(context as never)
+
+  expect(startContinuousSession).toHaveBeenCalledWith('session-track')
+  expect(update).toHaveBeenCalledWith({
+    components: [
+      expect.objectContaining({
+        components: [expect.objectContaining({ disabled: true, label: 'Tasky started a session!' })]
+      })
+    ]
+  })
+  expect(createMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      components: [
+        expect.objectContaining({
+          components: expect.not.arrayContaining([expect.objectContaining({ label: 'Give up' })])
+        })
+      ],
+      content: expect.stringMatching(/^-# Session mode keeps new Jumbles coming/mu)
+    })
+  )
+  expect(attachMessage).toHaveBeenCalledWith('session-track', 'continuous-message')
 })
 
 test('channel message creation falls back to REST when the channel is not cached', async () => {
@@ -123,7 +214,7 @@ test('channel message editing falls back to REST after a cached edit fails', asy
 })
 
 test('playing replay labels stay within Discord limits without splitting emoji', () => {
-  const components = buildJumbleReplayComponents('jumble/replay/track', {
+  const components = buildJumbleReplayComponents('jumble/replay/track', undefined, {
     status: 'playing',
     userDisplayName: '😀'.repeat(100)
   })
@@ -171,7 +262,14 @@ test('a failed replay restores the button and expires the hidden game', async ()
       channelID: 'channel-1',
       guildID: 'guild-1',
       member: null,
-      message: { id: 'completed-message' },
+      message: {
+        components: buildJumbleReplayComponents(
+          'jumble/replay/album',
+          'jumble/session/session-album',
+          { status: 'ready' }
+        ),
+        id: 'completed-message'
+      },
       user: { globalName: 'Tasky', id: 'user-1', username: 'tasky' }
     },
     params: { kind: 'album' },
@@ -185,7 +283,10 @@ test('a failed replay restores the button and expires the hidden game', async ()
   expect(update.mock.calls[1]?.[0]).toEqual({
     components: [
       expect.objectContaining({
-        components: [expect.objectContaining({ label: 'Play again' })]
+        components: [
+          expect.objectContaining({ label: 'Play again' }),
+          expect.objectContaining({ label: 'Start session' })
+        ]
       })
     ]
   })
@@ -226,7 +327,14 @@ test.each([
     const handled = await handleJumbleMessage(client, message, {
       service,
       renderer: {} as JumbleImageRenderer,
-      idsFor: () => ({ giveUp: '', hint: '', replay: () => '', reshuffle: '', unblur: '' })
+      idsFor: () => ({
+        giveUp: '',
+        hint: '',
+        replay: () => '',
+        reshuffle: '',
+        startSession: '',
+        unblur: ''
+      })
     })
 
     expect(handled).toBe(true)
@@ -254,6 +362,131 @@ test.each([
     expect(createReaction).toHaveBeenCalledWith('✅')
   }
 )
+
+test('winning a continuous game automatically sends the next game', async () => {
+  const active = continuousJumbleState('track', false)
+  const completed = {
+    ...continuousJumbleState('track', true),
+    session: { ...continuousJumbleState('track', true).session, messageId: 'game-message' }
+  }
+  const next = {
+    ...continuousJumbleState('track', false),
+    session: { ...continuousJumbleState('track', false).session, id: 'next-session' }
+  }
+  const createMessage = vi
+    .fn()
+    .mockResolvedValueOnce({ id: 'winner-announcement' })
+    .mockResolvedValueOnce({ id: 'next-message' })
+  const editMessage = vi.fn(async () => ({}))
+  const sendTyping = vi.fn(async () => undefined)
+  const createReaction = vi.fn(async () => undefined)
+  const attachMessage = vi.fn(async () => next)
+  const continueContinuousSession = vi.fn(async () => ({ action: 'started' as const, state: next }))
+  const client = {
+    getChannel: vi.fn(() => ({ createMessage, editMessage, sendTyping })),
+    rest: {
+      channels: {
+        createMessage: vi.fn(async () => ({ id: 'rest-message' })),
+        editMessage: vi.fn(async () => ({})),
+        sendTyping: vi.fn(async () => undefined)
+      }
+    }
+  } as unknown as Client
+  const message = {
+    author: { bot: false, id: 'winner' },
+    channelID: 'channel-1',
+    content: 'Jóga',
+    createReaction,
+    guildID: 'guild-1',
+    id: 'guess-message'
+  } as unknown as Message
+  const service = {
+    activeForChannel: vi.fn(async () => active),
+    attachMessage,
+    continueContinuousSession,
+    submitGuess: vi.fn(async () => ({ action: 'won' as const, state: completed }))
+  } as unknown as JumbleService
+
+  await handleJumbleMessage(client, message, {
+    service,
+    renderer: {} as JumbleImageRenderer,
+    idsFor: (state) => componentIds(state.session.id)
+  })
+
+  expect(continueContinuousSession).toHaveBeenCalledWith('session-track')
+  expect(createMessage).toHaveBeenNthCalledWith(
+    2,
+    expect.objectContaining({
+      content: expect.stringMatching(/-# Session mode keeps new Jumbles coming/u)
+    })
+  )
+  expect(attachMessage).toHaveBeenCalledWith('next-session', 'next-message')
+  expect(sendTyping).toHaveBeenCalledOnce()
+})
+
+test('saying cancel stops a continuous game without recording a guess', async () => {
+  const active = continuousJumbleState('album', false)
+  const cancelled = {
+    ...active,
+    session: { ...active.session, endedAt: 2_000, outcome: 'cancelled' as const }
+  }
+  const editMessage = vi.fn(async () => ({}))
+  const createReaction = vi.fn(async () => undefined)
+  const submitGuess = vi.fn()
+  const cancelContinuousSession = vi.fn(async () => ({
+    action: 'cancelled' as const,
+    state: cancelled
+  }))
+  const client = {
+    getChannel: vi.fn(() => ({ editMessage })),
+    rest: {
+      channels: {
+        createMessage: vi.fn(async () => ({})),
+        editMessage: vi.fn(async () => ({}))
+      }
+    }
+  } as unknown as Client
+  const message = {
+    author: { bot: false, id: 'user-2' },
+    channelID: 'channel-1',
+    content: '  CANCEL  ',
+    createReaction,
+    guildID: 'guild-1',
+    id: 'cancel-message'
+  } as unknown as Message
+  const service = {
+    activeForChannel: vi.fn(async () => active),
+    cancelContinuousSession,
+    submitGuess
+  } as unknown as JumbleService
+
+  await handleJumbleMessage(client, message, {
+    service,
+    renderer: {} as JumbleImageRenderer,
+    idsFor: (state) => componentIds(state.session.id)
+  })
+
+  expect(cancelContinuousSession).toHaveBeenCalledWith('session-album')
+  expect(submitGuess).not.toHaveBeenCalled()
+  expect(editMessage).toHaveBeenCalledWith(
+    'game-message',
+    expect.objectContaining({
+      content: expect.stringMatching(/-# The session ended because someone said "cancel"\.$/u)
+    })
+  )
+  expect(createReaction).toHaveBeenCalledWith('🛑')
+})
+
+test('an expired continuous game says the session ended from inactivity', () => {
+  const active = continuousJumbleState('artist', false)
+  const expired = {
+    ...active,
+    session: { ...active.session, endedAt: 26_000, outcome: 'expired' as const }
+  }
+  const payload = buildJumblePayload(expired, { componentIds: componentIds(expired.session.id) })
+
+  expect(payload.content).toMatch(/-# The session ended after inactivity\.$/u)
+})
 
 test('does not reply or react to an incorrect guess', async () => {
   const state = jumbleState('track', false)
@@ -284,6 +517,7 @@ test('does not reply or react to an incorrect guess', async () => {
       hint: '',
       replay: () => '',
       reshuffle: '',
+      startSession: '',
       unblur: ''
     })
   })
@@ -335,6 +569,20 @@ function jumbleState(
       startedAt: 1_000,
       starterUserId: 'user-1',
       kind
+    }
+  }
+}
+
+function continuousJumbleState(kind: JumbleKind, ended: boolean): JumbleState {
+  const state = jumbleState(kind, ended)
+  return {
+    ...state,
+    session: {
+      ...state.session,
+      metadata: {
+        ...state.session.metadata,
+        continuousSession: { id: '12345678-1234-4234-8234-123456789abc' }
+      }
     }
   }
 }

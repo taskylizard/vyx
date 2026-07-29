@@ -261,6 +261,16 @@ export class JumbleRepository {
       .orderBy(asc(jumbleAnswers.answeredAt))
   }
 
+  async winningUserId(sessionId: string): Promise<string | null> {
+    const rows = await this.db
+      .select({ userId: jumbleAnswers.discordUserId })
+      .from(jumbleAnswers)
+      .where(and(eq(jumbleAnswers.sessionId, sessionId), eq(jumbleAnswers.correct, true)))
+      .orderBy(asc(jumbleAnswers.answeredAt), asc(jumbleAnswers.id))
+      .limit(1)
+    return rows[0]?.userId ?? null
+  }
+
   async statsForUser(discordUserId: string, kind?: JumbleKind): Promise<JumbleStats> {
     const startedSessions = await this.db
       .select()
@@ -339,7 +349,7 @@ function toSession(row: JumbleSessionRow): JumbleSession {
     startedAt: row.startedAt,
     endedAt: row.endedAt,
     outcome: match(row.outcome)
-      .with('won', 'gave_up', 'expired', (outcome) => outcome)
+      .with('won', 'gave_up', 'expired', 'cancelled', (outcome) => outcome)
       .otherwise(() => null),
     blurStage: row.blurStage,
     reshuffleCount: row.reshuffleCount

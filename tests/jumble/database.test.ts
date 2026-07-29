@@ -194,6 +194,62 @@ test('reveals hints, advances pixel stages, and allows reshuffles without daily 
   expect(second.action).toBe('started')
 })
 
+test('continuous sessions follow each winner Last.fm profile until cancelled', async () => {
+  await service.setProfile('winner-1', 'first-winner')
+  await service.setProfile('winner-2', 'second-winner')
+  const first = await service.start({
+    starterUserId: 'starter',
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    kind: 'track',
+    username: 'original-profile'
+  })
+  await service.submitGuess(first.state.session.id, 'winner-1', 'Jóga')
+
+  const second = await service.startContinuousSession(first.state.session.id)
+  expect(second.state.session).toMatchObject({
+    sourceUsername: 'first-winner',
+    starterUserId: 'winner-1'
+  })
+  expect(second.state.session.metadata.continuousSession).toBeDefined()
+  await expect(service.giveUp(second.state.session.id, 'winner-1')).rejects.toMatchObject({
+    code: 'not-supported'
+  })
+
+  await service.submitGuess(second.state.session.id, 'winner-2', 'Jóga')
+  const third = await service.continueContinuousSession(second.state.session.id)
+  expect(third?.state.session).toMatchObject({
+    sourceUsername: 'second-winner',
+    starterUserId: 'winner-2'
+  })
+  expect(third?.state.session.metadata.continuousSession).toEqual(
+    second.state.session.metadata.continuousSession
+  )
+  if (third === null) throw new Error('Expected the continuous session to start another game.')
+
+  const cancelled = await service.cancelContinuousSession(third.state.session.id)
+  expect(cancelled).toMatchObject({
+    action: 'cancelled',
+    state: { session: { outcome: 'cancelled' } }
+  })
+  await expect(service.activeForChannel('channel-1')).resolves.toBeNull()
+})
+
+test('continuous sessions require the winner to have a saved Last.fm profile', async () => {
+  const first = await service.start({
+    starterUserId: 'starter',
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    kind: 'album',
+    username: 'original-profile'
+  })
+  await service.submitGuess(first.state.session.id, 'profileless-winner', 'Homogenic')
+
+  await expect(service.startContinuousSession(first.state.session.id)).rejects.toMatchObject({
+    code: 'profile-missing'
+  })
+})
+
 test('hydrates candidates before artwork checks and persists accepted aliases', async () => {
   service.stop()
   let hydrations = 0

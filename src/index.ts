@@ -118,6 +118,7 @@ export {
   type JumbleAnswerVariant,
   type JumbleArtistMetadata,
   type JumbleCandidate,
+  type JumbleContinuousSession,
   type JumbleHint,
   type JumbleKind,
   type JumbleOutcome,

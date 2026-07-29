@@ -3,7 +3,7 @@ import type { JumbleTimingSink } from './timing.ts'
 export const JUMBLE_KINDS = ['artist', 'album', 'track'] as const
 export type JumbleKind = (typeof JUMBLE_KINDS)[number]
 
-export type JumbleOutcome = 'won' | 'gave_up' | 'expired'
+export type JumbleOutcome = 'won' | 'gave_up' | 'expired' | 'cancelled'
 
 /** Provenance for an answer accepted in addition to the displayed title. */
 export type JumbleAnswerSource = 'lastfm' | 'musicbrainz' | 'discogs' | 'transliteration' | 'manual'
@@ -17,6 +17,10 @@ export interface JumbleAnswerVariant {
 export interface JumbleHint {
   kind: string
   content: string
+}
+
+export interface JumbleContinuousSession {
+  id: string
 }
 
 export interface JumbleArtistMetadata {
@@ -88,6 +92,7 @@ export interface JumbleSessionMetadata {
   shuffledAnswer?: string
   answerVariants?: readonly JumbleAnswerVariant[]
   hints: readonly JumbleHint[]
+  continuousSession?: JumbleContinuousSession
 }
 
 export interface JumbleSession {
@@ -134,6 +139,7 @@ export type JumbleAction =
   | 'won'
   | 'gave_up'
   | 'expired'
+  | 'cancelled'
   | 'unchanged'
 
 export type JumbleActionResult<TAction extends JumbleAction = JumbleAction> = {
@@ -146,6 +152,7 @@ export interface StartJumbleInput {
   channelId: string
   kind: JumbleKind
   username?: string
+  continuousSession?: JumbleContinuousSession
 }
 
 export interface JumbleServiceOptions {

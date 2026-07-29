@@ -1,12 +1,15 @@
-import { MessageFlags } from 'oceanic.js'
+import { MessageFlags, type MessageActionRow } from 'oceanic.js'
 import { match, P } from 'ts-pattern'
 import { button } from '../bot/rosepack.ts'
-import { createJumbleMessage, jumblePermissionError, renderJumble } from './discord.ts'
-import { buildJumbleReplayComponents } from './presentation.ts'
+import { createJumbleGameMessage, jumblePermissionError, renderJumble } from './discord.ts'
+import {
+  buildJumbleReplayComponents,
+  buildJumbleSessionStartingComponents
+} from './presentation.ts'
 import type { ComponentContext } from 'rosepack'
 import type { BotContext } from '../bot/context.ts'
 import { modules } from '../modules.ts'
-import { isJumbleKind, type JumbleActionResult } from './types.ts'
+import { isJumbleKind, type JumbleActionResult, type JumbleState } from './types.ts'
 import { startJumbleTyping } from './typing.ts'
 
 export const jumbleHintButton = button({
@@ -70,81 +73,113 @@ export const jumbleReplayButton = button({
     if (!isJumbleKind(kind)) throw new Error('That Jumble type is not supported.')
 
     const replayCustomID = jumbleReplayButton.buildID({ params: { kind } })
-    const readyComponents = buildJumbleReplayComponents(replayCustomID, { status: 'ready' })
     const userDisplayName =
       context.interaction.member?.displayName ??
       context.interaction.user.globalName ??
       context.interaction.user.username
-    await context.update({
-      components: buildJumbleReplayComponents(replayCustomID, {
+    await startJumbleFromCompletedMessage(context, {
+      pendingComponents: buildJumbleReplayComponents(replayCustomID, undefined, {
         status: 'playing',
         userDisplayName
-      })
+      }),
+      start: () =>
+        context.app.jumble.start({
+          starterUserId: context.interaction.user.id,
+          guildId: context.interaction.guildID,
+          channelId: context.interaction.channelID,
+          kind
+        })
     })
-
-    const stopTyping = startJumbleTyping(context.client, context.interaction.channelID)
-    let startedSessionId: string | undefined
-    try {
-      const result = await context.app.jumble.start({
-        starterUserId: context.interaction.user.id,
-        guildId: context.interaction.guildID,
-        channelId: context.interaction.channelID,
-        kind,
-        username: (await context.app.jumble.getProfile(context.interaction.user.id)) ?? undefined
-      })
-      startedSessionId = result.state.session.id
-      const rendered = await renderJumble(
-        result.state,
-        context.app.jumbleRenderer,
-        componentIds(result.state.session.id),
-        result.action
-      )
-      if (rendered.imageError !== undefined) {
-        context.app.logger.warn('jumble image could not be rendered', {
-          error: rendered.imageError
-        })
-      }
-      const message = await createJumbleMessage(
-        context.client,
-        context.interaction.channelID,
-        rendered.payload
-      )
-      try {
-        await context.app.jumble.attachMessage(result.state.session.id, message.id)
-      } catch (error) {
-        context.app.logger.warn('jumble message ID could not be saved', { error })
-      }
-    } catch (error) {
-      if (startedSessionId !== undefined) {
-        try {
-          await context.app.jumble.expire(startedSessionId)
-        } catch (expiryError) {
-          context.app.logger.warn('failed replay Jumble could not be expired', {
-            error: expiryError
-          })
-        }
-      }
-      try {
-        await context.update({ components: readyComponents })
-      } catch (updateError) {
-        context.app.logger.warn('jumble replay button could not be restored', {
-          error: updateError
-        })
-      }
-      throw error
-    } finally {
-      stopTyping()
-    }
   },
   onError: handleComponentError
 })
+
+export const jumbleStartSessionButton = button({
+  customID: 'jumble/session/:sessionId',
+  beforeExecute: assertJumbleEnabled,
+  async execute(context) {
+    const permissionError = jumblePermissionError(context.interaction)
+    if (permissionError !== null) throw new Error(permissionError)
+    await assertComponentSession(context, context.params.sessionId)
+
+    const customID = jumbleStartSessionButton.buildID({
+      params: { sessionId: context.params.sessionId }
+    })
+    const userDisplayName =
+      context.interaction.member?.displayName ??
+      context.interaction.user.globalName ??
+      context.interaction.user.username
+    await startJumbleFromCompletedMessage(context, {
+      pendingComponents: buildJumbleSessionStartingComponents(customID, userDisplayName),
+      start: () => context.app.jumble.startContinuousSession(context.params.sessionId)
+    })
+  },
+  onError: handleComponentError
+})
+
+interface StartJumbleFromCompletedOptions {
+  pendingComponents: MessageActionRow[]
+  start: () => Promise<JumbleActionResult<'started'>>
+}
+
+async function startJumbleFromCompletedMessage<TRoute extends string>(
+  context: ComponentContext<BotContext, TRoute, 'button', typeof modules>,
+  options: StartJumbleFromCompletedOptions
+): Promise<void> {
+  const readyComponents = context.interaction.message.components
+  await context.update({ components: options.pendingComponents })
+
+  const stopTyping = startJumbleTyping(context.client, context.interaction.channelID)
+  let startedSessionId: string | undefined
+  try {
+    const result = await options.start()
+    startedSessionId = result.state.session.id
+    const created = await createJumbleGameMessage(
+      context.client,
+      result,
+      context.app.jumbleRenderer,
+      componentIds(result.state.session.id)
+    )
+    if (created.imageError !== undefined) {
+      context.app.logger.warn('jumble image could not be rendered', {
+        error: created.imageError
+      })
+    }
+    try {
+      await context.app.jumble.attachMessage(result.state.session.id, created.message.id)
+    } catch (error) {
+      context.app.logger.warn('jumble message ID could not be saved', { error })
+    }
+  } catch (error) {
+    if (startedSessionId !== undefined) {
+      try {
+        await context.app.jumble.expire(startedSessionId)
+      } catch (expiryError) {
+        context.app.logger.warn('failed component-started Jumble could not be expired', {
+          error: expiryError
+        })
+      }
+    }
+    try {
+      await context.update({ components: readyComponents })
+    } catch (updateError) {
+      context.app.logger.warn('jumble completion buttons could not be restored', {
+        error: updateError
+      })
+    }
+    throw error
+  } finally {
+    stopTyping()
+  }
+}
 
 export const jumbleComponents = [
   jumbleHintButton,
   jumbleUnblurButton,
   jumbleReshuffleButton,
   jumbleGiveUpButton,
-  jumbleReplayButton
+  jumbleReplayButton,
+  jumbleStartSessionButton
 ] as const
 
 export function componentIds(sessionId: string) {
@@ -153,7 +188,8 @@ export function componentIds(sessionId: string) {
     unblur: jumbleUnblurButton.buildID({ params: { sessionId } }),
     reshuffle: jumbleReshuffleButton.buildID({ params: { sessionId } }),
     giveUp: jumbleGiveUpButton.buildID({ params: { sessionId } }),
-    replay: (kind: string) => jumbleReplayButton.buildID({ params: { kind } })
+    replay: (kind: string) => jumbleReplayButton.buildID({ params: { kind } }),
+    startSession: jumbleStartSessionButton.buildID({ params: { sessionId } })
   }
 }
 
@@ -176,7 +212,7 @@ async function updateJumbleComponent<TRoute extends string>(
 async function assertComponentSession<TRoute extends string>(
   context: ComponentContext<BotContext, TRoute, 'button', typeof modules>,
   sessionId: string
-): Promise<void> {
+): Promise<JumbleState> {
   const state = await context.app.jumble.getState(sessionId)
   if (
     state.session.channelId !== context.interaction.channelID ||
@@ -184,6 +220,7 @@ async function assertComponentSession<TRoute extends string>(
   ) {
     throw new Error('That control belongs to a different Jumble message.')
   }
+  return state
 }
 
 async function handleComponentError<TRoute extends string>(

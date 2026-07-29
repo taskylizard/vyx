@@ -22,7 +22,11 @@ export async function handleMessageCreate(context: BotContext, message: Message)
         service: context.jumble,
         renderer: context.jumbleRenderer,
         idsFor: (state) => componentIds(state.session.id),
-        isEnabled: () => isModuleEnabled(context, guildID, modules.jumble.id)
+        isEnabled: () => isModuleEnabled(context, guildID, modules.jumble.id),
+        onImageError: (error) =>
+          context.logger.warn('jumble image could not be rendered', { error }),
+        onSessionError: (error) =>
+          context.logger.warn('jumble session continuation failed', { error })
       })
       if (handledByJumble) {
         setActiveSpanAttributes({ 'kanikou.message.route': 'jumble-guess' })

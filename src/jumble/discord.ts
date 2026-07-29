@@ -13,8 +13,9 @@ import {
   buildJumbleWinnerAnnouncement,
   type JumbleComponentIds
 } from './presentation.ts'
-import type { JumbleAction, JumbleState } from './types.ts'
-import type { JumbleService } from './service.ts'
+import { JumbleError, type JumbleService } from './service.ts'
+import type { JumbleAction, JumbleActionResult, JumbleState } from './types.ts'
+import { startJumbleTyping } from './typing.ts'
 
 export interface JumbleComponentIdFactory {
   hint(sessionId: string): string
@@ -22,6 +23,7 @@ export interface JumbleComponentIdFactory {
   reshuffle(sessionId: string): string
   giveUp(sessionId: string): string
   replay(kind: string): string
+  startSession(sessionId: string): string
 }
 
 export interface RenderedJumble {
@@ -34,6 +36,8 @@ export interface HandleJumbleMessageOptions {
   renderer: JumbleImageRenderer
   idsFor: (state: JumbleState) => JumbleComponentIds
   isEnabled?: () => Promise<boolean>
+  onImageError?: (error: Error) => void
+  onSessionError?: (error: unknown) => void
 }
 
 export async function renderJumble(
@@ -65,10 +69,15 @@ export async function renderJumble(
       imageError = error instanceof Error ? error : new Error(String(error))
     }
   }
-  const payload = buildJumblePayload(state, { componentIds: ids, image, action })
-  if (imageError !== undefined && typeof payload.content === 'string') {
-    payload.content += '\n\n⚠️ The cover art could not be loaded. Hints and guesses still work.'
-  }
+  const payload = buildJumblePayload(state, {
+    componentIds: ids,
+    image,
+    action,
+    warning:
+      imageError === undefined
+        ? undefined
+        : '⚠️ The cover art could not be loaded. Hints and guesses still work.'
+  })
   return { payload, imageError }
 }
 
@@ -111,6 +120,23 @@ export async function createJumbleMessage(
   return client.rest.channels.createMessage(channelId, options)
 }
 
+export async function createJumbleGameMessage(
+  client: Pick<Client, 'getChannel' | 'rest'>,
+  result: JumbleActionResult,
+  renderer: JumbleImageRenderer,
+  ids: JumbleComponentIds
+): Promise<{ message: Message; imageError?: Error }> {
+  const rendered = await renderJumble(result.state, renderer, ids, result.action)
+  const message = await createJumbleMessage(
+    client,
+    result.state.session.channelId,
+    rendered.payload
+  )
+  return rendered.imageError === undefined
+    ? { message }
+    : { imageError: rendered.imageError, message }
+}
+
 export async function editJumbleMessage(
   client: Client,
   channelId: string,
@@ -144,8 +170,10 @@ export async function handleJumbleMessage(
   if (active === null) return false
   if (isEnabled !== undefined && !(await isEnabled())) return false
 
-  const result = await service.submitGuess(active.session.id, message.author.id, message.content)
-  const renderFinished = async (action: 'won' | 'expired' | 'gave_up'): Promise<void> => {
+  const renderFinished = async (
+    result: JumbleActionResult,
+    action: 'won' | 'expired' | 'gave_up' | 'cancelled'
+  ): Promise<void> => {
     const rendered = await renderJumble(result.state, renderer, idsFor(result.state), action)
     if (result.state.session.messageId !== null) {
       await editJumbleMessage(
@@ -156,9 +184,21 @@ export async function handleJumbleMessage(
       )
     }
   }
+
+  if (
+    active.session.metadata.continuousSession !== undefined &&
+    message.content.trim().toLowerCase() === 'cancel'
+  ) {
+    const cancelled = await service.cancelContinuousSession(active.session.id)
+    await renderFinished(cancelled, 'cancelled')
+    await safeReaction(message, '🛑')
+    return true
+  }
+
+  const result = await service.submitGuess(active.session.id, message.author.id, message.content)
   await match(result.action)
     .with('won', async (action) => {
-      await renderFinished(action)
+      await renderFinished(result, action)
       await createJumbleMessage(client, message.channelID, {
         allowedMentions: {
           everyone: false,
@@ -175,11 +215,67 @@ export async function handleJumbleMessage(
         }
       })
       await safeReaction(message, '✅')
+      if (result.state.session.metadata.continuousSession !== undefined) {
+        await continueJumbleSession(client, result.state, options)
+      }
     })
-    .with('expired', 'gave_up', renderFinished)
+    .with('expired', 'gave_up', 'cancelled', async (action) => renderFinished(result, action))
     .with('incorrect', 'started', 'updated', 'unchanged', async () => undefined)
     .exhaustive()
   return true
+}
+
+async function continueJumbleSession(
+  client: Client,
+  completed: JumbleState,
+  options: HandleJumbleMessageOptions
+): Promise<void> {
+  const stopTyping = startJumbleTyping(client, completed.session.channelId)
+  let startedSessionId: string | undefined
+  try {
+    const next = await options.service.continueContinuousSession(completed.session.id)
+    if (next === null) return
+    startedSessionId = next.state.session.id
+    const created = await createJumbleGameMessage(
+      client,
+      next,
+      options.renderer,
+      options.idsFor(next.state)
+    )
+    if (created.imageError !== undefined) options.onImageError?.(created.imageError)
+    try {
+      await options.service.attachMessage(next.state.session.id, created.message.id)
+    } catch (error) {
+      options.onSessionError?.(error)
+    }
+  } catch (error) {
+    if (startedSessionId !== undefined) {
+      try {
+        await options.service.expire(startedSessionId)
+      } catch (expiryError) {
+        options.onSessionError?.(expiryError)
+      }
+    }
+    if (error instanceof JumbleError && error.code === 'busy') return
+
+    options.onSessionError?.(error)
+    const detail = error instanceof JumbleError ? error.message : 'The next Jumble could not start.'
+    try {
+      await createJumbleMessage(client, completed.session.channelId, {
+        allowedMentions: {
+          everyone: false,
+          repliedUser: false,
+          roles: false,
+          users: false
+        },
+        content: `The Jumble session stopped. ${detail}`
+      })
+    } catch (notificationError) {
+      options.onSessionError?.(notificationError)
+    }
+  } finally {
+    stopTyping()
+  }
 }
 
 async function safeReaction(message: Message, emoji: string): Promise<void> {
