@@ -4,7 +4,7 @@ import { denyUnlessBotOwner } from './guards.ts'
 export default slash({
   name: 'ask',
   description: 'Ask the AI',
-  contexts: ['botDm', 'privateChannel'],
+  contexts: ['botDm', 'privateChannel', 'guild'],
   installations: ['user'],
   options: {
     ephemeral: {
