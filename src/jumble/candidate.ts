@@ -7,11 +7,28 @@ import type {
   JumbleArtistMetadata,
   JumbleCandidate,
   JumbleCandidateBase,
+  JumbleKind,
   JumbleReleaseCandidateBase
 } from './types.ts'
 
 export const MAX_JUMBLE_IMAGE_URLS = 8
 export const MAX_JUMBLE_ANSWER_VARIANTS = 16
+
+export function jumbleCandidateIdentityKey(candidate: {
+  kind: JumbleKind
+  answer: string
+  artistName?: string | null
+}): string {
+  return match(candidate.kind)
+    .with('artist', () => `artist\u0000${normalizeAnswer(candidate.answer)}`)
+    .with(
+      'album',
+      'track',
+      (kind) =>
+        `${kind}\u0000${normalizeAnswer(candidate.answer)}\u0000${normalizeAnswer(candidate.artistName ?? '')}`
+    )
+    .exhaustive()
+}
 
 /** Return bounded, valid artwork URLs in preference order. */
 export function getCandidateImageUrls(candidate: JumbleCandidate): string[] {

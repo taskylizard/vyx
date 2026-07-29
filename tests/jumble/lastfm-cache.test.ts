@@ -6,7 +6,7 @@ import { jumbleMetadataCache } from '../../src/database/schemas/jumble.ts'
 import { LastFmClient } from '../../src/jumble/lastfm.ts'
 import { JumbleMetadataCache } from '../../src/jumble/metadata-cache.ts'
 
-const TRACK_CACHE_KEY = `lastfm:v1:top:track:100:${createHash('sha256').update('tasky').digest('hex')}`
+const TRACK_CACHE_KEY = `lastfm:v2:top:track:100:1:${createHash('sha256').update('tasky').digest('hex')}`
 const DAY_MS = 24 * 60 * 60 * 1_000
 let database: ReturnType<typeof createKanikouDatabase>
 let cache: JumbleMetadataCache
@@ -210,7 +210,7 @@ test('bounds persistent cache keys for Unicode and adversarial usernames', async
   const rows = await database.db.select().from(jumbleMetadataCache)
   expect(rows).toHaveLength(1)
   expect(rows[0]?.cacheKey.length).toBeLessThanOrEqual(512)
-  expect(rows[0]?.cacheKey).toMatch(/^lastfm:v1:top:track:100:[a-f\d]{64}$/u)
+  expect(rows[0]?.cacheKey).toMatch(/^lastfm:v2:top:track:100:1:[a-f\d]{64}$/u)
   expect(rows[0]?.cacheKey).not.toContain('界')
 })
 
@@ -246,18 +246,66 @@ test('does not persist empty or oversized top lists', async () => {
   expect(rows).toHaveLength(0)
 })
 
+test('merges and deduplicates multiple top-list pages for larger candidate windows', async () => {
+  const pages: number[] = []
+  const client = new LastFmClient({
+    apiKey: 'test-key',
+    fetchImpl: async (input) => {
+      const url =
+        input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
+      const page = Number(url.searchParams.get('page'))
+      pages.push(page)
+      return jsonResponse({
+        toptracks: {
+          track:
+            page === 1
+              ? [topTrack('First Track'), topTrack('Shared Track')]
+              : page === 2
+                ? [topTrack('Shared Track'), topTrack('Deep Track')]
+                : []
+        }
+      })
+    }
+  })
+
+  await expect(client.getCandidates('track', 'tasky', 600)).resolves.toMatchObject([
+    { answer: 'First Track' },
+    { answer: 'Shared Track' },
+    { answer: 'Deep Track' }
+  ])
+  expect(pages.sort((first, second) => first - second)).toEqual([1, 2, 3])
+})
+
+test('keeps the first candidate page when deeper pages fail', async () => {
+  const client = new LastFmClient({
+    apiKey: 'test-key',
+    fetchImpl: async (input) => {
+      const url =
+        input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
+      if (url.searchParams.get('page') !== '1') throw new Error('deep page unavailable')
+      return topTrackResponse('First Page Track')
+    }
+  })
+
+  await expect(client.getCandidates('track', 'tasky', 600)).resolves.toMatchObject([
+    { answer: 'First Page Track' }
+  ])
+})
+
 function topTrackResponse(name: string): Response {
   return jsonResponse({
     toptracks: {
-      track: [
-        {
-          name,
-          artist: { name: 'Pretty Patterns' },
-          playcount: '66'
-        }
-      ]
+      track: [topTrack(name)]
     }
   })
+}
+
+function topTrack(name: string) {
+  return {
+    name,
+    artist: { name: 'Pretty Patterns' },
+    playcount: '66'
+  }
 }
 
 function jsonResponse(value: unknown): Response {

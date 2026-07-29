@@ -13,7 +13,7 @@ beforeAll(async () => {
   await database.initialize()
   cache = new JumbleMetadataCache(database.db)
   await cache.set(
-    `lastfm:v1:top:track:100:${createHash('sha256').update('tasky').digest('hex')}`,
+    `lastfm:v2:top:track:100:1:${createHash('sha256').update('tasky').digest('hex')}`,
     [
       {
         kind: 'track',

@@ -351,6 +351,98 @@ test('bounds failed candidate hydration attempts', async () => {
   ])
 })
 
+test('selects from a six-hundred-item candidate window', async () => {
+  service.stop()
+  let requestedLimit: number | undefined
+  service = new JumbleService(
+    repository,
+    {
+      async getCandidates(_kind, _username, limit) {
+        requestedLimit = limit
+        return Array.from({ length: 600 }, (_, index) => ({
+          kind: 'track' as const,
+          answer: `Track ${index}`,
+          artistName: `Artist ${index}`,
+          imageUrl: `https://example.test/track-${index}.png`
+        }))
+      },
+      async getHints() {
+        return []
+      }
+    },
+    { now: () => now, randomIndex: (maxExclusive) => maxExclusive - 1 }
+  )
+
+  const started = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'track',
+    username: 'tasky'
+  })
+
+  expect(requestedLimit).toBe(600)
+  expect(started.state.session.answer).toBe('Track 599')
+})
+
+test('falls back to the oldest half instead of immediately repeating a recent candidate', async () => {
+  service.stop()
+  service = new JumbleService(
+    repository,
+    {
+      async getCandidates() {
+        return [
+          {
+            kind: 'track',
+            answer: 'First Track',
+            artistName: 'First Artist',
+            imageUrl: 'https://example.test/first.png'
+          },
+          {
+            kind: 'track',
+            answer: 'Second Track',
+            artistName: 'Second Artist',
+            imageUrl: 'https://example.test/second.png'
+          }
+        ] satisfies readonly JumbleCandidate[]
+      },
+      async getHints() {
+        return []
+      }
+    },
+    { now: () => now, randomIndex: () => 0 }
+  )
+
+  const first = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'track',
+    username: 'tasky'
+  })
+  expect(first.state.session.answer).toBe('First Track')
+  await service.giveUp(first.state.session.id, 'user-1')
+
+  const second = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'track',
+    username: 'tasky'
+  })
+  expect(second.state.session.answer).toBe('Second Track')
+  await service.giveUp(second.state.session.id, 'user-1')
+
+  const third = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'track',
+    username: 'tasky'
+  })
+  expect(third.state.session.answer).toBe('First Track')
+})
+
 test('expires an active session when its clock passes the kind timeout', async () => {
   const started = await service.start({
     starterUserId: 'user-1',

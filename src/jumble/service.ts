@@ -1,7 +1,7 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { match, P } from 'ts-pattern'
 import { answerMatchesAny, normalizeAnswer, shuffleCharacters } from './answer.ts'
-import { getCandidateImageUrls } from './candidate.ts'
+import { getCandidateImageUrls, jumbleCandidateIdentityKey } from './candidate.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
 import type {
@@ -34,6 +34,8 @@ export const JUMBLE_TIMEOUT_MS: Readonly<Record<JumbleKind, number>> = {
 }
 
 const MAX_CANDIDATE_HYDRATION_ATTEMPTS = 8
+const JUMBLE_CANDIDATE_LIMIT = 600
+const JUMBLE_RECENT_CANDIDATE_LIMIT = 500
 
 export class JumbleError extends Error {
   readonly code:
@@ -472,9 +474,9 @@ export class JumbleService {
       const candidateFetchStartedAt = performance.now()
       let candidates: JumbleCandidate[]
       try {
-        candidates = [...(await this.provider.getCandidates(kind, username, 100))].filter(
-          (candidate) => isCandidateIdentityValid(candidate, kind)
-        )
+        candidates = [
+          ...(await this.provider.getCandidates(kind, username, JUMBLE_CANDIDATE_LIMIT))
+        ].filter((candidate) => isCandidateIdentityValid(candidate, kind))
       } finally {
         candidateFetchMs = jumbleDurationMs(candidateFetchStartedAt)
       }
@@ -485,17 +487,15 @@ export class JumbleService {
       const recentLookupStartedAt = performance.now()
       let recent: readonly JumbleSession[]
       try {
-        recent = await this.repository.listRecentForUser(starterUserId, kind, 80)
+        recent = await this.repository.listRecentForUser(
+          starterUserId,
+          kind,
+          JUMBLE_RECENT_CANDIDATE_LIMIT
+        )
       } finally {
         recentLookupMs = jumbleDurationMs(recentLookupStartedAt)
       }
-      const recentKeys = new Set(
-        recent.map((session) => candidateKey(session.answer, session.artistName))
-      )
-      const unseen = candidates.filter(
-        (candidate) => !recentKeys.has(candidateKey(candidate.answer, candidate.artistName))
-      )
-      const pool = unseen.length > 0 ? unseen : candidates
+      const pool = buildCandidatePool(candidates, recent)
       const startIndex = this.randomIndex(pool.length)
       const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
       let selected: JumbleCandidate | undefined
@@ -608,8 +608,26 @@ function isPlayableCandidate(candidate: JumbleCandidate, kind: JumbleKind): bool
   return hasSemanticAnswer && getCandidateImageUrls(candidate).length > 0
 }
 
-function candidateKey(answer: string, artist: string | null | undefined): string {
-  return `${normalizeAnswer(answer)}\u0000${normalizeAnswer(artist ?? '')}`
+function buildCandidatePool(
+  candidates: JumbleCandidate[],
+  recent: readonly JumbleSession[]
+): JumbleCandidate[] {
+  const recentRanks = new Map<string, number>()
+  for (const [index, session] of recent.entries()) {
+    const key = jumbleCandidateIdentityKey(session)
+    if (!recentRanks.has(key)) recentRanks.set(key, index)
+  }
+  const unseen = candidates.filter(
+    (candidate) => !recentRanks.has(jumbleCandidateIdentityKey(candidate))
+  )
+  if (unseen.length > 0) return unseen
+
+  const cooldownRank = Math.max(1, Math.ceil(Math.min(recentRanks.size, candidates.length) / 2))
+  const cooled = candidates.filter((candidate) => {
+    const rank = recentRanks.get(jumbleCandidateIdentityKey(candidate))
+    return rank === undefined || rank >= cooldownRank
+  })
+  return cooled.length > 0 ? cooled : candidates
 }
 
 function shuffle<T>(items: T[], randomIndex: (maxExclusive: number) => number): T[] {

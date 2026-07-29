@@ -2,7 +2,11 @@ import { createHash } from 'node:crypto'
 import { match, P } from 'ts-pattern'
 import { z } from 'zod'
 import { normalizeAnswer } from './answer.ts'
-import { getCandidateImageUrls, mergeJumbleCandidates } from './candidate.ts'
+import {
+  getCandidateImageUrls,
+  jumbleCandidateIdentityKey,
+  mergeJumbleCandidates
+} from './candidate.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
 import {
   type JumbleMusicProvider,
@@ -37,7 +41,9 @@ const RESPONSE_CACHE_TTL_MS = 5 * 60_000
 const TOP_LIST_FRESH_TTL_MS = 15 * 60_000
 const TOP_LIST_STALE_TTL_MS = 24 * 60 * 60 * 1_000
 const STALE_RETRY_TTL_MS = 60_000
-const LastFmCandidateListSchema = z.array(JumbleCandidateSchema).min(1).max(200)
+const MAX_CANDIDATES = 600
+const MAX_CANDIDATES_PER_PAGE = 200
+const LastFmCandidateListSchema = z.array(JumbleCandidateSchema).max(MAX_CANDIDATES_PER_PAGE)
 
 type LastFmMemoryCacheEntry =
   | { kind: 'response'; expiresAt: number; value: LastFmEnvelope; bytes: number }
@@ -55,6 +61,7 @@ interface LastFmCandidateRequest {
   kind: JumbleKind
   username: string
   limit: number
+  requirement: 'required' | 'optional'
 }
 
 export class LastFmError extends Error {
@@ -135,28 +142,60 @@ export class LastFmClient implements JumbleMusicProvider {
       .with('album', () => 'user.gettopalbums')
       .with('track', () => 'user.gettoptracks')
       .exhaustive()
-    const safeLimit = clamp(limit, 1, 200)
-    const params = {
-      user: safeUsername,
-      period: 'overall',
-      limit: String(safeLimit),
-      page: '1'
-    }
+    const safeLimit = clamp(limit, 1, MAX_CANDIDATES)
+    const pageSize = Math.min(safeLimit, MAX_CANDIDATES_PER_PAGE)
+    const pageCount = Math.ceil(safeLimit / pageSize)
     const usernameKey = createHash('sha256').update(safeUsername.toLowerCase()).digest('hex')
-    const cacheKey = `lastfm:v1:top:${kind}:${safeLimit}:${usernameKey}`
+    const requests = Array.from({ length: pageCount }, (_, index) => {
+      const page = index + 1
+      return this.getCandidatePage({
+        cacheKey: `lastfm:v2:top:${kind}:${pageSize}:${page}:${usernameKey}`,
+        method,
+        params: {
+          user: safeUsername,
+          period: 'overall',
+          limit: String(pageSize),
+          page: String(page)
+        },
+        kind,
+        username: safeUsername,
+        limit: pageSize,
+        requirement: page === 1 ? 'required' : 'optional'
+      })
+    })
+    const results = await Promise.allSettled(requests)
+    const firstCandidates = match(results[0])
+      .returnType<readonly JumbleCandidate[]>()
+      .with({ status: 'fulfilled' }, ({ value }) => value)
+      .with({ status: 'rejected' }, ({ reason }) => {
+        throw reason
+      })
+      .exhaustive()
+    const candidates = [...firstCandidates]
+    for (const result of results.slice(1)) {
+      match(result)
+        .with({ status: 'fulfilled' }, ({ value }) => candidates.push(...value))
+        .with({ status: 'rejected' }, ({ reason }) => this.report(reason))
+        .exhaustive()
+    }
+    const unique = new Map<string, JumbleCandidate>()
+    for (const candidate of candidates) {
+      const key = jumbleCandidateIdentityKey(candidate)
+      if (!unique.has(key)) unique.set(key, candidate)
+    }
+    return [...unique.values()].slice(0, safeLimit)
+  }
+
+  private async getCandidatePage(
+    request: LastFmCandidateRequest
+  ): Promise<readonly JumbleCandidate[]> {
+    const { cacheKey } = request
     const memoryCached = this.readCachedCandidates(cacheKey)
     if (memoryCached !== undefined) return memoryCached
     const existing = this.candidateInflight.get(cacheKey)
     if (existing !== undefined) return existing
 
-    const task = this.loadCandidates({
-      cacheKey,
-      method,
-      params,
-      kind,
-      username: safeUsername,
-      limit: safeLimit
-    })
+    const task = this.loadCandidatePage(request)
     this.candidateInflight.set(cacheKey, task)
     try {
       return await task
@@ -165,10 +204,10 @@ export class LastFmClient implements JumbleMusicProvider {
     }
   }
 
-  private async loadCandidates(
+  private async loadCandidatePage(
     request: LastFmCandidateRequest
   ): Promise<readonly JumbleCandidate[]> {
-    const { cacheKey, method, params, kind, username, limit } = request
+    const { cacheKey, method, params, kind, username, limit, requirement } = request
     let staleCandidates: readonly JumbleCandidate[] | undefined
     if (this.persistentCache !== undefined) {
       try {
@@ -176,7 +215,11 @@ export class LastFmClient implements JumbleMusicProvider {
         if (
           cached !== null &&
           cached.value.length <= limit &&
-          cached.value.every((candidate) => candidate.kind === kind)
+          cached.value.every((candidate) => candidate.kind === kind) &&
+          match(requirement)
+            .with('required', () => cached.value.length > 0)
+            .with('optional', () => true)
+            .exhaustive()
         ) {
           const ageMs = Math.max(0, Date.now() - cached.fetchedAt)
           if (ageMs <= TOP_LIST_FRESH_TTL_MS) {
@@ -199,12 +242,14 @@ export class LastFmClient implements JumbleMusicProvider {
     try {
       const payload = await this.request(method, params)
       candidates = parseLastFmTopItems(payload, kind)
-      if (candidates.length === 0) {
-        throw new LastFmError(
-          `Last.fm did not return any ${kind} scrobbles for "${username}".`,
-          'empty-results'
-        )
-      }
+      match({ candidateCount: candidates.length, requirement })
+        .with({ candidateCount: 0, requirement: 'required' }, () => {
+          throw new LastFmError(
+            `Last.fm did not return any ${kind} scrobbles for "${username}".`,
+            'empty-results'
+          )
+        })
+        .otherwise(() => undefined)
     } catch (error) {
       if (staleCandidates === undefined) throw error
       this.storeMemory(cacheKey, {
