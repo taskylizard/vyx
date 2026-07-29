@@ -58,5 +58,7 @@ test('/modules still allows the bot owner to inspect a guild', async () => {
   } as never)
 
   expect(defer).toHaveBeenCalledWith({ ephemeral: true })
-  expect(editResponse).toHaveBeenCalledWith('**Server modules**\n⬜ 🤖 AI\n⬜ 🧩 Jumble')
+  expect(editResponse).toHaveBeenCalledWith(
+    '**Server modules**\n⬜ 🤖 AI\n⬜ 🔗 Autoembeds\n⬜ 🧩 Jumble'
+  )
 })

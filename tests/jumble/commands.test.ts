@@ -22,7 +22,7 @@ test('keeps Jumble out of global registration until its guild module is enabled'
   expect(registry.modules.catalog.ai).toBe(modules.ai)
   expect(registry.modules.catalog.jumble).toBe(modules.jumble)
   expect(askCommand.module).toBeUndefined()
-  expect(askCommand.contexts).toEqual(['botDm', 'privateChannel'])
+  expect(askCommand.contexts).toEqual(['botDm', 'privateChannel', 'guild'])
   expect(askCommand.installations).toEqual(['user'])
   expect(memoryCommand.module).toBe(modules.ai)
   expect(slashCommandToDiscord(jumbleCommand)).toMatchObject({
