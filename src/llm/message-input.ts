@@ -1,7 +1,7 @@
 import type { AssistantModelMessage, ModelMessage, UserContent, UserModelMessage } from 'ai'
 import type { CommandInteraction, Message } from 'oceanic.js'
 import type { BotContext } from '../bot/context.ts'
-import { fetchMessageCached } from '../discord/cached.ts'
+import { fetchReferencedMessageCached } from '../discord/cached.ts'
 
 const MAX_REPLY_CHAIN_MESSAGES = 12
 
@@ -130,7 +130,7 @@ async function replyChain(context: BotContext, source: Message): Promise<Message
 
   for (let index = 0; index < MAX_REPLY_CHAIN_MESSAGES; index += 1) {
     // eslint-disable-next-line no-await-in-loop -- tasky: sequential chain walk, each message's reference resolves the next
-    const referenced = await referencedMessage(context, current)
+    const referenced = await fetchReferencedMessageCached(context.client, current)
     if (referenced === undefined) {
       break
     }
@@ -139,24 +139,4 @@ async function replyChain(context: BotContext, source: Message): Promise<Message
   }
 
   return chain.reverse()
-}
-
-async function referencedMessage(
-  context: BotContext,
-  message: Message
-): Promise<Message | undefined> {
-  if (message.referencedMessage !== undefined && message.referencedMessage !== null) {
-    return message.referencedMessage
-  }
-
-  const messageID = message.messageReference?.messageID
-  if (messageID === undefined) {
-    return undefined
-  }
-
-  return fetchMessageCached(
-    context.client,
-    message.messageReference?.channelID ?? message.channelID,
-    messageID
-  )
 }

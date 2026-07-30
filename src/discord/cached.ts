@@ -21,3 +21,23 @@ export async function fetchMessageCached(
 
   return client.rest.channels.getMessage(channelID, messageID)
 }
+
+export async function fetchReferencedMessageCached(
+  client: Pick<Client, 'rest'> & CacheClient,
+  message: Message
+): Promise<Message | undefined> {
+  if (message.referencedMessage !== undefined && message.referencedMessage !== null) {
+    return message.referencedMessage
+  }
+
+  const messageID = message.messageReference?.messageID
+  if (messageID === undefined) {
+    return undefined
+  }
+
+  return fetchMessageCached(
+    client,
+    message.messageReference?.channelID ?? message.channelID,
+    messageID
+  )
+}

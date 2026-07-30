@@ -166,3 +166,145 @@ test('only checks for active Jumble guesses when the guild module is enabled', a
     module: 'jumble'
   })
 })
+
+test('ignores reply pings to autoembed responses', async () => {
+  const replyToMessage = vi.fn(async () => undefined)
+  const getMessage = vi.fn(async () => ({
+    author: { id: 'user' },
+    content: 'check this out https://instagram.com/reel/example/'
+  }))
+  const context = {
+    applicationID: 'app',
+    botUserID: 'bot',
+    client: { rest: { channels: { getMessage } } },
+    jumble: { activeForChannel: vi.fn(async () => null) },
+    logger: { warn: vi.fn() },
+    moduleStore: {
+      isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
+    },
+    responder: { replyToMessage }
+  } as unknown as BotContext
+  const message = {
+    author: { bot: false, id: 'user' },
+    channelID: 'channel',
+    content: 'lol this is insane',
+    guildID: 'guild',
+    id: 'message',
+    mentions: { users: [{ id: 'bot' }] },
+    referencedMessage: {
+      author: { bot: true, id: 'bot' },
+      channelID: 'channel',
+      content: '',
+      messageReference: { channelID: 'channel', messageID: 'parent-message' }
+    }
+  } as unknown as Message
+
+  await handleMessageCreate(context, message)
+
+  expect(replyToMessage).not.toHaveBeenCalled()
+  expect(getMessage).toHaveBeenCalledWith('channel', 'parent-message')
+})
+
+test('responds to explicit mentions in replies to autoembed responses', async () => {
+  const replyToMessage = vi.fn(async () => undefined)
+  const getMessage = vi.fn(async () => ({}))
+  const context = {
+    applicationID: 'app',
+    botUserID: 'bot',
+    client: { rest: { channels: { getMessage } } },
+    jumble: { activeForChannel: vi.fn(async () => null) },
+    logger: { warn: vi.fn() },
+    moduleStore: {
+      isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
+    },
+    responder: { replyToMessage }
+  } as unknown as BotContext
+  const message = {
+    author: { bot: false, id: 'user' },
+    channelID: 'channel',
+    content: '<@bot> what song is in this reel?',
+    guildID: 'guild',
+    id: 'message',
+    mentions: { users: [{ id: 'bot' }] },
+    referencedMessage: {
+      author: { bot: true, id: 'bot' },
+      channelID: 'channel',
+      content: '',
+      messageReference: { channelID: 'channel', messageID: 'parent-message' }
+    }
+  } as unknown as Message
+
+  await handleMessageCreate(context, message)
+
+  expect(replyToMessage).toHaveBeenCalledWith(context, message)
+  expect(getMessage).not.toHaveBeenCalled()
+})
+
+test('responds to reply pings on regular bot responses', async () => {
+  const replyToMessage = vi.fn(async () => undefined)
+  const getMessage = vi.fn(async () => ({
+    author: { id: 'user' },
+    content: '<@bot> hello there'
+  }))
+  const context = {
+    applicationID: 'app',
+    botUserID: 'bot',
+    client: { rest: { channels: { getMessage } } },
+    jumble: { activeForChannel: vi.fn(async () => null) },
+    logger: { warn: vi.fn() },
+    moduleStore: {
+      isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
+    },
+    responder: { replyToMessage }
+  } as unknown as BotContext
+  const message = {
+    author: { bot: false, id: 'user' },
+    channelID: 'channel',
+    content: 'tell me more',
+    guildID: 'guild',
+    id: 'message',
+    mentions: { users: [{ id: 'bot' }] },
+    referencedMessage: {
+      author: { bot: true, id: 'bot' },
+      channelID: 'channel',
+      content: 'hi! how can I help?',
+      messageReference: { channelID: 'channel', messageID: 'parent-message' }
+    }
+  } as unknown as Message
+
+  await handleMessageCreate(context, message)
+
+  expect(replyToMessage).toHaveBeenCalledWith(context, message)
+})
+
+test('responds when a replied-to bot message cannot be resolved', async () => {
+  const replyToMessage = vi.fn(async () => undefined)
+  const getMessage = vi.fn(async () => {
+    throw new Error('unknown message')
+  })
+  const context = {
+    applicationID: 'app',
+    botUserID: 'bot',
+    client: { rest: { channels: { getMessage } } },
+    jumble: { activeForChannel: vi.fn(async () => null) },
+    logger: { warn: vi.fn() },
+    moduleStore: {
+      isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
+    },
+    responder: { replyToMessage }
+  } as unknown as BotContext
+  const message = {
+    author: { bot: false, id: 'user' },
+    channelID: 'channel',
+    content: 'any thoughts?',
+    guildID: 'guild',
+    id: 'message',
+    mentions: { users: [{ id: 'bot' }] },
+    messageReference: { channelID: 'channel', messageID: 'deleted-message' },
+    referencedMessage: null
+  } as unknown as Message
+
+  await handleMessageCreate(context, message)
+
+  expect(replyToMessage).toHaveBeenCalledWith(context, message)
+})

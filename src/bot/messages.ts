@@ -1,6 +1,7 @@
 import type { Message } from 'oceanic.js'
 import { handleAutoembeds, isAutoembedMessage } from '../discord/autoembeds.ts'
 import { OWNER_USER_ID } from '../discord/ids.ts'
+import { isIntentionalBotMention } from '../discord/mention-intent.ts'
 import { isOperationsScope } from '../llm/mintlify-mcp.ts'
 import { handleJumbleMessage } from '../jumble/discord.ts'
 import { componentIds } from '../jumble/components.ts'
@@ -68,24 +69,30 @@ export async function handleMessageCreate(context: BotContext, message: Message)
     return
   }
 
-  if (mentionsBot && isOperationsScope({ channelID: message.channelID, guildID })) {
-    setActiveSpanAttributes({ 'kanikou.message.route': 'ai-operations-mention' })
-    await context.responder.replyToMessage(context, message)
-    return
-  }
+  if (mentionsBot) {
+    if (!(await isIntentionalBotMention(context, message))) {
+      setActiveSpanAttributes({ 'kanikou.message.outcome': 'ignored-autoembed-reply' })
+      return
+    }
 
-  if (
-    guildID !== null &&
-    mentionsBot &&
-    (await context.moduleStore.isEnabled({
-      applicationID: context.applicationID,
-      guildID,
-      module: modules.ai.id
-    }))
-  ) {
-    setActiveSpanAttributes({ 'kanikou.message.route': 'ai-guild-mention' })
-    await context.responder.replyToMessage(context, message)
-    return
+    if (isOperationsScope({ channelID: message.channelID, guildID })) {
+      setActiveSpanAttributes({ 'kanikou.message.route': 'ai-operations-mention' })
+      await context.responder.replyToMessage(context, message)
+      return
+    }
+
+    if (
+      guildID !== null &&
+      (await context.moduleStore.isEnabled({
+        applicationID: context.applicationID,
+        guildID,
+        module: modules.ai.id
+      }))
+    ) {
+      setActiveSpanAttributes({ 'kanikou.message.route': 'ai-guild-mention' })
+      await context.responder.replyToMessage(context, message)
+      return
+    }
   }
 
   setActiveSpanAttributes({ 'kanikou.message.outcome': 'ignored-unmatched' })
