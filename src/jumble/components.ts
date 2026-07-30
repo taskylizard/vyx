@@ -1,56 +1,65 @@
 import { MessageFlags, type MessageActionRow } from 'oceanic.js'
-import { match, P } from 'ts-pattern'
+import { match } from 'ts-pattern'
 import { button } from '../bot/rosepack.ts'
-import { createJumbleGameMessage, jumblePermissionError, renderJumble } from './discord.ts'
+import { createJumbleGameMessage, renderJumble } from './discord.ts'
+import { jumbleErrorMessage } from './errors.ts'
 import {
   buildJumbleReplayComponents,
   buildJumbleSessionStartingComponents
 } from './presentation.ts'
-import type { ComponentContext } from 'rosepack'
+import type { ComponentContext, GuardedContext } from 'rosepack'
 import type { BotContext } from '../bot/context.ts'
 import { modules } from '../modules.ts'
+import { jumbleComponentGuards, jumbleStartGuards } from './guards.ts'
+import { JumbleError } from './service.ts'
 import { isJumbleKind, type JumbleActionResult, type JumbleState } from './types.ts'
 import { startJumbleTyping } from './typing.ts'
 
+type JumbleComponentContext<TRoute extends string> = GuardedContext<
+  ComponentContext<BotContext, TRoute, 'button', typeof modules>,
+  typeof jumbleComponentGuards
+>
+
 export const jumbleHintButton = button({
   customID: 'jumble/hint/:sessionId',
-  beforeExecute: assertJumbleEnabled,
+  guards: jumbleComponentGuards,
+  onError: handleComponentError,
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
     const result = await context.app.jumble.revealHint(context.params.sessionId)
     await updateJumbleComponent(context, result)
-  },
-  onError: handleComponentError
+  }
 })
 
 export const jumbleUnblurButton = button({
   customID: 'jumble/unblur/:sessionId',
-  beforeExecute: assertJumbleEnabled,
+  guards: jumbleComponentGuards,
+  onError: handleComponentError,
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
     const result = await context.app.jumble.unblur(context.params.sessionId)
     await updateJumbleComponent(context, result)
-  },
-  onError: handleComponentError
+  }
 })
 
 export const jumbleReshuffleButton = button({
   customID: 'jumble/reshuffle/:sessionId',
-  beforeExecute: assertJumbleEnabled,
+  guards: jumbleComponentGuards,
+  onError: handleComponentError,
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
     const result = await context.app.jumble.reshuffle(context.params.sessionId)
     await updateJumbleComponent(context, result)
-  },
-  onError: handleComponentError
+  }
 })
 
 export const jumbleGiveUpButton = button({
   customID: 'jumble/give-up/:sessionId',
-  beforeExecute: assertJumbleEnabled,
+  guards: jumbleComponentGuards,
+  onError: handleComponentError,
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
@@ -59,22 +68,22 @@ export const jumbleGiveUpButton = button({
       context.interaction.user.id
     )
     await updateJumbleComponent(context, result)
-  },
-  onError: handleComponentError
+  }
 })
 
 export const jumbleReplayButton = button({
   customID: 'jumble/replay/:kind',
-  beforeExecute: assertJumbleEnabled,
+  guards: jumbleStartGuards,
+  onError: handleComponentError,
   async execute(context) {
-    const permissionError = jumblePermissionError(context.interaction)
-    if (permissionError !== null) throw new Error(permissionError)
     const kind = context.params.kind
-    if (!isJumbleKind(kind)) throw new Error('That Jumble type is not supported.')
+    if (!isJumbleKind(kind)) {
+      throw new JumbleError('That Jumble type is not supported.', 'not-supported')
+    }
 
     const replayCustomID = jumbleReplayButton.buildID({ params: { kind } })
     const userDisplayName =
-      context.interaction.member?.displayName ??
+      context.interaction.member.displayName ??
       context.interaction.user.globalName ??
       context.interaction.user.username
     await startJumbleFromCompletedMessage(context, {
@@ -90,31 +99,28 @@ export const jumbleReplayButton = button({
           kind
         })
     })
-  },
-  onError: handleComponentError
+  }
 })
 
 export const jumbleStartSessionButton = button({
   customID: 'jumble/session/:sessionId',
-  beforeExecute: assertJumbleEnabled,
+  guards: jumbleStartGuards,
+  onError: handleComponentError,
   async execute(context) {
-    const permissionError = jumblePermissionError(context.interaction)
-    if (permissionError !== null) throw new Error(permissionError)
     await assertComponentSession(context, context.params.sessionId)
 
     const customID = jumbleStartSessionButton.buildID({
       params: { sessionId: context.params.sessionId }
     })
     const userDisplayName =
-      context.interaction.member?.displayName ??
+      context.interaction.member.displayName ??
       context.interaction.user.globalName ??
       context.interaction.user.username
     await startJumbleFromCompletedMessage(context, {
       pendingComponents: buildJumbleSessionStartingComponents(customID, userDisplayName),
       start: () => context.app.jumble.startContinuousSession(context.params.sessionId)
     })
-  },
-  onError: handleComponentError
+  }
 })
 
 interface StartJumbleFromCompletedOptions {
@@ -123,7 +129,7 @@ interface StartJumbleFromCompletedOptions {
 }
 
 async function startJumbleFromCompletedMessage<TRoute extends string>(
-  context: ComponentContext<BotContext, TRoute, 'button', typeof modules>,
+  context: JumbleComponentContext<TRoute>,
   options: StartJumbleFromCompletedOptions
 ): Promise<void> {
   const readyComponents = context.interaction.message.components
@@ -194,7 +200,7 @@ export function componentIds(sessionId: string) {
 }
 
 async function updateJumbleComponent<TRoute extends string>(
-  context: ComponentContext<BotContext, TRoute, 'button', typeof modules>,
+  context: JumbleComponentContext<TRoute>,
   result: JumbleActionResult
 ): Promise<void> {
   const rendered = await renderJumble(
@@ -210,7 +216,7 @@ async function updateJumbleComponent<TRoute extends string>(
 }
 
 async function assertComponentSession<TRoute extends string>(
-  context: ComponentContext<BotContext, TRoute, 'button', typeof modules>,
+  context: JumbleComponentContext<TRoute>,
   sessionId: string
 ): Promise<JumbleState> {
   const state = await context.app.jumble.getState(sessionId)
@@ -218,7 +224,7 @@ async function assertComponentSession<TRoute extends string>(
     state.session.channelId !== context.interaction.channelID ||
     (state.session.messageId !== null && state.session.messageId !== context.interaction.message.id)
   ) {
-    throw new Error('That control belongs to a different Jumble message.')
+    throw new JumbleError('That control belongs to a different Jumble message.', 'forbidden')
   }
   return state
 }
@@ -228,30 +234,8 @@ async function handleComponentError<TRoute extends string>(
   error: unknown
 ): Promise<void> {
   context.app.logger.error('jumble component failed', { error })
-  const message = match(error)
-    .with(P.instanceOf(Error), (value) => value.message)
-    .otherwise(() => 'That Jumble action failed.')
+  const message = jumbleErrorMessage(error, 'Could not update Jumble. Try again.')
   await match(context.acknowledged)
     .with(true, async () => context.followUp({ content: message, flags: MessageFlags.EPHEMERAL }))
     .otherwise(async () => context.reply({ content: message, flags: MessageFlags.EPHEMERAL }))
-}
-
-async function assertJumbleEnabled<TRoute extends string>(
-  context: ComponentContext<BotContext, TRoute, 'button', typeof modules>
-): Promise<void> {
-  await match(context.interaction.guildID)
-    .with(null, () => {
-      throw new Error(
-        'Jumble is disabled in this server. Ask the bot owner to enable it with /modules enable.'
-      )
-    })
-    .otherwise(async () => {
-      return match(await context.modules.isEnabled(modules.jumble))
-        .with(true, () => undefined)
-        .otherwise(() => {
-          throw new Error(
-            'Jumble is disabled in this server. Ask the bot owner to enable it with /modules enable.'
-          )
-        })
-    })
 }

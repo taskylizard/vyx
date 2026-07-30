@@ -13,6 +13,7 @@ import type {
 import { SlashCommandContext } from 'rosepack'
 import { rosepack } from '../../src/bot/rosepack.ts'
 import memoryCommand from '../../src/commands/memory.ts'
+import { guildOnlyGuard } from '../../src/discord/guards.ts'
 import { MarkdownMemoryStore } from '../../src/memory/markdown-memory.ts'
 
 const temporaryDirectories: string[] = []
@@ -108,7 +109,7 @@ test('requires confirmation before clearing personal memory', async () => {
 
   await expect(memory.list({ id: 'user-1', kind: 'user' })).resolves.toHaveLength(1)
   expect(interaction.editOriginal).toHaveBeenLastCalledWith(
-    expect.objectContaining({ content: expect.stringContaining('confirmation was false') })
+    expect.objectContaining({ content: expect.stringContaining('Nothing was deleted.') })
   )
 })
 
@@ -130,8 +131,8 @@ test('allows everyone to inspect server memory but only managers to change it', 
     options: { memory: 'Shared fact' }
   })
   await expect(memory.list({ id: 'server-1', kind: 'server' })).resolves.toEqual([])
-  expect(denied.editOriginal).toHaveBeenLastCalledWith(
-    expect.objectContaining({ content: expect.stringContaining('Manage Server') })
+  expect(denied.createMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ content: 'You need **Manage Server** to do that.' })
   )
 
   const manager = createInteraction({
@@ -166,22 +167,15 @@ test('allows everyone to inspect server memory but only managers to change it', 
 })
 
 test('rejects server memory operations outside a server', async () => {
-  const memory = await createStore()
-  const bot = createBot(memory)
-  const interaction = createInteraction({ guildID: null, id: 'dm-call', userID: 'user-1' })
+  expect(memoryCommand.subcommands.server.subcommands.show.guards).toContain(guildOnlyGuard)
+  const decision = await guildOnlyGuard({
+    app: {},
+    interaction: { guildID: null, member: null, memberPermissions: null }
+  } as never)
 
-  const context = {
-    app: bot,
-    defer: interaction.defer,
-    editResponse: interaction.editOriginal,
-    interaction: interaction.interaction
-  } as never
-  await memoryCommand.beforeExecute?.(context)
-  await memoryCommand.subcommands.server.subcommands.show.execute(context)
-
-  expect(interaction.editOriginal).toHaveBeenLastCalledWith(
-    'Server memory can only be used inside a Discord server.'
-  )
+  expect(decision.allowed).toBe(false)
+  if (decision.allowed) throw new Error('Expected the guild guard to deny access.')
+  expect(decision.options.message).toBe('Use this command in a server.')
 })
 
 test('supports server forget, clear, and Markdown export actions', async () => {
@@ -327,6 +321,10 @@ function createInteraction({
   const defer = vi.fn(async () => {
     acknowledged = true
   })
+  const createMessage = vi.fn(async () => {
+    acknowledged = true
+    return {}
+  })
   const editOriginal = vi.fn(
     async (_payload: {
       allowedMentions?: AllowedMentionsShape
@@ -335,16 +333,21 @@ function createInteraction({
     }) => ({})
   )
   return {
+    createMessage,
     defer,
     editOriginal,
     interaction: {
       get acknowledged() {
         return acknowledged
       },
+      applicationID: 'application-1',
+      client: {},
+      createMessage,
       defer,
       editOriginal,
       guildID,
       id,
+      member: guildID === null ? null : { roles: [] },
       memberPermissions: guildID === null ? null : { has: vi.fn(() => canManageServer) },
       user: { id: userID }
     } as unknown as CommandInteraction

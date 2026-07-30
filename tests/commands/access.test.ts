@@ -1,48 +1,31 @@
-import { MessageFlags } from 'oceanic.js'
 import { expect, test, vi } from 'vite-plus/test'
 import askCommand from '../../src/commands/ask.ts'
 import modulesCommand from '../../src/commands/modules.ts'
+import { botOwnerGuard } from '../../src/discord/guards.ts'
 import { OWNER_USER_ID } from '../../src/discord/ids.ts'
 
 test('/modules rejects non-owner users before reading module state', async () => {
-  const reply = vi.fn(async () => undefined)
-  const defer = vi.fn(async () => undefined)
-  const list = vi.fn(async () => [])
-
-  await modulesCommand.subcommands.list.execute({
-    defer,
-    interaction: { user: { id: 'not-the-owner' } },
-    modules: { list },
-    reply
+  expect(modulesCommand.subcommands.list.guards).toContain(botOwnerGuard)
+  const decision = await botOwnerGuard({
+    app: {},
+    interaction: { user: { id: 'not-the-owner' } }
   } as never)
 
-  expect(reply).toHaveBeenCalledWith({
-    content: 'Only the bot owner can use this command.',
-    flags: MessageFlags.EPHEMERAL
-  })
-  expect(defer).not.toHaveBeenCalled()
-  expect(list).not.toHaveBeenCalled()
+  expect(decision.allowed).toBe(false)
+  if (decision.allowed) throw new Error('Expected the owner guard to deny access.')
+  expect(decision.options.message).toBe('Only the bot owner can use this.')
 })
 
 test('/ask rejects non-owner users before invoking the responder', async () => {
-  const reply = vi.fn(async () => undefined)
-  const answerPrompt = vi.fn(async () => undefined)
-  const defer = vi.fn(async () => undefined)
-
-  await askCommand.execute({
-    app: { responder: { answerPrompt } },
-    defer,
-    interaction: { user: { id: 'not-the-owner' } },
-    options: { ephemeral: false, question: 'secret' },
-    reply
+  expect(askCommand.guards).toContain(botOwnerGuard)
+  const decision = await botOwnerGuard({
+    app: {},
+    interaction: { user: { id: 'not-the-owner' } }
   } as never)
 
-  expect(reply).toHaveBeenCalledWith({
-    content: 'Only the bot owner can use this command.',
-    flags: MessageFlags.EPHEMERAL
-  })
-  expect(defer).not.toHaveBeenCalled()
-  expect(answerPrompt).not.toHaveBeenCalled()
+  expect(decision.allowed).toBe(false)
+  if (decision.allowed) throw new Error('Expected the owner guard to deny access.')
+  expect(decision.options.message).toBe('Only the bot owner can use this.')
 })
 
 test('/modules still allows the bot owner to inspect a guild', async () => {

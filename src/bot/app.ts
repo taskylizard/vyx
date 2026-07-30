@@ -15,7 +15,8 @@ import { startKanikouObservability } from '../observability/axiom.ts'
 import { addActiveSpanEvent, traceOperation } from '../observability/tracing.ts'
 import type { KanikouLogger, KanikouObservability } from '../observability/types.ts'
 import { componentIds, jumbleComponents } from '../jumble/components.ts'
-import { editJumbleMessage, renderJumble } from '../jumble/discord.ts'
+import { renderJumble } from '../jumble/discord.ts'
+import { safeEditMessage } from '../discord/safe-actions.ts'
 import { LastFmClient, MissingLastFmProvider } from '../jumble/lastfm.ts'
 import { DiscogsClient } from '../jumble/discogs.ts'
 import { DeezerClient } from '../jumble/deezer.ts'
@@ -110,11 +111,11 @@ function createJumbleInfrastructure(
             })
           }
           try {
-            await editJumbleMessage(
+            await safeEditMessage(
               client,
               state.session.channelId,
               state.session.messageId,
-              rendered
+              rendered.payload
             )
           } catch (error) {
             logger.warn('expired jumble message could not be updated', { error })
@@ -310,9 +311,12 @@ export function createKanikouApp(
       })
       const results = await Promise.allSettled([mintlifyMcp?.close()])
       for (const result of results) {
-        if (result.status === 'rejected') {
-          logger.error('failed to stop bot dependency', { error: result.reason })
-        }
+        match(result)
+          .with({ status: 'fulfilled' }, () => undefined)
+          .with({ status: 'rejected' }, ({ reason }) =>
+            logger.error('failed to stop bot dependency', { error: reason })
+          )
+          .exhaustive()
       }
       await observability.shutdown()
     }

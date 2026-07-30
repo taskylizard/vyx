@@ -1,4 +1,5 @@
-// Vendored and adapted with permission from edideaur/axinstagram@f98affd.
+// tasky: vendored and adapted with permission from edideaur/axinstagram@f98affd
+import { z } from 'zod'
 import type { ResolvedInstagramMedia } from './types.ts'
 
 const DESKTOP_USER_AGENT =
@@ -15,11 +16,71 @@ const EMBED_HEADERS = {
   'User-Agent': DESKTOP_USER_AGENT
 }
 
-interface Candidate {
-  height: number
-  url: string
-  width: number
-}
+const CandidateSchema = z.object({
+  height: z.number(),
+  url: z.string(),
+  width: z.number()
+})
+
+const ImageVersionsSchema = z.object({
+  candidates: z.array(CandidateSchema).nullable().optional()
+})
+const MobileMediaItemSchema = z.object({
+  image_versions2: ImageVersionsSchema.nullable().optional(),
+  video_versions: z.array(CandidateSchema).nullable().optional()
+})
+const MobileMediaSchema = MobileMediaItemSchema.extend({
+  carousel_media: z.array(MobileMediaItemSchema).nullable().optional()
+})
+const GqlMediaSchema = z.object({
+  display_url: z.string().nullable().optional(),
+  edge_sidecar_to_children: z
+    .object({
+      edges: z.array(
+        z.object({
+          node: z.object({
+            display_url: z.string().nullable().optional(),
+            video_url: z.string().nullable().optional()
+          })
+        })
+      )
+    })
+    .nullable()
+    .optional(),
+  video_url: z.string().nullable().optional()
+})
+const GqlEnvelopeSchema = z.object({
+  gql_data: z
+    .object({
+      shortcode_media: GqlMediaSchema.nullable().optional(),
+      xdt_shortcode_media: GqlMediaSchema.nullable().optional()
+    })
+    .nullable()
+    .optional()
+})
+const OembedSchema = z.object({ media_id: z.string().optional() })
+const MobileInfoSchema = z.object({ items: z.array(MobileMediaSchema).nullable().optional() })
+const LsdSchema = z.object({ token: z.string().optional() })
+const InstagramSecurityConfigSchema = z.object({ csrf_token: z.string().optional() })
+const DgwWebConfigSchema = z.object({ appId: z.string().optional() })
+const WebBloksVersioningSchema = z.object({ versioningID: z.string().optional() })
+const PolarisSiteDataSchema = z.object({
+  device_id: z.string().optional(),
+  machine_id: z.string().optional()
+})
+const SiteDataSchema = z.object({
+  __spin_b: z.union([z.string(), z.number()]).optional(),
+  __spin_r: z.union([z.string(), z.number()]).optional(),
+  __spin_t: z.union([z.string(), z.number()]).optional(),
+  haste_session: z.union([z.string(), z.number()]).optional(),
+  hsi: z.union([z.string(), z.number()]).optional()
+})
+const InstagramWebPushInfoSchema = z.object({ rollout_hash: z.string().optional() })
+const GraphQLResponseSchema = z.object({ data: z.unknown().optional() })
+const EmbedDataSchema = z.object({ contextJSON: z.string().optional() })
+
+type Candidate = z.infer<typeof CandidateSchema>
+type MobileMedia = z.infer<typeof MobileMediaSchema>
 
 interface AxMediaResult {
   isPhoto?: boolean
@@ -80,22 +141,19 @@ export function smallest(candidates: Array<Candidate>): string {
       ).url
 }
 
-export function extractFromGQL(data: Record<string, unknown>): AxMediaResult | undefined {
-  const graphData = data.gql_data as Record<string, unknown> | undefined
-  const media = (graphData?.shortcode_media ?? graphData?.xdt_shortcode_media) as
-    | Record<string, unknown>
-    | undefined
-  if (!media) {
+export function extractFromGQL(data: unknown): AxMediaResult | undefined {
+  const parsed = GqlEnvelopeSchema.safeParse(data)
+  if (!parsed.success) {
     return undefined
   }
+  const media = parsed.data.gql_data?.shortcode_media ?? parsed.data.gql_data?.xdt_shortcode_media
+  if (media == null) return undefined
 
-  const sidecar = media.edge_sidecar_to_children as
-    | { edges: Array<{ node: Record<string, unknown> }> }
-    | undefined
+  const sidecar = media.edge_sidecar_to_children
   if (sidecar?.edges.length) {
     const photos = sidecar.edges.flatMap(({ node }) => {
-      const displayURL = node.display_url as string | undefined
-      const videoURL = node.video_url as string | undefined
+      const displayURL = node.display_url
+      const videoURL = node.video_url
       if (!displayURL && !videoURL) {
         return []
       }
@@ -119,15 +177,18 @@ export function extractFromGQL(data: Record<string, unknown>): AxMediaResult | u
   return undefined
 }
 
-function extractFromMobileData(data: Record<string, unknown>): AxMediaResult | undefined {
-  const carousel = data.carousel_media as Array<Record<string, unknown>> | undefined
+function extractFromMobileData(data: unknown): AxMediaResult | undefined {
+  const parsed = MobileMediaSchema.safeParse(data)
+  if (!parsed.success) return undefined
+
+  const carousel = parsed.data.carousel_media
   if (carousel) {
     const photos = carousel.flatMap((item) => {
       const candidates = imageCandidates(item)
       if (candidates.length === 0) {
         return []
       }
-      const videoCandidates = item.video_versions as Array<Candidate> | undefined
+      const videoCandidates = item.video_versions
       return [
         videoCandidates?.length
           ? { full: biggest(videoCandidates), isVideo: true, thumb: smallest(candidates) }
@@ -137,12 +198,12 @@ function extractFromMobileData(data: Record<string, unknown>): AxMediaResult | u
     return photos.length > 0 ? { isPhoto: true, photos } : undefined
   }
 
-  const videos = data.video_versions as Array<Candidate> | undefined
+  const videos = parsed.data.video_versions
   if (videos?.length) {
     return { videoUrl: biggest(videos) }
   }
 
-  const images = imageCandidates(data)
+  const images = imageCandidates(parsed.data)
   if (images.length > 0) {
     return { isPhoto: true, thumbUrl: smallest(images), videoUrl: biggest(images) }
   }
@@ -152,28 +213,25 @@ function extractFromMobileData(data: Record<string, unknown>): AxMediaResult | u
 async function tryMobileAPI(
   postID: string,
   signal?: AbortSignal
-): Promise<Record<string, unknown> | undefined> {
+): Promise<MobileMedia | undefined> {
   const oembedURL = new URL('https://i.instagram.com/api/v1/oembed/')
   oembedURL.searchParams.set('url', `https://www.instagram.com/p/${postID}/`)
   const headers = { 'User-Agent': MOBILE_USER_AGENT, 'x-ig-app-id': INSTAGRAM_APP_ID }
-  const oembed = await fetchJSON(oembedURL, { headers, signal })
-  const mediaID = typeof oembed?.media_id === 'string' ? oembed.media_id : undefined
-  if (!mediaID) {
+  const oembed = OembedSchema.safeParse(await fetchJSON(oembedURL, { headers, signal }))
+  if (!oembed.success || oembed.data.media_id === undefined) {
     return undefined
   }
 
-  const data = await fetchJSON(`https://i.instagram.com/api/v1/media/${mediaID}/info/`, {
-    headers,
-    signal
-  })
-  const items = data?.items as Array<Record<string, unknown>> | undefined
-  return items?.[0]
+  const data = MobileInfoSchema.safeParse(
+    await fetchJSON(`https://i.instagram.com/api/v1/media/${oembed.data.media_id}/info/`, {
+      headers,
+      signal
+    })
+  )
+  return data.success ? data.data.items?.[0] : undefined
 }
 
-async function tryHTMLEmbed(
-  postID: string,
-  signal?: AbortSignal
-): Promise<Record<string, unknown> | undefined> {
+async function tryHTMLEmbed(postID: string, signal?: AbortSignal): Promise<unknown> {
   for (const suffix of ['/embed/captioned/', '/embed/']) {
     // eslint-disable-next-line no-await-in-loop -- tasky: sequential fallback, tries embed endpoints one at a time
     const response = await fetch(`https://www.instagram.com/p/${postID}${suffix}`, {
@@ -193,10 +251,7 @@ async function tryHTMLEmbed(
   return undefined
 }
 
-async function tryGraphQL(
-  postID: string,
-  signal?: AbortSignal
-): Promise<Record<string, unknown> | undefined> {
+async function tryGraphQL(postID: string, signal?: AbortSignal): Promise<unknown> {
   const pageResponse = await fetch(`https://www.instagram.com/p/${postID}/`, {
     headers: EMBED_HEADERS,
     signal
@@ -205,25 +260,27 @@ async function tryGraphQL(
     return undefined
   }
   const html = await pageResponse.text()
-  const lsd =
-    (getJSONEntry('LSD', html) as { token?: string } | undefined)?.token ?? randomBase64url(8)
-  const csrf =
-    (getJSONEntry('InstagramSecurityConfig', html) as { csrf_token?: string } | undefined)
-      ?.csrf_token ?? ''
-  const appID = (getJSONEntry('DGWWebConfig', html) as { appId?: string } | undefined)?.appId
-  const siteData = getJSONEntry('SiteData', html)
-  const versionID = (
-    getJSONEntry('WebBloksVersioningID', html) as { versioningID?: string } | undefined
-  )?.versioningID
-  const polaris = getJSONEntry('PolarisSiteData', html) as
-    | { device_id?: string; machine_id?: string }
-    | undefined
+  const lsdEntry = LsdSchema.safeParse(getJSONEntry('LSD', html))
+  const security = InstagramSecurityConfigSchema.safeParse(
+    getJSONEntry('InstagramSecurityConfig', html)
+  )
+  const webConfig = DgwWebConfigSchema.safeParse(getJSONEntry('DGWWebConfig', html))
+  const siteData = SiteDataSchema.safeParse(getJSONEntry('SiteData', html))
+  const versioning = WebBloksVersioningSchema.safeParse(getJSONEntry('WebBloksVersioningID', html))
+  const polaris = PolarisSiteDataSchema.safeParse(getJSONEntry('PolarisSiteData', html))
+  const pushInfo = InstagramWebPushInfoSchema.safeParse(getJSONEntry('InstagramWebPushInfo', html))
+  const lsd = lsdEntry.success ? (lsdEntry.data.token ?? randomBase64url(8)) : randomBase64url(8)
+  const csrf = security.success ? (security.data.csrf_token ?? '') : ''
+  const appID = webConfig.success ? webConfig.data.appId : undefined
+  const versionID = versioning.success ? versioning.data.versioningID : undefined
+  const polarisData = polaris.success ? polaris.data : undefined
+  const site = siteData.success ? siteData.data : undefined
   const cookie = [
     csrf && `csrftoken=${csrf}`,
-    polaris?.device_id && `ig_did=${polaris.device_id}`,
+    polarisData?.device_id && `ig_did=${polarisData.device_id}`,
     'wd=1280x720',
     'dpr=2',
-    polaris?.machine_id && `mid=${polaris.machine_id}`,
+    polarisData?.machine_id && `mid=${polarisData.machine_id}`,
     'ig_nrcb=1'
   ]
     .filter(Boolean)
@@ -235,17 +292,14 @@ async function tryGraphQL(
     __csr: randomBase64url(154),
     __d: 'www',
     __dyn: randomBase64url(154),
-    __hs: stringValue(siteData?.haste_session, '20126.HYP:instagram_web_pkg.2.1...0'),
-    __hsi: stringValue(siteData?.hsi, '7436540909012459023'),
+    __hs: String(site?.haste_session ?? '20126.HYP:instagram_web_pkg.2.1...0'),
+    __hsi: String(site?.hsi ?? '7436540909012459023'),
     __req: 'b',
-    __rev: String(
-      (getJSONEntry('InstagramWebPushInfo', html) as { rollout_hash?: string } | undefined)
-        ?.rollout_hash ?? '1019933358'
-    ),
+    __rev: String(pushInfo.success ? (pushInfo.data.rollout_hash ?? '1019933358') : '1019933358'),
     __s: `::${randomBase64url(6)}`,
-    __spin_b: stringValue(siteData?.__spin_b, 'trunk'),
-    __spin_r: stringValue(siteData?.__spin_r, '1019933358'),
-    __spin_t: stringValue(siteData?.__spin_t, String(Math.floor(Date.now() / 1_000))),
+    __spin_b: String(site?.__spin_b ?? 'trunk'),
+    __spin_r: String(site?.__spin_r ?? '1019933358'),
+    __spin_t: String(site?.__spin_t ?? Math.floor(Date.now() / 1_000)),
     __user: '0',
     av: '0',
     doc_id: '8845758582119845',
@@ -281,8 +335,9 @@ async function tryGraphQL(
   if (!response?.ok) {
     return undefined
   }
-  const json = (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined
-  return json ? { gql_data: json.data } : undefined
+  const json: unknown = await response.json().catch(() => undefined)
+  const parsed = GraphQLResponseSchema.safeParse(json)
+  return parsed.success ? { gql_data: parsed.data.data } : undefined
 }
 
 function normalizeResult(result: AxMediaResult): ResolvedInstagramMedia | undefined {
@@ -309,13 +364,15 @@ function normalizeResult(result: AxMediaResult): ResolvedInstagramMedia | undefi
   return undefined
 }
 
-function parseEmbedContext(html: string): Record<string, unknown> | undefined {
+function parseEmbedContext(html: string): unknown {
   try {
     const raw = html.match(/"init",\[\],\[(.*?)\]\],/su)?.[1]
     if (raw) {
-      const embedData = JSON.parse(raw) as { contextJSON?: string }
-      if (embedData.contextJSON) {
-        return JSON.parse(embedData.contextJSON) as Record<string, unknown>
+      const parsed: unknown = JSON.parse(raw)
+      const embedData = EmbedDataSchema.safeParse(parsed)
+      if (embedData.success && embedData.data.contextJSON !== undefined) {
+        const context: unknown = JSON.parse(embedData.data.contextJSON)
+        return context
       }
     }
   } catch {}
@@ -323,30 +380,28 @@ function parseEmbedContext(html: string): Record<string, unknown> | undefined {
   try {
     const raw = html.match(/"contextJSON"\s*:\s*"((?:[^"\\]|\\.)*)"/su)?.[1]
     if (raw) {
-      return JSON.parse(
+      const context: unknown = JSON.parse(
         raw
           .replace(/\\"/gu, '"')
           .replace(/\\\\/gu, '\\')
           .replace(/\\[nr]/gu, '')
-      ) as Record<string, unknown>
+      )
+      return context
     }
   } catch {}
   return undefined
 }
 
-function imageCandidates(data: Record<string, unknown>): Array<Candidate> {
-  return (data.image_versions2 as { candidates?: Array<Candidate> } | undefined)?.candidates ?? []
+function imageCandidates(data: z.infer<typeof MobileMediaItemSchema>): Array<Candidate> {
+  return data.image_versions2?.candidates ?? []
 }
 
-async function fetchJSON(
-  input: string | URL,
-  init: RequestInit
-): Promise<Record<string, unknown> | undefined> {
+async function fetchJSON(input: string | URL, init: RequestInit): Promise<unknown> {
   const response = await fetch(input, init).catch(() => undefined)
   if (!response?.ok) {
     return undefined
   }
-  return (await response.json().catch(() => undefined)) as Record<string, unknown> | undefined
+  return response.json().catch(() => undefined)
 }
 
 function getNumber(name: string, html: string): number | undefined {
@@ -354,17 +409,15 @@ function getNumber(name: string, html: string): number | undefined {
   return value ? Number(value) : undefined
 }
 
-function getJSONEntry(name: string, html: string): Record<string, unknown> | undefined {
+function getJSONEntry(name: string, html: string): unknown {
   const raw = html.match(new RegExp(`\\["${name}",.*?,({.*?}),\\d+\\]`, 'u'))?.[1]
   try {
-    return raw ? (JSON.parse(raw) as Record<string, unknown>) : undefined
+    if (raw === undefined) return undefined
+    const parsed: unknown = JSON.parse(raw)
+    return parsed
   } catch {
     return undefined
   }
-}
-
-function stringValue(value: unknown, fallback: string): string {
-  return typeof value === 'string' || typeof value === 'number' ? String(value) : fallback
 }
 
 function instagramPostID(sourceURL: string): string | undefined {

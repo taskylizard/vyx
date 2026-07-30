@@ -1,8 +1,10 @@
 import { slashSub } from '../bot/rosepack.ts'
 import { match } from 'ts-pattern'
+import { guildOnlyGuard } from '../discord/guards.ts'
 
 export default slashSub({
   description: 'View your Jumble statistics',
+  guards: [guildOnlyGuard],
   options: {
     kind: {
       description: 'Filter by Jumble type',

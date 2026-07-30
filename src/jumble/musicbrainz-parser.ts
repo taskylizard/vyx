@@ -1,22 +1,42 @@
+import { z } from 'zod'
 import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
 import type { JumbleArtistMetadata } from './types.ts'
-import type {
-  MusicBrainzEnvelope,
-  RecordingMetadata,
-  ReleaseMetadata
+import {
+  MusicBrainzEnvelopeSchema,
+  type MusicBrainzEnvelope,
+  type RecordingMetadata,
+  type ReleaseMetadata
 } from './musicbrainz-types.ts'
+
+const UnknownArraySchema = z.array(z.unknown()).catch([])
+const MusicBrainzEnvelopeArraySchema = z.array(MusicBrainzEnvelopeSchema).catch([])
+const OptionalMusicBrainzTextSchema = z.unknown().transform((value): string | undefined => {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length === 0 ? undefined : trimmed
+})
+const MusicBrainzNumberSchema = z.unknown().transform((value): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string' || value.trim() === '') return 0
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+})
+const CoverArtArchiveSchema = z.object({ front: z.boolean().optional() })
 
 export function parseArtist(payload: MusicBrainzEnvelope | null): JumbleArtistMetadata | undefined {
   if (payload === null || typeof payload.id !== 'string') return undefined
-  const lifeSpan = isMusicBrainzObject(payload['life-span']) ? payload['life-span'] : undefined
+  const lifeSpan = MusicBrainzEnvelopeSchema.safeParse(payload['life-span'])
   const aliases = parseAliasEntries(payload.aliases)
   return {
-    mbid: stringValue(payload.id),
-    type: stringValue(payload.type),
-    countryCode: stringValue(payload.country),
-    startDate: lifeSpan === undefined ? undefined : stringValue(lifeSpan.begin),
-    endDate: lifeSpan === undefined ? undefined : stringValue(lifeSpan.end),
-    disambiguation: stringValue(payload.disambiguation),
+    mbid: OptionalMusicBrainzTextSchema.parse(payload.id),
+    type: OptionalMusicBrainzTextSchema.parse(payload.type),
+    countryCode: OptionalMusicBrainzTextSchema.parse(payload.country),
+    startDate: lifeSpan.success
+      ? OptionalMusicBrainzTextSchema.parse(lifeSpan.data.begin)
+      : undefined,
+    endDate: lifeSpan.success ? OptionalMusicBrainzTextSchema.parse(lifeSpan.data.end) : undefined,
+    disambiguation: OptionalMusicBrainzTextSchema.parse(payload.disambiguation),
     tags: parseNames(payload.tags),
     ...(aliases.length === 0 ? {} : { aliases })
   }
@@ -26,43 +46,50 @@ export function chooseArtist(
   payload: MusicBrainzEnvelope | null,
   name: string
 ): JumbleArtistMetadata | undefined {
-  const artists = arrayValue(payload?.artists)
+  const artists = MusicBrainzEnvelopeArraySchema.parse(payload?.artists)
   const exact = artists
-    .filter(isMusicBrainzObject)
     .filter(
       (artist) =>
-        stringValue(artist.name)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0 ||
-        aliasMatches(artist.aliases, name)
+        OptionalMusicBrainzTextSchema.parse(artist.name)?.localeCompare(name, undefined, {
+          sensitivity: 'base'
+        }) === 0 || aliasMatches(artist.aliases, name)
     )
-    .sort((first, second) => numberValue(second.score) - numberValue(first.score))[0]
+    .sort(
+      (first, second) =>
+        MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
+    )[0]
   return parseArtist(exact ?? null)
 }
 
 export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetadata | undefined {
   if (payload === null || typeof payload.id !== 'string') return undefined
-  const group = isMusicBrainzObject(payload['release-group']) ? payload['release-group'] : undefined
-  const labelInfo = arrayValue(payload['label-info']).find(isMusicBrainzObject)
-  const label =
-    labelInfo !== undefined && isMusicBrainzObject(labelInfo.label)
-      ? stringValue(labelInfo.label.name)
-      : undefined
-  const title = stringValue(payload.title)
+  const groupResult = MusicBrainzEnvelopeSchema.safeParse(payload['release-group'])
+  const group = groupResult.success ? groupResult.data : undefined
+  const labelInfo = MusicBrainzEnvelopeArraySchema.parse(payload['label-info'])[0]
+  const labelResult = MusicBrainzEnvelopeSchema.safeParse(labelInfo?.label)
+  const label = labelResult.success
+    ? OptionalMusicBrainzTextSchema.parse(labelResult.data.name)
+    : undefined
+  const title = OptionalMusicBrainzTextSchema.parse(payload.title)
   const aliases = [
     ...parseAliasEntries(payload.aliases),
     ...(group === undefined ? [] : parseAliasEntries(group.aliases))
   ]
-  const mbid = stringValue(payload.id)
+  const mbid = OptionalMusicBrainzTextSchema.parse(payload.id)
   return {
     mbid,
-    releaseGroupMbid: group === undefined ? undefined : stringValue(group.id),
+    releaseGroupMbid:
+      group === undefined ? undefined : OptionalMusicBrainzTextSchema.parse(group.id),
     releaseDate:
-      stringValue(payload.date) ??
-      (group === undefined ? undefined : stringValue(group['first-release-date'])),
+      OptionalMusicBrainzTextSchema.parse(payload.date) ??
+      (group === undefined
+        ? undefined
+        : OptionalMusicBrainzTextSchema.parse(group['first-release-date'])),
     releaseType: group === undefined ? undefined : releaseType(group),
     label,
     disambiguation:
-      stringValue(payload.disambiguation) ??
-      (group === undefined ? undefined : stringValue(group.disambiguation)),
+      OptionalMusicBrainzTextSchema.parse(payload.disambiguation) ??
+      (group === undefined ? undefined : OptionalMusicBrainzTextSchema.parse(group.disambiguation)),
     answerVariants: mergeAnswerVariantLists(
       title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
       createAnswerVariants(aliases, 'musicbrainz')
@@ -73,14 +100,14 @@ export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetada
 
 export function parseReleaseGroup(group: MusicBrainzEnvelope): ReleaseMetadata | undefined {
   if (typeof group.id !== 'string') return undefined
-  const releaseGroupMbid = stringValue(group.id)
-  const title = stringValue(group.title)
+  const releaseGroupMbid = OptionalMusicBrainzTextSchema.parse(group.id)
+  const title = OptionalMusicBrainzTextSchema.parse(group.title)
   const aliases = parseAliasEntries(group.aliases)
   return {
     releaseGroupMbid,
-    releaseDate: stringValue(group['first-release-date']),
+    releaseDate: OptionalMusicBrainzTextSchema.parse(group['first-release-date']),
     releaseType: releaseType(group),
-    disambiguation: stringValue(group.disambiguation),
+    disambiguation: OptionalMusicBrainzTextSchema.parse(group.disambiguation),
     answerVariants: mergeAnswerVariantLists(
       title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
       createAnswerVariants(aliases, 'musicbrainz')
@@ -91,32 +118,35 @@ export function parseReleaseGroup(group: MusicBrainzEnvelope): ReleaseMetadata |
 
 export function parseRecording(payload: MusicBrainzEnvelope | null): RecordingMetadata | undefined {
   if (payload === null || typeof payload.id !== 'string') return undefined
-  const releases = arrayValue(payload.releases).filter(isMusicBrainzObject)
+  const releases = MusicBrainzEnvelopeArraySchema.parse(payload.releases)
   const firstRelease = chooseEarliestRelease(releases)
-  const group =
-    firstRelease !== undefined && isMusicBrainzObject(firstRelease['release-group'])
-      ? firstRelease['release-group']
-      : undefined
+  const groupResult = MusicBrainzEnvelopeSchema.safeParse(firstRelease?.['release-group'])
+  const group = groupResult.success ? groupResult.data : undefined
   const release = firstRelease === undefined ? undefined : parseRelease(firstRelease)
-  const title = stringValue(payload.title)
+  const title = OptionalMusicBrainzTextSchema.parse(payload.title)
   const aliases = parseAliasEntries(payload.aliases)
   const releaseTitle =
     firstRelease === undefined
       ? undefined
-      : (stringValue(firstRelease.title) ??
-        (group === undefined ? undefined : stringValue(group.title)))
+      : (OptionalMusicBrainzTextSchema.parse(firstRelease.title) ??
+        (group === undefined ? undefined : OptionalMusicBrainzTextSchema.parse(group.title)))
   return {
-    mbid: stringValue(payload.id),
-    releaseDate: stringValue(payload['first-release-date']) ?? release?.releaseDate,
+    mbid: OptionalMusicBrainzTextSchema.parse(payload.id),
+    releaseDate:
+      OptionalMusicBrainzTextSchema.parse(payload['first-release-date']) ?? release?.releaseDate,
     releaseType: release?.releaseType ?? (group === undefined ? undefined : releaseType(group)),
     label: release?.label,
-    disambiguation: stringValue(payload.disambiguation),
-    durationMs: numberValue(payload.length),
+    disambiguation: OptionalMusicBrainzTextSchema.parse(payload.disambiguation),
+    durationMs: MusicBrainzNumberSchema.parse(payload.length),
     albumName: releaseTitle,
     releaseMbid:
-      release?.mbid ?? (firstRelease === undefined ? undefined : stringValue(firstRelease.id)),
+      release?.mbid ??
+      (firstRelease === undefined
+        ? undefined
+        : OptionalMusicBrainzTextSchema.parse(firstRelease.id)),
     releaseGroupMbid:
-      release?.releaseGroupMbid ?? (group === undefined ? undefined : stringValue(group.id)),
+      release?.releaseGroupMbid ??
+      (group === undefined ? undefined : OptionalMusicBrainzTextSchema.parse(group.id)),
     answerVariants: mergeAnswerVariantLists(
       title === undefined ? undefined : createAnswerVariants([title], 'musicbrainz'),
       createAnswerVariants(aliases, 'musicbrainz')
@@ -130,17 +160,21 @@ export function chooseReleaseGroup(
   name: string,
   artistName: string | undefined
 ): MusicBrainzEnvelope | undefined {
-  const groups = arrayValue(payload?.['release-groups']).filter(isMusicBrainzObject)
+  const groups = MusicBrainzEnvelopeArraySchema.parse(payload?.['release-groups'])
   return groups
     .filter(
       (group) =>
-        stringValue(group.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) === 0 ||
-        aliasMatches(group.aliases, name)
+        OptionalMusicBrainzTextSchema.parse(group.title)?.localeCompare(name, undefined, {
+          sensitivity: 'base'
+        }) === 0 || aliasMatches(group.aliases, name)
     )
     .filter(
       (group) => artistName === undefined || artistCreditMatches(group['artist-credit'], artistName)
     )
-    .sort((first, second) => numberValue(second.score) - numberValue(first.score))[0]
+    .sort(
+      (first, second) =>
+        MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
+    )[0]
 }
 
 export function chooseRecording(
@@ -148,32 +182,41 @@ export function chooseRecording(
   name: string,
   artistName: string | undefined
 ): MusicBrainzEnvelope | null {
-  const recordings = arrayValue(payload?.recordings).filter(isMusicBrainzObject)
+  const recordings = MusicBrainzEnvelopeArraySchema.parse(payload?.recordings)
   return (
     recordings
       .filter(
         (recording) =>
-          stringValue(recording.title)?.localeCompare(name, undefined, { sensitivity: 'base' }) ===
-            0 || aliasMatches(recording.aliases, name)
+          OptionalMusicBrainzTextSchema.parse(recording.title)?.localeCompare(name, undefined, {
+            sensitivity: 'base'
+          }) === 0 || aliasMatches(recording.aliases, name)
       )
       .filter(
         (recording) =>
           artistName === undefined || artistCreditMatches(recording['artist-credit'], artistName)
       )
       .sort((first, second) => {
-        const firstLive = stringValue(first.disambiguation)?.toLowerCase().includes('live') ? 1 : 0
-        const secondLive = stringValue(second.disambiguation)?.toLowerCase().includes('live')
+        const firstLive = OptionalMusicBrainzTextSchema.parse(first.disambiguation)
+          ?.toLowerCase()
+          .includes('live')
           ? 1
           : 0
-        return firstLive - secondLive || numberValue(second.score) - numberValue(first.score)
+        const secondLive = OptionalMusicBrainzTextSchema.parse(second.disambiguation)
+          ?.toLowerCase()
+          .includes('live')
+          ? 1
+          : 0
+        return (
+          firstLive - secondLive ||
+          MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
+        )
       })[0] ?? null
   )
 }
 
 export function firstReleaseId(group: MusicBrainzEnvelope): string | undefined {
-  return arrayValue(group.releases)
-    .filter(isMusicBrainzObject)
-    .map((release) => stringValue(release.id))
+  return MusicBrainzEnvelopeArraySchema.parse(group.releases)
+    .map((release) => OptionalMusicBrainzTextSchema.parse(release.id))
     .find(Boolean)
 }
 
@@ -206,10 +249,6 @@ export function mergeMusicBrainzTags(
   return unique.length === 0 ? undefined : unique.slice(0, 8)
 }
 
-export function isMusicBrainzObject(value: unknown): value is MusicBrainzEnvelope {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 export function normalizeMusicBrainzKey(value: string): string {
   return value
     .trim()
@@ -230,17 +269,19 @@ function chooseEarliestRelease(
   releases: readonly MusicBrainzEnvelope[]
 ): MusicBrainzEnvelope | undefined {
   return [...releases]
-    .filter((release) => stringValue(release.date) !== undefined)
+    .filter((release) => OptionalMusicBrainzTextSchema.parse(release.date) !== undefined)
     .sort((first, second) => {
-      const firstOfficial = stringValue(first.status)?.toLowerCase() === 'official' ? 0 : 1
-      const secondOfficial = stringValue(second.status)?.toLowerCase() === 'official' ? 0 : 1
+      const firstOfficial =
+        OptionalMusicBrainzTextSchema.parse(first.status)?.toLowerCase() === 'official' ? 0 : 1
+      const secondOfficial =
+        OptionalMusicBrainzTextSchema.parse(second.status)?.toLowerCase() === 'official' ? 0 : 1
       return firstOfficial - secondOfficial || String(first.date).localeCompare(String(second.date))
     })[0]
 }
 
 function releaseType(group: MusicBrainzEnvelope): string | undefined {
-  const primary = stringValue(group['primary-type'])
-  const secondary = arrayValue(group['secondary-types']).filter(
+  const primary = OptionalMusicBrainzTextSchema.parse(group['primary-type'])
+  const secondary = UnknownArraySchema.parse(group['secondary-types']).filter(
     (value): value is string => typeof value === 'string'
   )
   if (primary === undefined) return undefined
@@ -248,13 +289,15 @@ function releaseType(group: MusicBrainzEnvelope): string | undefined {
 }
 
 function artistCreditMatches(value: unknown, artistName: string): boolean {
-  return arrayValue(value).some((credit) => {
-    if (!isMusicBrainzObject(credit)) return false
-    const artistEntry = isMusicBrainzObject(credit.artist) ? credit.artist : undefined
-    const artist = artistEntry === undefined ? undefined : stringValue(artistEntry.name)
+  return MusicBrainzEnvelopeArraySchema.parse(value).some((credit) => {
+    const artistResult = MusicBrainzEnvelopeSchema.safeParse(credit.artist)
+    const artistEntry = artistResult.success ? artistResult.data : undefined
+    const artist =
+      artistEntry === undefined ? undefined : OptionalMusicBrainzTextSchema.parse(artistEntry.name)
     return (
-      stringValue(credit.name)?.localeCompare(artistName, undefined, { sensitivity: 'base' }) ===
-        0 ||
+      OptionalMusicBrainzTextSchema.parse(credit.name)?.localeCompare(artistName, undefined, {
+        sensitivity: 'base'
+      }) === 0 ||
       artist?.localeCompare(artistName, undefined, { sensitivity: 'base' }) === 0 ||
       aliasMatches(artistEntry?.aliases, artistName)
     )
@@ -268,36 +311,17 @@ function aliasMatches(value: unknown, expected: string): boolean {
 }
 
 function parseNames(value: unknown): string[] | undefined {
-  const names = arrayValue(value)
-    .filter(isMusicBrainzObject)
-    .map((entry) => stringValue(entry.name))
+  const names = MusicBrainzEnvelopeArraySchema.parse(value)
+    .map((entry) => OptionalMusicBrainzTextSchema.parse(entry.name))
     .filter((name): name is string => name !== undefined)
   return names.length === 0 ? undefined : names.slice(0, 8)
 }
 
 function parseAliasEntries(value: unknown, limit = 8): string[] {
-  return arrayValue(value)
+  return MusicBrainzEnvelopeArraySchema.parse(value)
     .slice(0, Math.max(0, Math.trunc(limit)))
-    .filter(isMusicBrainzObject)
-    .map((entry) => stringValue(entry.name))
+    .map((entry) => OptionalMusicBrainzTextSchema.parse(entry.name))
     .filter((name): name is string => name !== undefined)
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined
-}
-
-function numberValue(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return 0
 }
 
 function coverArtUrls(
@@ -310,6 +334,6 @@ function coverArtUrls(
 }
 
 function hasFrontCover(payload: MusicBrainzEnvelope): boolean {
-  const archive = payload['cover-art-archive']
-  return isMusicBrainzObject(archive) && typeof archive.front === 'boolean' && archive.front
+  const archive = CoverArtArchiveSchema.safeParse(payload['cover-art-archive'])
+  return archive.success && (archive.data.front ?? false)
 }

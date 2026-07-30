@@ -1,5 +1,6 @@
 import { match } from 'ts-pattern'
 import { slash, slashSub } from '../bot/rosepack.ts'
+import { guildOnlyGuard, manageGuildGuard } from '../discord/guards.ts'
 import {
   MEMORY_ENTRY_LIMIT,
   MEMORY_ENTRY_MAX_LENGTH,
@@ -11,6 +12,8 @@ import { modules } from '../modules.ts'
 
 const RESPONSE_MAX_LENGTH = 1_900
 const MEMORY_PREVIEW_MAX_LENGTH = 180
+const guildMemoryGuards = [guildOnlyGuard] as const
+const managedMemoryGuards = [manageGuildGuard] as const
 
 export default slash({
   name: 'memory',
@@ -28,18 +31,19 @@ export default slash({
     }
 
     context.app.logger.error('memory command failed', { error })
-    await context.editResponse('The memory operation failed. Please try again.')
+    await context.editResponse('Could not update memory. Try again.')
   },
   subcommands: {
     export: slashSub({
       description: 'Download your personal memory as Markdown',
+      guards: guildMemoryGuards,
       async execute(context) {
         const markdown = await context.app.memory.exportMarkdown({
           id: context.interaction.user.id,
           kind: 'user'
         })
         await context.editResponse({
-          content: 'Here is the requested Markdown memory export.',
+          content: 'Here is your Markdown memory export.',
           files: [
             {
               contents: Buffer.from(markdown, 'utf8'),
@@ -51,6 +55,7 @@ export default slash({
     }),
     clear: slashSub({
       description: 'Delete all of your personal memory',
+      guards: guildMemoryGuards,
       options: {
         confirm: {
           description: 'Confirm that all personal memory should be deleted',
@@ -60,7 +65,9 @@ export default slash({
       },
       async execute(context) {
         if (!context.options.confirm) {
-          await context.editResponse('Nothing was deleted because confirmation was false.')
+          await context.editResponse(
+            'Nothing was deleted.\n-# Run the command again with `confirm` enabled.'
+          )
           return
         }
         const count = await context.app.memory.clear({
@@ -79,17 +86,14 @@ export default slash({
       subcommands: {
         export: slashSub({
           description: "Download this server's memory as Markdown",
+          guards: guildMemoryGuards,
           async execute(context) {
-            if (context.interaction.guildID === null) {
-              await context.editResponse('Server memory can only be used inside a Discord server.')
-              return
-            }
             const markdown = await context.app.memory.exportMarkdown({
               id: context.interaction.guildID,
               kind: 'server'
             })
             await context.editResponse({
-              content: 'Here is the requested Markdown memory export.',
+              content: 'Here is your Markdown memory export.',
               files: [
                 {
                   contents: Buffer.from(markdown, 'utf8'),
@@ -101,6 +105,7 @@ export default slash({
         }),
         clear: slashSub({
           description: 'Delete all shared memory for this server',
+          guards: managedMemoryGuards,
           options: {
             confirm: {
               description: 'Confirm that all server memory should be deleted',
@@ -109,18 +114,10 @@ export default slash({
             }
           },
           async execute(context) {
-            if (context.interaction.guildID === null) {
-              await context.editResponse('Server memory can only be used inside a Discord server.')
-              return
-            }
-            if (!context.interaction.memberPermissions?.has('MANAGE_GUILD')) {
-              await context.editResponse(
-                'You need the Manage Server permission to change server memory.'
-              )
-              return
-            }
             if (!context.options.confirm) {
-              await context.editResponse('Nothing was deleted because confirmation was false.')
+              await context.editResponse(
+                'Nothing was deleted.\n-# Run the command again with `confirm` enabled.'
+              )
               return
             }
             const count = await context.app.memory.clear({
@@ -136,6 +133,7 @@ export default slash({
         }),
         forget: slashSub({
           description: 'Remove one shared server memory by ID',
+          guards: managedMemoryGuards,
           options: {
             id: {
               description: 'The memory ID shown by /memory server show',
@@ -146,16 +144,6 @@ export default slash({
             }
           },
           async execute(context) {
-            if (context.interaction.guildID === null) {
-              await context.editResponse('Server memory can only be used inside a Discord server.')
-              return
-            }
-            if (!context.interaction.memberPermissions?.has('MANAGE_GUILD')) {
-              await context.editResponse(
-                'You need the Manage Server permission to change server memory.'
-              )
-              return
-            }
             const result = await context.app.memory.forget(
               { id: context.interaction.guildID, kind: 'server' },
               context.options.id
@@ -165,11 +153,8 @@ export default slash({
         }),
         show: slashSub({
           description: "Show this server's shared memory",
+          guards: guildMemoryGuards,
           async execute(context) {
-            if (context.interaction.guildID === null) {
-              await context.editResponse('Server memory can only be used inside a Discord server.')
-              return
-            }
             const entries = await context.app.memory.list({
               id: context.interaction.guildID,
               kind: 'server'
@@ -179,6 +164,7 @@ export default slash({
         }),
         remember: slashSub({
           description: 'Save shared server memory',
+          guards: managedMemoryGuards,
           options: {
             memory: {
               description: 'The information Kanikou should remember for this server',
@@ -188,16 +174,6 @@ export default slash({
             }
           },
           async execute(context) {
-            if (context.interaction.guildID === null) {
-              await context.editResponse('Server memory can only be used inside a Discord server.')
-              return
-            }
-            if (!context.interaction.memberPermissions?.has('MANAGE_GUILD')) {
-              await context.editResponse(
-                'You need the Manage Server permission to change server memory.'
-              )
-              return
-            }
             const entry = await context.app.memory.remember(
               { id: context.interaction.guildID, kind: 'server' },
               context.options.memory,
@@ -212,6 +188,7 @@ export default slash({
     },
     forget: slashSub({
       description: 'Remove one personal memory by ID',
+      guards: guildMemoryGuards,
       options: {
         id: {
           description: 'The memory ID shown by /memory show',
@@ -231,6 +208,7 @@ export default slash({
     }),
     show: slashSub({
       description: 'Show your saved personal memory',
+      guards: guildMemoryGuards,
       async execute(context) {
         const entries = await context.app.memory.list({
           id: context.interaction.user.id,
@@ -241,6 +219,7 @@ export default slash({
     }),
     remember: slashSub({
       description: 'Save a personal memory',
+      guards: guildMemoryGuards,
       options: {
         memory: {
           description: 'The information Kanikou should remember',

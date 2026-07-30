@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import type { JumbleAnswerVariant } from './types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
+import { JumbleAnswerVariantSchema } from './schemas.ts'
 
 export interface DiscogsClientOptions {
   token?: string
@@ -16,20 +16,21 @@ export interface DiscogsClientOptions {
   onError?: (error: unknown) => void
 }
 
-export interface DiscogsEnvelope {
-  [key: string]: unknown
-}
+export const DiscogsEnvelopeSchema = z.record(z.string(), z.unknown())
+export type DiscogsEnvelope = z.infer<typeof DiscogsEnvelopeSchema>
 
-export interface DiscogsEnrichment {
-  answerVariants?: readonly JumbleAnswerVariant[]
-  imageUrls?: readonly string[]
-  releaseDate?: string
-  releaseType?: string
-  label?: string
-  tags?: readonly string[]
-  summary?: string
-  sourceUrl?: string
-}
+export const DiscogsEnrichmentSchema = z.object({
+  answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
+  imageUrls: z.array(z.string()).max(8).optional(),
+  releaseDate: z.string().optional(),
+  releaseType: z.string().optional(),
+  label: z.string().optional(),
+  tags: z.array(z.string()).max(8).optional(),
+  summary: z.string().optional(),
+  sourceUrl: z.string().optional()
+})
+
+export type DiscogsEnrichment = z.infer<typeof DiscogsEnrichmentSchema>
 
 export interface DiscogsSearchResult {
   id: number
@@ -50,29 +51,9 @@ export type DiscogsReleaseLookup =
   | { status: 'not-found' }
   | { status: 'unavailable' }
 
-const answerVariantSchema = z.object({
-  value: z.string(),
-  source: z.enum(['lastfm', 'musicbrainz', 'discogs', 'transliteration', 'manual']),
-  locale: z.string().optional()
-})
+export const DiscogsCachedValueSchema = z.discriminatedUnion('found', [
+  z.object({ found: z.literal(false) }),
+  z.object({ found: z.literal(true), value: DiscogsEnrichmentSchema })
+])
 
-export const DiscogsEnrichmentSchema: z.ZodType<DiscogsEnrichment> = z.object({
-  answerVariants: z.array(answerVariantSchema).max(16).optional(),
-  imageUrls: z.array(z.string()).max(8).optional(),
-  releaseDate: z.string().optional(),
-  releaseType: z.string().optional(),
-  label: z.string().optional(),
-  tags: z.array(z.string()).max(8).optional(),
-  summary: z.string().optional(),
-  sourceUrl: z.string().optional()
-})
-
-export type DiscogsCachedValue = { found: false } | { found: true; value: DiscogsEnrichment }
-
-export const DiscogsCachedValueSchema: z.ZodType<DiscogsCachedValue> = z.discriminatedUnion(
-  'found',
-  [
-    z.object({ found: z.literal(false) }),
-    z.object({ found: z.literal(true), value: DiscogsEnrichmentSchema })
-  ]
-)
+export type DiscogsCachedValue = z.infer<typeof DiscogsCachedValueSchema>

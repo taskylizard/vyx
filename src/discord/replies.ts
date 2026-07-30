@@ -1,11 +1,6 @@
-import type { AllowedMentions, Client, EmbedOptions, Message } from 'oceanic.js'
-
-const allowedMentions = {
-  everyone: false,
-  repliedUser: false,
-  roles: false,
-  users: false
-} satisfies AllowedMentions
+import type { Client, EmbedOptions, Message } from 'oceanic.js'
+import { replyMessageReference, suppressAllMentions } from './message-options.ts'
+import { safeCreateMessage, safeEditMessage } from './safe-actions.ts'
 
 export interface SentDiscordMessage {
   channelID: string
@@ -17,15 +12,10 @@ export async function sendReply(
   source: Message,
   content: string
 ): Promise<SentDiscordMessage> {
-  const sent = await client.rest.channels.createMessage(source.channelID, {
-    allowedMentions,
+  const sent = await safeCreateMessage(client, source.channelID, {
+    allowedMentions: suppressAllMentions,
     content,
-    messageReference: {
-      channelID: source.channelID,
-      failIfNotExists: false,
-      guildID: source.guildID ?? undefined,
-      messageID: source.id
-    }
+    messageReference: replyMessageReference(source)
   })
 
   return {
@@ -39,7 +29,7 @@ export async function editSentMessage(
   target: SentDiscordMessage,
   content: string
 ): Promise<void> {
-  await client.rest.channels.editMessage(target.channelID, target.messageID, {
+  await safeEditMessage(client, target.channelID, target.messageID, {
     content,
     embeds: null
   })
@@ -54,7 +44,7 @@ export async function editSentMessageWithEmbed(
     description
   } satisfies EmbedOptions
 
-  await client.rest.channels.editMessage(target.channelID, target.messageID, {
+  await safeEditMessage(client, target.channelID, target.messageID, {
     content: null,
     embeds: [embed]
   })

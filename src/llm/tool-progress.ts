@@ -3,14 +3,10 @@ import { toolActivityLabel } from './tools/tool-labels.ts'
 export const THINKING_RESPONSE = '*Thinking...*'
 
 export function formatThinkingProgress(toolNames: readonly string[]): string {
-  return appendToolSummary(THINKING_RESPONSE, toolNames)
+  return formatCompletedResponse(THINKING_RESPONSE, toolNames)
 }
 
 export function formatCompletedResponse(content: string, toolNames: readonly string[]): string {
-  return appendToolSummary(content, toolNames)
-}
-
-function appendToolSummary(content: string, toolNames: readonly string[]): string {
   if (toolNames.length === 0) {
     return content
   }

@@ -1,7 +1,7 @@
 import { match, P } from 'ts-pattern'
 import { normalizeAnswer } from './answer.ts'
 import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
-import type { LastFmEnvelope, LastFmImage } from './lastfm-types.ts'
+import { LastFmEnvelopeSchema, type LastFmEnvelope } from './lastfm-types.ts'
 import type { JumbleArtistMetadata, JumbleCandidate, JumbleKind } from './types.ts'
 
 export function parseLastFmTopItems(payload: LastFmEnvelope, kind: JumbleKind): JumbleCandidate[] {
@@ -10,7 +10,7 @@ export function parseLastFmTopItems(payload: LastFmEnvelope, kind: JumbleKind): 
     .with('album', () => payload.topalbums)
     .with('track', () => payload.toptracks)
     .exhaustive()
-  if (!isLastFmObject(container)) return []
+  if (!isLastFmEnvelope(container)) return []
   const rawItems = Array.isArray(container[kind]) ? container[kind].slice(0, 200) : []
   return rawItems.flatMap((raw) => parseTopItem(raw, kind))
 }
@@ -20,33 +20,31 @@ export function mergeLastFmDetails(
   payload: LastFmEnvelope
 ): JumbleCandidate {
   const root = payload[candidate.kind]
-  if (!isLastFmObject(root)) return candidate
+  if (!isLastFmEnvelope(root)) return candidate
   const tags =
-    isLastFmObject(root.tags) && Array.isArray(root.tags.tag)
-      ? root.tags.tag
-          .slice(0, 16)
-          .flatMap((tag) =>
-            isLastFmObject(tag) && parseLastFmString(tag.name) !== undefined
-              ? [parseLastFmString(tag.name)!]
-              : []
-          )
+    isLastFmEnvelope(root.tags) && Array.isArray(root.tags.tag)
+      ? root.tags.tag.slice(0, 16).flatMap((tag) => {
+          if (!isLastFmEnvelope(tag)) return []
+          const name = parseLastFmString(tag.name)
+          return name === undefined ? [] : [name]
+        })
       : undefined
-  const wiki = isLastFmObject(root.wiki) ? parseLastFmString(root.wiki.summary) : undefined
+  const wiki = isLastFmEnvelope(root.wiki) ? parseLastFmString(root.wiki.summary) : undefined
   const releaseDate = parseLastFmString(root.releasedate) ?? parseLastFmString(root.date)
   const artistName =
     parseLastFmString(root.artist) ??
-    (isLastFmObject(root.artist) ? parseLastFmString(root.artist.name) : undefined)
+    (isLastFmEnvelope(root.artist) ? parseLastFmString(root.artist.name) : undefined)
   const albumName =
     parseLastFmString(root.album) ??
-    (isLastFmObject(root.album)
+    (isLastFmEnvelope(root.album)
       ? (parseLastFmString(root.album.title) ?? parseLastFmString(root.album.name))
       : undefined)
   const duration = parseLastFmNumber(root.duration)
-  const stats = isLastFmObject(root.stats) ? root.stats : undefined
+  const stats = isLastFmEnvelope(root.stats) ? root.stats : undefined
   const nestedAlbumImages = match(candidate)
     .returnType<string[]>()
     .with({ kind: 'track' }, () =>
-      isLastFmObject(root.album) ? firstImages(root.album.image) : []
+      isLastFmEnvelope(root.album) ? firstImages(root.album.image) : []
     )
     .with({ kind: P.union('artist', 'album') }, () => [])
     .exhaustive()
@@ -104,14 +102,14 @@ export function mergeLastFmArtistDetails(
   payload: LastFmEnvelope
 ): JumbleCandidate {
   const root = payload.artist
-  if (!isLastFmObject(root)) return candidate
+  if (!isLastFmEnvelope(root)) return candidate
   const tags = parseTags(root.tags)
-  const stats = isLastFmObject(root.stats) ? root.stats : undefined
+  const stats = isLastFmEnvelope(root.stats) ? root.stats : undefined
   const aliases = parseAliasValues(root.aliases)
   const metadata: JumbleArtistMetadata = {
     mbid: parseLastFmString(root.mbid),
     tags,
-    summary: isLastFmObject(root.bio) ? parseLastFmString(root.bio.summary) : undefined,
+    summary: isLastFmEnvelope(root.bio) ? parseLastFmString(root.bio.summary) : undefined,
     countryCode: undefined,
     ...(aliases.length === 0 ? {} : { aliases })
   }
@@ -147,12 +145,8 @@ export function normalizeLastFmUsername(value: string): string {
   return value.trim().replace(/^@/u, '').slice(0, 64)
 }
 
-export function isLastFmObject(value: unknown): value is LastFmEnvelope {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-  if ('error' in value && value.error !== undefined && typeof value.error !== 'number') {
-    return false
-  }
-  return !('message' in value) || value.message === undefined || typeof value.message === 'string'
+export function isLastFmEnvelope(value: unknown): value is LastFmEnvelope {
+  return LastFmEnvelopeSchema.safeParse(value).success
 }
 
 export function parseLastFmString(value: unknown): string | undefined {
@@ -162,17 +156,19 @@ export function parseLastFmString(value: unknown): string | undefined {
 }
 
 function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
-  if (!isLastFmObject(value)) return []
+  if (!isLastFmEnvelope(value)) return []
   const answer = parseLastFmString(value.name)
   if (answer === undefined || answer.trim().length < 2) return []
-  const listedArtist = isLastFmObject(value.artist)
+  const listedArtist = isLastFmEnvelope(value.artist)
     ? parseLastFmString(value.artist.name)
     : parseLastFmString(value.artist)
-  const listedAlbum = isLastFmObject(value.album) ? parseLastFmString(value.album.name) : undefined
+  const listedAlbum = isLastFmEnvelope(value.album)
+    ? parseLastFmString(value.album.name)
+    : undefined
   const directImages = firstImages(value.image)
   const listedImages = mergeImageUrlLists(
     directImages,
-    isLastFmObject(value.album) ? firstImages(value.album.image) : undefined
+    isLastFmEnvelope(value.album) ? firstImages(value.album.image) : undefined
   )
   const common = {
     answer: answer.trim(),
@@ -216,10 +212,10 @@ function parseTopItem(value: unknown, kind: JumbleKind): JumbleCandidate[] {
 }
 
 function parseTags(value: unknown): string[] | undefined {
-  if (!isLastFmObject(value)) return undefined
+  if (!isLastFmEnvelope(value)) return undefined
   const tags = Array.isArray(value.tag) ? value.tag : []
   const names = tags
-    .filter(isLastFmObject)
+    .filter(isLastFmEnvelope)
     .map((tag) => parseLastFmString(tag.name))
     .filter((name): name is string => name !== undefined)
   return names.length === 0 ? undefined : names.slice(0, 8)
@@ -237,7 +233,7 @@ function mergeTagValues(
 function firstImages(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   const ranked = value
-    .filter((entry): entry is LastFmImage => isLastFmObject(entry))
+    .filter(isLastFmEnvelope)
     .sort((first, second) => imageRank(String(second.size)) - imageRank(String(first.size)))
   const urls: string[] = []
   for (const entry of ranked) {
@@ -258,7 +254,7 @@ function parseAliasValues(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   return value.slice(0, 16).flatMap((entry) => {
     if (typeof entry === 'string') return [entry]
-    if (!isLastFmObject(entry)) return []
+    if (!isLastFmEnvelope(entry)) return []
     const name = parseLastFmString(entry.name)
     return name === undefined ? [] : [name]
   })

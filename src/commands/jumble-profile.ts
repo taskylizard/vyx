@@ -1,7 +1,9 @@
 import { slashSub } from '../bot/rosepack.ts'
+import { guildOnlyGuard } from '../discord/guards.ts'
 
 export default slashSub({
   description: 'Set the Last.fm profile used by Jumble',
+  guards: [guildOnlyGuard],
   options: {
     username: {
       description: 'Your Last.fm username',
@@ -17,6 +19,6 @@ export default slashSub({
       context.interaction.user.id,
       context.options.username
     )
-    await context.editResponse(`Saved Last.fm profile "${username.replaceAll('"', '')}".`)
+    await context.editResponse(`Saved Last.fm profile \`${username.replaceAll('`', '')}\`.`)
   }
 })

@@ -1,6 +1,7 @@
 import type { AssistantModelMessage, ModelMessage, UserContent, UserModelMessage } from 'ai'
 import type { CommandInteraction, Message } from 'oceanic.js'
 import type { BotContext } from '../bot/context.ts'
+import { fetchMessageCached } from '../discord/cached.ts'
 
 const MAX_REPLY_CHAIN_MESSAGES = 12
 
@@ -153,7 +154,8 @@ async function referencedMessage(
     return undefined
   }
 
-  return context.client.rest.channels.getMessage(
+  return fetchMessageCached(
+    context.client,
     message.messageReference?.channelID ?? message.channelID,
     messageID
   )

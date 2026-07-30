@@ -11,25 +11,7 @@ export interface DeezerClientOptions {
   onError?: (error: unknown) => void
 }
 
-export interface DeezerEnrichment {
-  imageUrls?: readonly string[]
-  releaseDate?: string
-  releaseType?: string
-  durationMs?: number
-  albumName?: string
-  sourceUrl?: string
-}
-
-export type DeezerParseResult =
-  | { status: 'found'; value: DeezerEnrichment }
-  | { status: 'not-found' }
-  | { status: 'invalid' }
-
-export type DeezerRequestResult = { status: 'ok'; payload: unknown } | { status: 'unavailable' }
-
-export type DeezerCachedValue = { found: false } | { found: true; value: DeezerEnrichment }
-
-const DeezerEnrichmentSchema: z.ZodType<DeezerEnrichment> = z.object({
+export const DeezerEnrichmentSchema = z.object({
   imageUrls: z.array(z.string()).max(8).optional(),
   releaseDate: z.string().optional(),
   releaseType: z.string().optional(),
@@ -38,7 +20,18 @@ const DeezerEnrichmentSchema: z.ZodType<DeezerEnrichment> = z.object({
   sourceUrl: z.string().optional()
 })
 
-export const DeezerCachedValueSchema: z.ZodType<DeezerCachedValue> = z.discriminatedUnion('found', [
+export type DeezerEnrichment = z.infer<typeof DeezerEnrichmentSchema>
+
+export type DeezerParseResult =
+  | { status: 'found'; value: DeezerEnrichment }
+  | { status: 'not-found' }
+  | { status: 'invalid' }
+
+export type DeezerRequestResult = { status: 'ok'; payload: unknown } | { status: 'unavailable' }
+
+export const DeezerCachedValueSchema = z.discriminatedUnion('found', [
   z.object({ found: z.literal(false) }),
   z.object({ found: z.literal(true), value: DeezerEnrichmentSchema })
 ])
+
+export type DeezerCachedValue = z.infer<typeof DeezerCachedValueSchema>

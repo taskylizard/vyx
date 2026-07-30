@@ -1,10 +1,9 @@
 import { slash, slashSub } from '../bot/rosepack.ts'
-import { match, P } from 'ts-pattern'
-import { JumbleError } from '../jumble/service.ts'
-import { jumblePermissionError, renderJumble } from '../jumble/discord.ts'
-import { JumbleImageError } from '../jumble/renderer.ts'
-import { LastFmError } from '../jumble/lastfm.ts'
+import { match } from 'ts-pattern'
+import { renderJumble } from '../jumble/discord.ts'
+import { jumbleErrorMessage } from '../jumble/errors.ts'
 import { componentIds } from '../jumble/components.ts'
+import { jumblePlayGuards } from '../jumble/guards.ts'
 import { modules } from '../modules.ts'
 import jumbleProfileSubcommand from './jumble-profile.ts'
 import jumbleStatsSubcommand from './jumble-stats.ts'
@@ -17,11 +16,12 @@ export default slash({
   installations: ['guild'],
   async onError(context, error) {
     context.app.logger.error('jumble command failed', { error })
-    await context.editResponse(errorMessage(error))
+    await context.editResponse(jumbleErrorMessage(error, 'Could not start Jumble. Try again.'))
   },
   subcommands: {
     play: slashSub({
       description: 'Guess a scrambled artist, album, or track from its name and artwork',
+      guards: jumblePlayGuards,
       options: {
         kind: {
           description: 'Choose whether to guess an artist, album, or track',
@@ -47,11 +47,6 @@ export default slash({
           .otherwise(() => undefined)
         if (kind === undefined) {
           await context.editResponse('That Jumble type is not available.')
-          return
-        }
-        const permissionError = jumblePermissionError(context.interaction)
-        if (permissionError !== null) {
-          await context.editResponse(permissionError)
           return
         }
         if (username !== undefined)
@@ -87,11 +82,3 @@ export default slash({
     stats: jumbleStatsSubcommand
   }
 })
-
-function errorMessage(error: unknown): string {
-  return match(error)
-    .with(P.instanceOf(JumbleError), (value) => value.message)
-    .with(P.instanceOf(LastFmError), (value) => value.message)
-    .with(P.instanceOf(JumbleImageError), (value) => value.message)
-    .otherwise(() => 'The Jumble could not be started. Please try again.')
-}

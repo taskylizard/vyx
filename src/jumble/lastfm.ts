@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { clamp } from 'radashi'
 import { match, P } from 'ts-pattern'
 import { z } from 'zod'
 import { normalizeAnswer } from './answer.ts'
@@ -14,14 +15,13 @@ import {
   type LastFmEnvelope
 } from './lastfm-types.ts'
 import {
-  isLastFmObject,
+  isLastFmEnvelope,
   mergeLastFmArtistDetails,
   mergeLastFmDetails,
   normalizeLastFmUsername,
   parseLastFmString,
   parseLastFmTopItems
 } from './lastfm-parser.ts'
-import { clamp } from './numbers.ts'
 import { readBoundedJson } from './response.ts'
 import { JumbleCandidateSchema } from './schemas.ts'
 import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './timing.ts'
@@ -291,7 +291,7 @@ export class LastFmClient implements JumbleMusicProvider {
     const normalized = normalizeLastFmUsername(username)
     const payload = await this.request('user.getinfo', { user: normalized })
     const user = payload.user
-    if (!isLastFmObject(user))
+    if (!isLastFmEnvelope(user))
       throw new LastFmError('Last.fm could not find that user.', 'invalid-username')
     return parseLastFmString(user.name) ?? normalized
   }
@@ -344,7 +344,7 @@ export class LastFmClient implements JumbleMusicProvider {
         )
         .otherwise(() => hydrated)
     } catch {
-      // tasky: top-list data is enough to play; detail calls only improve hints.
+      // tasky: top-list data is playable, detail calls only improve hints
     } finally {
       emitJumbleTiming(this.onTiming, {
         type: 'provider',
@@ -467,7 +467,7 @@ export class LastFmClient implements JumbleMusicProvider {
         throw new LastFmError('Last.fm response was too large.', 'response-too-large')
       }
       const payload: unknown = await readBoundedJson(response, this.maxResponseBytes)
-      if (!isLastFmObject(payload))
+      if (!isLastFmEnvelope(payload))
         throw new LastFmError('Last.fm returned an invalid response.', 'invalid-response')
       if (payload.error !== undefined) {
         throw new LastFmError(

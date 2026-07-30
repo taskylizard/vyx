@@ -6,6 +6,8 @@ import {
   type TranscriptOrJobId
 } from '@supadata/js'
 import { tool, type Tool } from 'ai'
+import { sleep } from 'radashi'
+import { match, P } from 'ts-pattern'
 import { z } from 'zod'
 
 export const SUPADATA_TRANSCRIPT_TOOL_NAME = 'youtubeTranscript'
@@ -90,7 +92,7 @@ async function waitForTranscript(
 ): Promise<Transcript> {
   const now = config.now ?? Date.now
   const pollIntervalMs = config.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
-  const sleep = config.sleep ?? defaultSleep
+  const wait = config.sleep ?? sleep
   const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS
 
   if (pollIntervalMs < 0) {
@@ -104,23 +106,26 @@ async function waitForTranscript(
   while (true) {
     // eslint-disable-next-line no-await-in-loop -- tasky: sequential polling, each poll depends on elapsed time and prior job status
     const job = await client.transcript.getJobStatus(jobId)
-    if (job.status === 'completed') {
-      if (job.result === null || job.result === undefined) {
+    const transcript = match(job)
+      .returnType<Transcript | undefined>()
+      .with({ status: 'completed', result: P.nonNullable }, ({ result }) => result)
+      .with({ status: 'completed' }, () => {
         throw new Error(`Supadata transcript job ${jobId} completed without a transcript.`)
-      }
-      return job.result
-    }
-    if (job.status === 'failed') {
-      const reason = job.error?.message ?? job.error?.details ?? 'unknown error'
-      throw new Error(`Supadata transcript job ${jobId} failed: ${reason}`)
-    }
+      })
+      .with({ status: 'failed' }, ({ error }) => {
+        const reason = error?.message ?? error?.details ?? 'unknown error'
+        throw new Error(`Supadata transcript job ${jobId} failed: ${reason}`)
+      })
+      .with({ status: P.union('queued', 'active') }, () => undefined)
+      .exhaustive()
+    if (transcript !== undefined) return transcript
 
     const remainingMs = deadline - now()
     if (remainingMs <= 0) {
       throw new Error(`Supadata transcript job ${jobId} timed out after ${timeoutMs}ms.`)
     }
     // eslint-disable-next-line no-await-in-loop -- tasky: sequential polling, sleep before the next status check
-    await sleep(Math.min(pollIntervalMs, remainingMs))
+    await wait(Math.min(pollIntervalMs, remainingMs))
   }
 }
 
@@ -158,11 +163,5 @@ function decodeHtmlEntities(value: string): string {
     }
 
     return String.fromCodePoint(codePoint)
-  })
-}
-
-async function defaultSleep(delayMs: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, delayMs)
   })
 }

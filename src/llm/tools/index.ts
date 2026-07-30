@@ -37,12 +37,11 @@ export function createKanikouTools(config: KanikouToolsConfig): ToolSet {
   return tools
 }
 
-export type SearchToolsConfig = KanikouToolsConfig
-
 /** @deprecated Use createKanikouTools. */
-export function createSearchTools(config: SearchToolsConfig): ToolSet {
-  return createKanikouTools(config)
-}
+export { createKanikouTools as createSearchTools }
+
+/** @deprecated Use KanikouToolsConfig. */
+export { type KanikouToolsConfig as SearchToolsConfig }
 
 export { createParallelExtractTool, PARALLEL_EXTRACT_TOOL_NAME } from './parallel-extract.ts'
 export { createParallelSearchTool, PARALLEL_SEARCH_TOOL_NAME } from './parallel-search.ts'

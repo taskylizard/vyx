@@ -1,7 +1,7 @@
+import { clamp, sleep } from 'radashi'
 import { match } from 'ts-pattern'
 import type { ZodType } from 'zod'
 import { createAnswerVariants, mergeAnswerVariantLists, mergeImageUrlLists } from './candidate.ts'
-import { clamp } from './numbers.ts'
 import type { JumbleArtistMetadata, JumbleCandidate } from './types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
 import {
@@ -10,7 +10,6 @@ import {
   chooseReleaseGroup,
   firstReleaseId,
   isMusicBrainzId,
-  isMusicBrainzObject,
   mergeMusicBrainzTags,
   mergeRelease,
   normalizeMusicBrainzKey,
@@ -23,6 +22,7 @@ import {
   type CachedMusicBrainzLookup,
   type CachedMusicBrainzValue,
   type MusicBrainzClientOptions,
+  MusicBrainzEnvelopeSchema,
   type MusicBrainzEnvelope,
   RecordingMetadataSchema,
   type RecordingMetadata,
@@ -365,7 +365,7 @@ export class MusicBrainzClient {
     await previous
     try {
       const waitMs = Math.max(0, this.nextRequestAt - this.now())
-      if (waitMs > 0) await delay(waitMs)
+      if (waitMs > 0) await sleep(waitMs)
       this.nextRequestAt = this.now() + this.minIntervalMs
 
       const controller = new AbortController()
@@ -382,7 +382,8 @@ export class MusicBrainzClient {
         const length = Number(response.headers.get('content-length') ?? 0)
         if (length > this.maxResponseBytes) return null
         const payload: unknown = await readBoundedJson(response, this.maxResponseBytes)
-        return isMusicBrainzObject(payload) ? payload : null
+        const parsed = MusicBrainzEnvelopeSchema.safeParse(payload)
+        return parsed.success ? parsed.data : null
       } catch (error) {
         this.report(error)
         return null
@@ -402,8 +403,4 @@ export class MusicBrainzClient {
 
 function escapeLucene(value: string): string {
   return value.replace(/[+\-!(){}[\]^"~*?:\\/]/gu, '\\$&')
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }

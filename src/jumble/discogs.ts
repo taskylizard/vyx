@@ -1,7 +1,7 @@
+import { clamp, sleep, unique } from 'radashi'
 import { match } from 'ts-pattern'
 import { normalizeAnswer, removeEditionSuffix } from './answer.ts'
 import { createAnswerVariants, mergeImageUrlLists, mergeJumbleCandidates } from './candidate.ts'
-import { clamp } from './numbers.ts'
 import {
   discogsTitleVariants,
   parseDiscogsArtist,
@@ -10,6 +10,7 @@ import {
 } from './discogs-parser.ts'
 import {
   DiscogsCachedValueSchema,
+  DiscogsEnvelopeSchema,
   type DiscogsCachedValue,
   type DiscogsClientOptions,
   type DiscogsEnrichment,
@@ -168,10 +169,9 @@ export class DiscogsClient {
     const terms = [candidate.albumName, candidate.answer]
       .map((value) => value?.trim())
       .filter((value): value is string => value !== undefined && value.length > 0)
-      .filter((value, index, values) => values.indexOf(value) === index)
-      .slice(0, 2)
+    const uniqueTerms = unique(terms).slice(0, 2)
     let unavailable = false
-    for (const term of terms) {
+    for (const term of uniqueTerms) {
       // eslint-disable-next-line no-await-in-loop -- tasky: sequential search, tries query terms in priority order, returning the first match
       const search = await this.request('/database/search', {
         type: 'release',
@@ -241,7 +241,7 @@ export class DiscogsClient {
     await previous
     try {
       const waitMs = Math.max(0, this.nextRequestAt - this.now())
-      if (waitMs > 0) await delay(waitMs)
+      if (waitMs > 0) await sleep(waitMs)
       this.nextRequestAt = this.now() + this.minIntervalMs
 
       const controller = new AbortController()
@@ -259,7 +259,8 @@ export class DiscogsClient {
         const length = Number(response.headers.get('content-length') ?? 0)
         if (Number.isFinite(length) && length > this.maxResponseBytes) return null
         const payload: unknown = await readBoundedJson(response, this.maxResponseBytes)
-        return isDiscogsObject(payload) ? payload : null
+        const parsed = DiscogsEnvelopeSchema.safeParse(payload)
+        return parsed.success ? parsed.data : null
       } catch (error) {
         this.report(error)
         return null
@@ -438,12 +439,4 @@ function discogsCacheKeyPart(value: string): string {
 
 function stripDiscogsSuffix(value: string): string {
   return value.replace(/\s+\(\d+\)$/u, '')
-}
-
-function isDiscogsObject(value: unknown): value is DiscogsEnvelope {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function delay(milliseconds: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }

@@ -1,3 +1,4 @@
+import { clamp } from 'radashi'
 import { match } from 'ts-pattern'
 import { mergeImageUrlLists, mergeJumbleCandidates } from './candidate.ts'
 import { parseDeezerSearch } from './deezer-parser.ts'
@@ -9,7 +10,6 @@ import {
   type DeezerRequestResult
 } from './deezer-types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
-import { clamp } from './numbers.ts'
 import { readBoundedJson } from './response.ts'
 import type { JumbleCandidate } from './types.ts'
 
@@ -59,24 +59,26 @@ export class DeezerClient {
     }
 
     const response = await this.request(candidate)
-    if (response.status === 'unavailable') {
-      return cached?.value === undefined
-        ? candidate
-        : applyDeezerEnrichment(candidate, cached.value)
-    }
-
-    const parsed = parseDeezerSearch(response.payload, candidate)
-    return match(parsed)
+    return match(response)
       .returnType<Promise<JumbleCandidate>>()
-      .with({ status: 'found' }, async ({ value }) => {
-        await this.writeCache(cacheKey, value, ENRICHMENT_TTL_MS)
-        return applyDeezerEnrichment(candidate, value)
+      .with({ status: 'unavailable' }, async () =>
+        cached?.value === undefined ? candidate : applyDeezerEnrichment(candidate, cached.value)
+      )
+      .with({ status: 'ok' }, async ({ payload }) => {
+        const parsed = parseDeezerSearch(payload, candidate)
+        return match(parsed)
+          .returnType<Promise<JumbleCandidate>>()
+          .with({ status: 'found' }, async ({ value }) => {
+            await this.writeCache(cacheKey, value, ENRICHMENT_TTL_MS)
+            return applyDeezerEnrichment(candidate, value)
+          })
+          .with({ status: 'not-found' }, async () => {
+            await this.writeCache(cacheKey, undefined, NEGATIVE_TTL_MS)
+            return candidate
+          })
+          .with({ status: 'invalid' }, async () => candidate)
+          .exhaustive()
       })
-      .with({ status: 'not-found' }, async () => {
-        await this.writeCache(cacheKey, undefined, NEGATIVE_TTL_MS)
-        return candidate
-      })
-      .with({ status: 'invalid' }, async () => candidate)
       .exhaustive()
   }
 

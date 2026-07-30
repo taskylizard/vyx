@@ -22,7 +22,12 @@ export async function handleMessageCreate(context: BotContext, message: Message)
         service: context.jumble,
         renderer: context.jumbleRenderer,
         idsFor: (state) => componentIds(state.session.id),
-        isEnabled: () => isModuleEnabled(context, guildID, modules.jumble.id),
+        isEnabled: () =>
+          context.moduleStore.isEnabled({
+            applicationID: context.applicationID,
+            guildID,
+            module: modules.jumble.id
+          }),
         onImageError: (error) =>
           context.logger.warn('jumble image could not be rendered', { error }),
         onSessionError: (error) =>
@@ -40,7 +45,11 @@ export async function handleMessageCreate(context: BotContext, message: Message)
   if (
     guildID !== null &&
     isAutoembedMessage(message.content) &&
-    (await isModuleEnabled(context, guildID, modules.autoembeds.id))
+    (await context.moduleStore.isEnabled({
+      applicationID: context.applicationID,
+      guildID,
+      module: modules.autoembeds.id
+    }))
   ) {
     try {
       await handleAutoembeds(context, message)
@@ -65,15 +74,19 @@ export async function handleMessageCreate(context: BotContext, message: Message)
     return
   }
 
-  if (guildID !== null && mentionsBot && (await isModuleEnabled(context, guildID, modules.ai.id))) {
+  if (
+    guildID !== null &&
+    mentionsBot &&
+    (await context.moduleStore.isEnabled({
+      applicationID: context.applicationID,
+      guildID,
+      module: modules.ai.id
+    }))
+  ) {
     setActiveSpanAttributes({ 'kanikou.message.route': 'ai-guild-mention' })
     await context.responder.replyToMessage(context, message)
     return
   }
 
   setActiveSpanAttributes({ 'kanikou.message.outcome': 'ignored-unmatched' })
-}
-
-function isModuleEnabled(context: BotContext, guildID: string, module: string): Promise<boolean> {
-  return context.moduleStore.isEnabled({ applicationID: context.applicationID, guildID, module })
 }

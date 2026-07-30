@@ -10,46 +10,19 @@ import { match } from 'ts-pattern'
 import { KANIKOU_MODEL_SETTINGS } from '../config/model.ts'
 import { kanikouSystemPrompt } from '../config/system-prompt.ts'
 import { formatCitations } from './citations.ts'
+import type { GenerationHooks, GenerationToolOutcome } from './generation-types.ts'
 import { suppressLinkEmbeds } from './links.ts'
 
 const DEFAULT_MAX_TOOL_ITERATIONS = 6
 
-export interface GenerationHooks {
-  instructions?: string
-  maxToolIterations?: number | null
-  onStepEnd?(event: GenerationStepEndEvent): void | Promise<void>
-  onStepStart?(event: GenerationStepStartEvent): void | Promise<void>
-  onToolExecutionEnd?(event: GenerationToolEndEvent): void | Promise<void>
-  onToolExecutionStart?(event: GenerationToolStartEvent): void | Promise<void>
-}
-
-export interface GenerationStepStartEvent {
-  callId: string
-  modelId: string
-  provider: string
-  stepNumber: number
-}
-
-export interface GenerationStepEndEvent extends GenerationStepStartEvent {
-  durationMs: number
-  finishReason: FinishReason
-  inputTokens?: number
-  outputTokens?: number
-  responseTimeMs: number
-  totalTokens?: number
-}
-
-export interface GenerationToolStartEvent {
-  callId: string
-  toolCallId: string
-  toolName: string
-}
-
-export interface GenerationToolEndEvent extends GenerationToolStartEvent {
-  durationMs: number
-  error?: string
-  outcome: 'error' | 'success'
-}
+export type {
+  GenerationHooks,
+  GenerationStepEndEvent,
+  GenerationStepStartEvent,
+  GenerationToolEndEvent,
+  GenerationToolOutcome,
+  GenerationToolStartEvent
+} from './generation-types.ts'
 
 export async function generateKanikouResponse(
   model: LanguageModel,
@@ -87,15 +60,24 @@ export async function generateKanikouResponse(
       }),
     onStepStart: async ({ callId, modelId, provider, stepNumber }) =>
       hooks.onStepStart?.({ callId, modelId, provider, stepNumber }),
-    onToolExecutionEnd: async ({ callId, toolCall, toolExecutionMs, toolOutput }) =>
-      hooks.onToolExecutionEnd?.({
+    onToolExecutionEnd: async ({ callId, toolCall, toolExecutionMs, toolOutput }) => {
+      const result = match(toolOutput)
+        .returnType<GenerationToolOutcome>()
+        .with({ type: 'tool-error' }, ({ error }) => ({
+          error: errorText(error),
+          outcome: 'error'
+        }))
+        .with({ type: 'tool-result' }, () => ({ outcome: 'success' }))
+        .exhaustive()
+
+      await hooks.onToolExecutionEnd?.({
         callId,
         durationMs: toolExecutionMs,
-        error: toolOutput.type === 'tool-error' ? errorText(toolOutput.error) : undefined,
-        outcome: toolOutput.type === 'tool-error' ? 'error' : 'success',
+        ...result,
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName
-      }),
+      })
+    },
     onToolExecutionStart: async ({ callId, toolCall }) =>
       hooks.onToolExecutionStart?.({
         callId,

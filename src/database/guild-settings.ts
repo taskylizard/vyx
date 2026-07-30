@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+import { unique } from 'radashi'
 import type { ApplicationCommandKey } from 'rosepack'
 import { match, P } from 'ts-pattern'
 import { guildSettings } from './schemas/guild-settings.ts'
@@ -119,7 +120,7 @@ export class GuildSettingsStore {
     guildID,
     keys
   }: GuildModuleStateScope & { keys: readonly ApplicationCommandKey[] }): Promise<void> {
-    const ownedCommandKeys = JSON.stringify([...new Set(keys)])
+    const ownedCommandKeys = JSON.stringify(unique(keys))
     await this.db
       .insert(guildSettings)
       .values({
@@ -158,7 +159,7 @@ function parseStringArray(value: string | null | undefined): readonly string[] {
       try {
         const parsed: unknown = JSON.parse(raw)
         return match(parsed)
-          .with(P.array(P.string), (strings) => Object.freeze([...new Set(strings)]))
+          .with(P.array(P.string), (strings) => Object.freeze(unique(strings)))
           .otherwise(() => [])
       } catch {
         return []

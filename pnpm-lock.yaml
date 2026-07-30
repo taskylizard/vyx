@@ -286,7 +286,7 @@ importers:
         specifier: 1.14.0
         version: 1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)
       radashi:
-        specifier: ^12.9.1
+        specifier: 12.9.1
         version: 12.9.1
       rosepack:
         specifier: 0.3.0
@@ -298,7 +298,7 @@ importers:
         specifier: 2.0.0
         version: 2.0.0
       undici:
-        specifier: ^8.9.0
+        specifier: 8.9.0
         version: 8.9.0
       zod:
         specifier: 4.4.3

@@ -1,6 +1,6 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
+import { clamp, unique } from 'radashi'
 import { match, P } from 'ts-pattern'
-import { clamp } from './numbers.ts'
 import { readBoundedBytes } from './response.ts'
 import {
   emitJumbleTiming,
@@ -348,7 +348,7 @@ export class JumbleImageRenderer {
 }
 
 function boundedArtworkUrls(urls: readonly string[]): string[] {
-  return [...new Set(urls.map((url) => url.trim()).filter((url) => url.length > 0))].slice(0, 8)
+  return unique(urls.map((url) => url.trim()).filter((url) => url.length > 0)).slice(0, 8)
 }
 
 class AsyncGate {

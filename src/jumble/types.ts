@@ -3,10 +3,30 @@ import type { JumbleTimingSink } from './timing.ts'
 export const JUMBLE_KINDS = ['artist', 'album', 'track'] as const
 export type JumbleKind = (typeof JUMBLE_KINDS)[number]
 
-export type JumbleOutcome = 'won' | 'gave_up' | 'expired' | 'cancelled'
+export const JUMBLE_OUTCOMES = ['won', 'gave_up', 'expired', 'cancelled'] as const
+export type JumbleOutcome = (typeof JUMBLE_OUTCOMES)[number]
+
+export const JUMBLE_ERROR_CODES = [
+  'busy',
+  'profile-missing',
+  'no-candidates',
+  'invalid-candidate',
+  'not-found',
+  'not-supported',
+  'forbidden',
+  'configuration'
+] as const
+export type JumbleErrorCode = (typeof JUMBLE_ERROR_CODES)[number]
 
 /** Provenance for an answer accepted in addition to the displayed title. */
-export type JumbleAnswerSource = 'lastfm' | 'musicbrainz' | 'discogs' | 'transliteration' | 'manual'
+export const JUMBLE_ANSWER_SOURCES = [
+  'lastfm',
+  'musicbrainz',
+  'discogs',
+  'transliteration',
+  'manual'
+] as const
+export type JumbleAnswerSource = (typeof JUMBLE_ANSWER_SOURCES)[number]
 
 export interface JumbleAnswerVariant {
   value: string
@@ -131,6 +151,10 @@ export interface JumbleState {
   session: JumbleSession
   hints: readonly (JumbleHint & { shown: boolean; order: number })[]
 }
+
+export type JumbleActivityState =
+  | { status: 'active'; state: JumbleState }
+  | { status: 'ended'; action: JumbleOutcome | 'unchanged'; state: JumbleState }
 
 export type JumbleAction =
   | 'started'

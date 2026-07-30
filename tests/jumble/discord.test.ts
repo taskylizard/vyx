@@ -6,11 +6,7 @@ import {
   jumbleReplayButton,
   jumbleStartSessionButton
 } from '../../src/jumble/components.ts'
-import {
-  createJumbleMessage,
-  editJumbleMessage,
-  handleJumbleMessage
-} from '../../src/jumble/discord.ts'
+import { handleJumbleMessage } from '../../src/jumble/discord.ts'
 import { buildJumblePayload, buildJumbleReplayComponents } from '../../src/jumble/presentation.ts'
 import type { JumbleImageRenderer } from '../../src/jumble/renderer.ts'
 import type { JumbleService } from '../../src/jumble/service.ts'
@@ -161,58 +157,6 @@ test('start session disables the completed controls and sends the first continuo
   expect(attachMessage).toHaveBeenCalledWith('session-track', 'continuous-message')
 })
 
-test('channel message creation falls back to REST when the channel is not cached', async () => {
-  const createMessage = vi.fn(async () => ({ id: 'rest-message' }))
-  const result = await createJumbleMessage(
-    {
-      getChannel: vi.fn(() => undefined),
-      rest: { channels: { createMessage } }
-    } as never,
-    'channel-1',
-    { content: 'hello' }
-  )
-
-  expect(createMessage).toHaveBeenCalledWith('channel-1', { content: 'hello' })
-  expect(result.id).toBe('rest-message')
-})
-
-test('channel message creation falls back to REST after a cached send fails', async () => {
-  const cachedCreateMessage = vi.fn(async () => Promise.reject(new Error('cache send failed')))
-  const restCreateMessage = vi.fn(async () => ({ id: 'rest-message' }))
-  const result = await createJumbleMessage(
-    {
-      getChannel: vi.fn(() => ({ createMessage: cachedCreateMessage })),
-      rest: { channels: { createMessage: restCreateMessage } }
-    } as never,
-    'channel-1',
-    { content: 'hello' }
-  )
-
-  expect(cachedCreateMessage).toHaveBeenCalledWith({ content: 'hello' })
-  expect(restCreateMessage).toHaveBeenCalledWith('channel-1', { content: 'hello' })
-  expect(result.id).toBe('rest-message')
-})
-
-test('channel message editing falls back to REST after a cached edit fails', async () => {
-  const cachedEditMessage = vi.fn(() => Promise.reject(new Error('stale channel')))
-  const restEditMessage = vi.fn(async () => ({}))
-
-  await editJumbleMessage(
-    {
-      getChannel: vi.fn(() => ({ editMessage: cachedEditMessage })),
-      rest: { channels: { editMessage: restEditMessage } }
-    } as never,
-    'channel-1',
-    'message-1',
-    { payload: { content: 'finished' } }
-  )
-
-  expect(cachedEditMessage).toHaveBeenCalledWith('message-1', { content: 'finished' })
-  expect(restEditMessage).toHaveBeenCalledWith('channel-1', 'message-1', {
-    content: 'finished'
-  })
-})
-
 test('playing replay labels stay within Discord limits without splitting emoji', () => {
   const components = buildJumbleReplayComponents('jumble/replay/track', undefined, {
     status: 'playing',
@@ -261,7 +205,7 @@ test('a failed replay restores the button and expires the hidden game', async ()
       appPermissions: { has: vi.fn(() => true) },
       channelID: 'channel-1',
       guildID: 'guild-1',
-      member: null,
+      member: { displayName: 'Tasky' },
       message: {
         components: buildJumbleReplayComponents(
           'jumble/replay/album',

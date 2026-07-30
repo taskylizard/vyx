@@ -1,11 +1,11 @@
 import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
-import type {
-  GitHubCodeSearchResponse,
-  GitHubCommitResponse,
-  GitHubTreeEntry,
-  GitHubTreeResponse,
-  ProjectSeleneConfig
+import {
+  GitHubCodeSearchResponseSchema,
+  GitHubCommitResponseSchema,
+  GitHubTreeResponseSchema,
+  type GitHubTreeResponse,
+  type ProjectSeleneConfig
 } from './project-selene-types.ts'
 
 export type { ProjectSeleneConfig } from './project-selene-types.ts'
@@ -43,28 +43,6 @@ const SearchCodeArgsSchema = z.object({
     .optional()
     .describe('Optional repository directory or path prefix to restrict the search.'),
   query: z.string().min(1).describe('Code, symbol, filename, or concept to search for.')
-})
-
-const GitHubTreeEntrySchema: z.ZodType<GitHubTreeEntry> = z.object({
-  path: z.string(),
-  size: z.number().optional(),
-  type: z.enum(['blob', 'commit', 'tree'])
-})
-const GitHubTreeResponseSchema: z.ZodType<GitHubTreeResponse> = z.object({
-  tree: z.array(GitHubTreeEntrySchema),
-  truncated: z.boolean()
-})
-const GitHubCommitResponseSchema: z.ZodType<GitHubCommitResponse> = z.object({
-  sha: z.string()
-})
-const GitHubCodeSearchResponseSchema: z.ZodType<GitHubCodeSearchResponse> = z.object({
-  items: z.array(
-    z.object({
-      path: z.string(),
-      text_matches: z.array(z.object({ fragment: z.string() })).optional()
-    })
-  ),
-  total_count: z.number()
 })
 
 export function createProjectSeleneTools(config: ProjectSeleneConfig = {}): ToolSet {

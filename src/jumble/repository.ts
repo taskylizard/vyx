@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from 'drizzle-orm'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+import { unique } from 'radashi'
 import { match } from 'ts-pattern'
 import {
   jumbleAnswers,
@@ -285,7 +286,7 @@ export class JumbleRepository {
       .select()
       .from(jumbleAnswers)
       .where(eq(jumbleAnswers.discordUserId, discordUserId))
-    const answeredIds = [...new Set(allAnswers.map((answer) => answer.sessionId))]
+    const answeredIds = unique(allAnswers.map((answer) => answer.sessionId))
     const answeredSessions =
       answeredIds.length === 0
         ? []
@@ -362,10 +363,11 @@ function parseMetadata(
   kind: JumbleKind
 ): JumbleSessionMetadata {
   try {
-    const parsed = JumbleSessionMetadataSchema.safeParse(JSON.parse(value))
+    const metadata: unknown = JSON.parse(value)
+    const parsed = JumbleSessionMetadataSchema.safeParse(metadata)
     if (parsed.success) return parsed.data
   } catch {
-    // tasky: bad metadata should fall back to row fields, not brick an otherwise playable game.
+    // tasky: bad metadata falls back to row fields instead of bricking the game
   }
   const candidate = match(kind)
     .returnType<JumbleCandidate>()

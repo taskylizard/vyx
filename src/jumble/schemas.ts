@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import {
+  JUMBLE_ANSWER_SOURCES,
   JUMBLE_KINDS,
   type JumbleArtistMetadata,
   type JumbleAnswerVariant,
@@ -21,9 +22,9 @@ export const JumbleArtistMetadataSchema: z.ZodType<JumbleArtistMetadata> = z
   })
   .passthrough()
 
-const JumbleAnswerVariantSchema: z.ZodType<JumbleAnswerVariant> = z.object({
+export const JumbleAnswerVariantSchema: z.ZodType<JumbleAnswerVariant> = z.object({
   value: z.string(),
-  source: z.enum(['lastfm', 'musicbrainz', 'discogs', 'transliteration', 'manual']),
+  source: z.enum(JUMBLE_ANSWER_SOURCES),
   locale: z.string().optional()
 })
 

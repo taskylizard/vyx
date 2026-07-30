@@ -1,11 +1,7 @@
-import type {
-  Client,
-  CreateMessageOptions,
-  EditMessageOptions,
-  Message,
-  Permission
-} from 'oceanic.js'
+import type { Client, Message } from 'oceanic.js'
 import { match } from 'ts-pattern'
+import { replyMessageReference, suppressAllMentions } from '../discord/message-options.ts'
+import { safeCreateMessage, safeCreateReaction, safeEditMessage } from '../discord/safe-actions.ts'
 import { mergeImageUrlLists } from './candidate.ts'
 import { JumbleImageRenderer } from './renderer.ts'
 import {
@@ -81,45 +77,6 @@ export async function renderJumble(
   return { payload, imageError }
 }
 
-export function jumblePermissionError(interaction: {
-  guildID: string | null
-  appPermissions: Pick<Permission, 'has'>
-}): string | null {
-  if (interaction.guildID === null) return null
-
-  const missing: string[] = []
-  if (!interaction.appPermissions.has('VIEW_CHANNEL')) missing.push('View Channel')
-  if (
-    !interaction.appPermissions.has('SEND_MESSAGES') &&
-    !interaction.appPermissions.has('SEND_MESSAGES_IN_THREADS')
-  ) {
-    missing.push('Send Messages')
-  }
-  if (!interaction.appPermissions.has('READ_MESSAGE_HISTORY')) missing.push('Read Message History')
-  if (!interaction.appPermissions.has('ADD_REACTIONS')) missing.push('Add Reactions')
-  if (!interaction.appPermissions.has('ATTACH_FILES')) missing.push('Attach Files')
-  if (missing.length === 0) return null
-
-  return `Kanikou needs the following permissions in this channel before starting Jumble: **${missing.join(', ')}**.`
-}
-
-export async function createJumbleMessage(
-  client: Pick<Client, 'getChannel' | 'rest'>,
-  channelId: string,
-  options: CreateMessageOptions
-) {
-  const channel = client.getChannel(channelId)
-  if (channel !== undefined && 'createMessage' in channel) {
-    try {
-      return await channel.createMessage(options)
-    } catch {
-      return client.rest.channels.createMessage(channelId, options)
-    }
-  }
-
-  return client.rest.channels.createMessage(channelId, options)
-}
-
 export async function createJumbleGameMessage(
   client: Pick<Client, 'getChannel' | 'rest'>,
   result: JumbleActionResult,
@@ -127,35 +84,10 @@ export async function createJumbleGameMessage(
   ids: JumbleComponentIds
 ): Promise<{ message: Message; imageError?: Error }> {
   const rendered = await renderJumble(result.state, renderer, ids, result.action)
-  const message = await createJumbleMessage(
-    client,
-    result.state.session.channelId,
-    rendered.payload
-  )
+  const message = await safeCreateMessage(client, result.state.session.channelId, rendered.payload)
   return rendered.imageError === undefined
     ? { message }
     : { imageError: rendered.imageError, message }
-}
-
-export async function editJumbleMessage(
-  client: Client,
-  channelId: string,
-  messageId: string,
-  rendered: RenderedJumble
-): Promise<void> {
-  const options = rendered.payload as EditMessageOptions
-  const channel = client.getChannel(channelId)
-  if (channel !== undefined && 'editMessage' in channel) {
-    try {
-      await channel.editMessage(messageId, options)
-      return
-    } catch {
-      await client.rest.channels.editMessage(channelId, messageId, options)
-      return
-    }
-  }
-
-  await client.rest.channels.editMessage(channelId, messageId, options)
 }
 
 /** Handle free-text guesses while a channel has an active game. */
@@ -176,11 +108,11 @@ export async function handleJumbleMessage(
   ): Promise<void> => {
     const rendered = await renderJumble(result.state, renderer, idsFor(result.state), action)
     if (result.state.session.messageId !== null) {
-      await editJumbleMessage(
+      await safeEditMessage(
         client,
         result.state.session.channelId,
         result.state.session.messageId,
-        rendered
+        rendered.payload
       )
     }
   }
@@ -191,7 +123,7 @@ export async function handleJumbleMessage(
   ) {
     const cancelled = await service.cancelContinuousSession(active.session.id)
     await renderFinished(cancelled, 'cancelled')
-    await safeReaction(message, '🛑')
+    await safeCreateReaction(message, '🛑')
     return true
   }
 
@@ -199,22 +131,15 @@ export async function handleJumbleMessage(
   await match(result.action)
     .with('won', async (action) => {
       await renderFinished(result, action)
-      await createJumbleMessage(client, message.channelID, {
+      await safeCreateMessage(client, message.channelID, {
         allowedMentions: {
-          everyone: false,
-          repliedUser: false,
-          roles: false,
+          ...suppressAllMentions,
           users: [message.author.id]
         },
         content: buildJumbleWinnerAnnouncement(result.state, message.author.id),
-        messageReference: {
-          channelID: message.channelID,
-          failIfNotExists: false,
-          guildID: message.guildID ?? undefined,
-          messageID: message.id
-        }
+        messageReference: replyMessageReference(message)
       })
-      await safeReaction(message, '✅')
+      await safeCreateReaction(message, '✅')
       if (result.state.session.metadata.continuousSession !== undefined) {
         await continueJumbleSession(client, result.state, options)
       }
@@ -261,13 +186,8 @@ async function continueJumbleSession(
     options.onSessionError?.(error)
     const detail = error instanceof JumbleError ? error.message : 'The next Jumble could not start.'
     try {
-      await createJumbleMessage(client, completed.session.channelId, {
-        allowedMentions: {
-          everyone: false,
-          repliedUser: false,
-          roles: false,
-          users: false
-        },
+      await safeCreateMessage(client, completed.session.channelId, {
+        allowedMentions: suppressAllMentions,
         content: `The Jumble session stopped. ${detail}`
       })
     } catch (notificationError) {
@@ -275,13 +195,5 @@ async function continueJumbleSession(
     }
   } finally {
     stopTyping()
-  }
-}
-
-async function safeReaction(message: Message, emoji: string): Promise<void> {
-  try {
-    await message.createReaction(emoji)
-  } catch {
-    // tasky: reactions are optional, so missing permission can't break the guess path.
   }
 }

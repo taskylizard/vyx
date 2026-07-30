@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
+import { JumbleAnswerVariantSchema } from './schemas.ts'
 
 export interface MusicBrainzClientOptions {
   cache?: Pick<JumbleMetadataCache, 'get' | 'set'>
@@ -15,9 +16,8 @@ export interface MusicBrainzClientOptions {
   onError?: (error: unknown) => void
 }
 
-export interface MusicBrainzEnvelope {
-  [key: string]: unknown
-}
+export const MusicBrainzEnvelopeSchema = z.record(z.string(), z.unknown())
+export type MusicBrainzEnvelope = z.infer<typeof MusicBrainzEnvelopeSchema>
 
 export const ReleaseMetadataSchema = z.object({
   releaseDate: z.string().optional(),
@@ -26,16 +26,7 @@ export const ReleaseMetadataSchema = z.object({
   disambiguation: z.string().optional(),
   mbid: z.string().optional(),
   releaseGroupMbid: z.string().optional(),
-  answerVariants: z
-    .array(
-      z.object({
-        value: z.string(),
-        source: z.enum(['lastfm', 'musicbrainz', 'discogs', 'transliteration', 'manual']),
-        locale: z.string().optional()
-      })
-    )
-    .max(16)
-    .optional(),
+  answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
   imageUrls: z.array(z.string()).max(8).optional()
 })
 

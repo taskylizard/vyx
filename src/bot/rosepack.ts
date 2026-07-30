@@ -1,4 +1,5 @@
 import { MessageFlags } from 'oceanic.js'
+import { unique } from 'radashi'
 import { createRosepack } from 'rosepack'
 import { match } from 'ts-pattern'
 import { modules } from '../modules.ts'
@@ -34,7 +35,7 @@ export const rosepack = createRosepack<BotContext>({
       .with(true, async () => undefined)
       .otherwise(async () => {
         await interaction.createMessage({
-          content: `${module.label} is disabled in this server. Ask the bot owner to enable it with /modules enable.`,
+          content: `${module.label} is disabled here.\n-# Ask the bot owner to use \`/modules enable\`.`,
           flags: MessageFlags.EPHEMERAL
         })
       })
@@ -42,7 +43,7 @@ export const rosepack = createRosepack<BotContext>({
 })
 
 function filterKnownModules(values: readonly string[]): readonly string[] {
-  return Object.freeze([...new Set(values.filter((value) => knownModuleIDs.has(value)))])
+  return Object.freeze(unique(values.filter((value) => knownModuleIDs.has(value))))
 }
 
-export const { button, component, modal, slash, slashSub } = rosepack
+export const { button, component, guard, modal, slash, slashSub } = rosepack

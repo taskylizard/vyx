@@ -1,4 +1,4 @@
-// Vendored and adapted from ahmedrangel/snapsave-media-downloader@0103417.
+// tasky: vendored and adapted from ahmedrangel/snapsave-media-downloader@0103417
 export function decryptSnapSave(data: string): string {
   return extractSnapSaveHTML(decodeSnapApp(getEncodedArguments(data)))
 }

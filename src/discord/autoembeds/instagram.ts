@@ -6,9 +6,11 @@ import {
   type Message,
   type MessageComponent
 } from 'oceanic.js'
+import { match } from 'ts-pattern'
 import type { BotContext } from '../../bot/context.ts'
+import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
+import { safeCreateMessage } from '../safe-actions.ts'
 import { escapeMarkdown, textDisplay, trimComponentText, unfurledMedia } from './components.ts'
-import { allowedMentions, messageReference } from './discord.ts'
 import { BROWSER_USER_AGENT, MAX_DISCORD_ATTACHMENTS } from './media.ts'
 import type {
   InstagramCacheEntry,
@@ -16,6 +18,7 @@ import type {
   InstagramPost,
   InstagramResolution
 } from './instagram-types.ts'
+import { InstagramPostResponseSchema, InstagramSharerResponseSchema } from './instagram-types.ts'
 import { resolveAxInstagramMedia } from './vendor/axinstagram.ts'
 import { resolveSnapSaveInstagramMedia } from './vendor/snapsave/instagram.ts'
 import type { ResolvedInstagramMedia } from './vendor/types.ts'
@@ -47,27 +50,28 @@ export async function sendInstagramAutoembed(
   }
   const realURL = canonicalInstagramURL(sourceURL)
 
-  if (resolution.kind === 'media') {
-    context.logger.info('instagram autoembed resolved via fallback', {
-      strategy: resolution.strategy
+  await match(resolution)
+    .returnType<Promise<void>>()
+    .with({ kind: 'media' }, async ({ media, strategy }) => {
+      context.logger.info('instagram autoembed resolved via fallback', { strategy })
+      await safeCreateMessage(context.client, message.channelID, {
+        allowedMentions: suppressAllMentions,
+        components: instagramMediaComponents(realURL, media),
+        flags: MessageFlags.IS_COMPONENTS_V2,
+        messageReference: replyMessageReference(message)
+      })
     })
-    await context.client.rest.channels.createMessage(message.channelID, {
-      allowedMentions,
-      components: instagramMediaComponents(realURL, resolution.media),
-      flags: MessageFlags.IS_COMPONENTS_V2,
-      messageReference: messageReference(message)
+    .with({ kind: 'rich' }, async ({ post }) => {
+      const sharer = await fetchInstagramSharerSafely(context, sourceURL)
+      const assets = prepareInstagramAssets(post)
+      await safeCreateMessage(context.client, message.channelID, {
+        allowedMentions: suppressAllMentions,
+        components: instagramComponents(realURL, post, assets, sharer),
+        flags: MessageFlags.IS_COMPONENTS_V2,
+        messageReference: replyMessageReference(message)
+      })
     })
-    return
-  }
-
-  const sharer = await fetchInstagramSharerSafely(context, sourceURL)
-  const assets = prepareInstagramAssets(resolution.post)
-  await context.client.rest.channels.createMessage(message.channelID, {
-    allowedMentions,
-    components: instagramComponents(realURL, resolution.post, assets, sharer),
-    flags: MessageFlags.IS_COMPONENTS_V2,
-    messageReference: messageReference(message)
-  })
+    .exhaustive()
 }
 
 export function instagramMediaComponents(
@@ -296,14 +300,12 @@ async function fetchInstagramPost(sourceURL: string, signal?: AbortSignal): Prom
     throw new InstagramRequestError(response.status)
   }
 
-  const data = (await response.json()) as {
-    data?: {
-      xdt_api__v1__media__shortcode__web_info?: {
-        items?: Array<InstagramPost> | null
-      } | null
-    } | null
+  const payload: unknown = await response.json()
+  const data = InstagramPostResponseSchema.safeParse(payload)
+  if (!data.success) {
+    throw new Error('Instagram post API returned an invalid response')
   }
-  const post = data.data?.xdt_api__v1__media__shortcode__web_info?.items?.[0]
+  const post = data.data.data?.xdt_api__v1__media__shortcode__web_info?.items?.[0]
   if (post === undefined) {
     throw new Error('Instagram post is unavailable without authentication')
   }
@@ -360,14 +362,12 @@ async function fetchInstagramSharer(sourceURL: string): Promise<string | undefin
     throw new Error(`Instagram sharer fetch failed with ${response.status}`)
   }
 
-  const data = (await response.json()) as {
-    data?: {
-      xdt_get_relationship_for_shid_logged_out?: {
-        sender?: { username?: string | null } | null
-      } | null
-    } | null
+  const payload: unknown = await response.json()
+  const data = InstagramSharerResponseSchema.safeParse(payload)
+  if (!data.success) {
+    throw new Error('Instagram sharer API returned an invalid response')
   }
-  return data.data?.xdt_get_relationship_for_shid_logged_out?.sender?.username ?? undefined
+  return data.data.data?.xdt_get_relationship_for_shid_logged_out?.sender?.username ?? undefined
 }
 
 function instagramShortcode(url: string): string | undefined {

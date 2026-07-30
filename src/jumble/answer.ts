@@ -131,10 +131,7 @@ function maximumAnswerDistance(length: number): number {
 
 export type RandomIndex = (maxExclusive: number) => number
 
-export function shuffleCharacters(
-  value: string,
-  randomIndex: RandomIndex = secureRandomIndex
-): string {
+export function shuffleCharacters(value: string, randomIndex: RandomIndex = randomInt): string {
   const words = value.split(/(\s+)/u)
   return words.map((word) => (/^\s+$/u.test(word) ? word : shuffleWord(word, randomIndex))).join('')
 }
@@ -151,8 +148,4 @@ function shuffleWord(value: string, randomIndex: RandomIndex): string {
     shuffled = letters.join('')
   }
   return shuffled
-}
-
-function secureRandomIndex(maxExclusive: number): number {
-  return randomInt(maxExclusive)
 }

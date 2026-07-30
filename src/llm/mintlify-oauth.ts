@@ -54,9 +54,8 @@ export class MintlifyFileOAuthProvider implements OAuthClientProvider {
 
   constructor(filePath: string) {
     this.#filePath = path.resolve(filePath)
-    this.#credentials = OAuthCredentialsSchema.parse(
-      JSON.parse(readFileSync(this.#filePath, 'utf8'))
-    )
+    const storedCredentials: unknown = JSON.parse(readFileSync(this.#filePath, 'utf8'))
+    this.#credentials = OAuthCredentialsSchema.parse(storedCredentials)
   }
 
   get clientMetadata(): OAuthClientMetadata {

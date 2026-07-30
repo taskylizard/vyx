@@ -1,31 +1,17 @@
-import { MessageFlags, type AllowedMentions, type Message } from 'oceanic.js'
+import { MessageFlags, type Message } from 'oceanic.js'
 import type { BotContext } from '../../bot/context.ts'
-
-export const allowedMentions = {
-  everyone: false,
-  repliedUser: false,
-  roles: false,
-  users: false
-} satisfies AllowedMentions
-
-export function messageReference(message: Message) {
-  return {
-    channelID: message.channelID,
-    failIfNotExists: false,
-    guildID: message.guildID ?? undefined,
-    messageID: message.id
-  }
-}
+import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
+import { safeCreateMessage, safeEditMessage } from '../safe-actions.ts'
 
 export async function sendTextReply(
   context: BotContext,
   message: Message,
   content: string
 ): Promise<void> {
-  await context.client.rest.channels.createMessage(message.channelID, {
-    allowedMentions,
+  await safeCreateMessage(context.client, message.channelID, {
+    allowedMentions: suppressAllMentions,
     content,
-    messageReference: messageReference(message)
+    messageReference: replyMessageReference(message)
   })
 }
 
@@ -35,7 +21,7 @@ export async function suppressOriginalEmbed(context: BotContext, message: Messag
   }
 
   try {
-    await context.client.rest.channels.editMessage(message.channelID, message.id, {
+    await safeEditMessage(context.client, message.channelID, message.id, {
       flags: MessageFlags.SUPPRESS_EMBEDS
     })
   } catch (error) {

@@ -1,4 +1,5 @@
 import type { Client } from 'oceanic.js'
+import { safeSendTyping } from '../discord/safe-actions.ts'
 
 type TypingClient = {
   getChannel: Pick<Client, 'getChannel'>['getChannel']
@@ -18,17 +19,7 @@ export function startJumbleTyping(
     if (stopped || pending) return
     pending = true
     try {
-      const channel = client.getChannel(channelId)
-      if (channel !== undefined && 'sendTyping' in channel) {
-        try {
-          await channel.sendTyping()
-          return
-        } catch {
-          await client.rest.channels.sendTyping(channelId)
-        }
-      } else {
-        await client.rest.channels.sendTyping(channelId)
-      }
+      await safeSendTyping(client, channelId)
     } catch {
       stopped = true
       clearInterval(timer)

@@ -4,12 +4,13 @@ import {
   ComponentTypes,
   MessageFlags,
   type ContainerComponent,
-  type File as DiscordFile,
   type MediaGalleryItem,
   type Message,
   type MessageComponent
 } from 'oceanic.js'
 import type { BotContext } from '../../bot/context.ts'
+import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
+import { safeCreateMessage } from '../safe-actions.ts'
 import {
   discordTimestamp,
   escapeMarkdown,
@@ -17,50 +18,22 @@ import {
   trimComponentText,
   unfurledMedia
 } from './components.ts'
-import { allowedMentions, messageReference } from './discord.ts'
 import {
   BROWSER_USER_AGENT,
   MAX_DISCORD_ATTACHMENTS,
   downloadAutoembedAssetSafely
 } from './media.ts'
+import {
+  TwitterStatusSchema,
+  type PreparedTwitterAssets,
+  type TwitterComponentAssets,
+  type TwitterStatus
+} from './twitter-types.ts'
 
 const TWITTER_COMPONENT_COLOR = 0x1da1f2
 const DEFAULT_PRIVATE_API_HOST_BASE64 = 'ZmF1bmEuYWx5eGlhLmRldg=='
 
-interface TwitterStatus {
-  account?: TwitterAccount | null
-  content?: string | null
-  created_at?: string | null
-  media_attachments?: Array<TwitterMediaAttachment> | null
-}
-
-interface TwitterMediaAttachment {
-  description?: string | null
-  preview_url?: string | null
-  url?: string | null
-}
-
-interface TwitterAccount {
-  acct?: string | null
-  avatar?: string | null
-  display_name?: string | null
-  fields?: Array<TwitterAccountField> | null
-  username?: string | null
-}
-
-interface TwitterAccountField {
-  name?: string | null
-  value?: string | null
-}
-
-export interface TwitterComponentAssets {
-  avatarReference?: string
-  mediaItems: Array<MediaGalleryItem>
-}
-
-interface PreparedTwitterAssets extends TwitterComponentAssets {
-  files: Array<DiscordFile>
-}
+export type { TwitterComponentAssets } from './twitter-types.ts'
 
 export async function sendTwitterAutoembed(
   context: BotContext,
@@ -70,12 +43,12 @@ export async function sendTwitterAutoembed(
 ): Promise<void> {
   const status = await fetchTwitterStatus(statusID, context.env.FAUNA_URL)
   const assets = await prepareTwitterAssets(context, status)
-  await context.client.rest.channels.createMessage(message.channelID, {
-    allowedMentions,
+  await safeCreateMessage(context.client, message.channelID, {
+    allowedMentions: suppressAllMentions,
     components: twitterComponents(realURL, status, assets),
     files: assets.files,
     flags: MessageFlags.IS_COMPONENTS_V2,
-    messageReference: messageReference(message)
+    messageReference: replyMessageReference(message)
   })
 }
 
@@ -197,7 +170,12 @@ async function fetchTwitterStatus(statusID: string, faunaURL?: string): Promise<
     throw new Error(`Twitter status fetch failed with ${response.status}: ${await response.text()}`)
   }
 
-  return (await response.json()) as TwitterStatus
+  const payload: unknown = await response.json()
+  const status = TwitterStatusSchema.safeParse(payload)
+  if (!status.success) {
+    throw new Error('Twitter status API returned an invalid response')
+  }
+  return status.data
 }
 
 function normalizePrivateAPIURL(privateAPIURL?: string): string {

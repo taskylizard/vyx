@@ -1,4 +1,4 @@
-// Vendored and adapted from ahmedrangel/snapsave-media-downloader@0103417.
+// tasky: vendored and adapted from ahmedrangel/snapsave-media-downloader@0103417
 import { load } from 'cheerio'
 import { decryptSnapSave } from './decrypter.ts'
 import type { ResolvedInstagramMedia, ResolvedInstagramMediaItem } from '../types.ts'

@@ -2,41 +2,25 @@ import { createMCPClient, type MCPClient } from '@ai-sdk/mcp'
 import { asSchema, jsonSchema, type ToolSet } from 'ai'
 import { OPERATIONS_CHANNEL_ID, OPERATIONS_GUILD_ID } from '../discord/ids.ts'
 import { MintlifyFileOAuthProvider } from './mintlify-oauth.ts'
+import type {
+  MintlifyMcpConfig,
+  MintlifySession,
+  OperationsToolProviderConfig,
+  ScopedToolProvider,
+  ScopedToolSet,
+  ToolScope
+} from './mintlify-mcp-types.ts'
 
 const MINTLIFY_MCP_URL = 'https://mcp.mintlify.com'
 const OPERATIONS_INSTRUCTIONS = `You are helping with documentation operations in the designated operations channel. The docs_* tools can read and modify the connected documentation project. Call docs_list_deployments when the target deployment is unclear, and call docs_checkout before branch-backed reads or edits. Keep each change focused. After making edits, call docs_diff and show the user the resulting file changes, including the relevant patch content, before asking whether to save them. Never call docs_save unless the user explicitly approves saving after seeing that diff; an initial request to edit documentation is not approval to save. After approval, default docs_save to opening a pull request unless the user explicitly requests an existing PR branch. Never use these tools outside this channel.`
 
-export interface ToolScope {
-  channelID: string
-  guildID: string | null
-}
-
-export interface ScopedToolSet {
-  instructions?: string
-  tools: ToolSet
-}
-
-export interface ScopedToolProvider {
-  resolve(scope: ToolScope): Promise<ScopedToolSet>
-}
-
-interface MintlifyMcpClient {
-  readonly instructions?: string
-  close(): Promise<void>
-  tools(): Promise<ToolSet>
-}
-
-export interface MintlifyMcpConfig {
-  createClient?: () => Promise<MintlifyMcpClient>
-  oauthFile?: string
-  onError?: (error: unknown) => void
-}
-
-export interface OperationsToolProviderConfig {
-  instructions?: string
-  provider?: ScopedToolProvider
-  tools?: ToolSet
-}
+export type {
+  MintlifyMcpConfig,
+  OperationsToolProviderConfig,
+  ScopedToolProvider,
+  ScopedToolSet,
+  ToolScope
+} from './mintlify-mcp-types.ts'
 
 export class OperationsToolProvider implements ScopedToolProvider {
   readonly #config: OperationsToolProviderConfig
@@ -57,11 +41,6 @@ export class OperationsToolProvider implements ScopedToolProvider {
       tools: { ...provided.tools, ...this.#config.tools }
     }
   }
-}
-
-interface MintlifySession {
-  client: MintlifyMcpClient
-  tools: ToolSet
 }
 
 export class MintlifyMcpToolProvider implements ScopedToolProvider {

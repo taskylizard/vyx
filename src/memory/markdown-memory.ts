@@ -1,6 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
+import { match } from 'ts-pattern'
+import type {
+  ForgetMemoryResult,
+  MarkdownMemoryStoreOptions,
+  MemoryEntry,
+  MemoryPromptContext,
+  MemoryScope,
+  MemoryStore,
+  MemoryStoreErrorCode
+} from './types.ts'
 
 export const MEMORY_ENTRY_LIMIT = 100
 export const MEMORY_ENTRY_MAX_LENGTH = 1_000
@@ -17,48 +27,24 @@ const MEMORY_ENTRY_PATTERN = new RegExp(
   'gmu'
 )
 
-export interface MemoryEntry {
-  content: string
-  createdAt: string
-  id: string
-  sourceInteractionID: string
-}
-
-export interface MemoryPromptContext {
-  personal: string | undefined
-  server: string | undefined
-}
-
-export type MemoryScope = { id: string; kind: 'server' } | { id: string; kind: 'user' }
-
-export type ForgetMemoryResult =
-  | { entry: MemoryEntry; outcome: 'forgotten' }
-  | { outcome: 'ambiguous' }
-  | { outcome: 'not-found' }
-
-export interface MemoryStore {
-  clear(scope: MemoryScope): Promise<number>
-  exportMarkdown(scope: MemoryScope): Promise<string>
-  forget(scope: MemoryScope, identifier: string): Promise<ForgetMemoryResult>
-  list(scope: MemoryScope): Promise<MemoryEntry[]>
-  promptContext(userID: string, serverID: string | null): Promise<MemoryPromptContext>
-  remember(scope: MemoryScope, content: string, sourceInteractionID: string): Promise<MemoryEntry>
-}
+export type {
+  ForgetMemoryResult,
+  MarkdownMemoryStoreOptions,
+  MemoryEntry,
+  MemoryPromptContext,
+  MemoryScope,
+  MemoryStore,
+  MemoryStoreErrorCode
+} from './types.ts'
 
 export class MemoryStoreError extends Error {
-  readonly code: 'empty' | 'entry-limit' | 'entry-too-long' | 'identifier-too-short'
+  readonly code: MemoryStoreErrorCode
 
-  constructor(code: MemoryStoreError['code'], message: string) {
+  constructor(code: MemoryStoreErrorCode, message: string) {
     super(message)
     this.name = 'MemoryStoreError'
     this.code = code
   }
-}
-
-export interface MarkdownMemoryStoreOptions {
-  createID?: () => string
-  now?: () => Date
-  rootDirectory?: string
 }
 
 export class MarkdownMemoryStore implements MemoryStore {
@@ -191,9 +177,13 @@ export class MarkdownMemoryStore implements MemoryStore {
 
   #path(scope: MemoryScope): string {
     const digest = createHash('sha256').update(scope.id).digest('hex')
+    const directory = match(scope.kind)
+      .with('user', () => 'users')
+      .with('server', () => 'servers')
+      .exhaustive()
     return resolve(
       this.#rootDirectory,
-      scope.kind === 'user' ? 'users' : 'servers',
+      directory,
       digest.slice(0, 2),
       digest.slice(2, 4),
       `${digest}.md`
@@ -227,7 +217,10 @@ function escapeReservedMemoryHeadings(content: string): string {
 }
 
 function serializeMemoryFile(scope: MemoryScope, entries: readonly MemoryEntry[]): string {
-  const title = scope.kind === 'user' ? 'Kanikou personal memory' : 'Kanikou server memory'
+  const title = match(scope.kind)
+    .with('user', () => 'Kanikou personal memory')
+    .with('server', () => 'Kanikou server memory')
+    .exhaustive()
   const body = entries
     .map(
       (entry) =>

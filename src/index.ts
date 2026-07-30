@@ -40,7 +40,7 @@ export {
   type SlashSubcommandRecord,
   type ValidateSlashCommandDefinition
 } from 'rosepack'
-export { rosepack, button, component, modal, slash, slashSub } from './bot/rosepack.ts'
+export { rosepack, button, component, guard, modal, slash, slashSub } from './bot/rosepack.ts'
 export {
   OPERATIONS_CHANNEL_ID,
   OPERATIONS_GUILD_ID,
@@ -112,13 +112,17 @@ export type {
   StartJumbleInput
 } from './jumble/types.ts'
 export {
+  JUMBLE_ANSWER_SOURCES,
+  JUMBLE_ERROR_CODES,
   JUMBLE_KINDS,
+  JUMBLE_OUTCOMES,
   isJumbleKind,
   type JumbleAnswerSource,
   type JumbleAnswerVariant,
   type JumbleArtistMetadata,
   type JumbleCandidate,
   type JumbleContinuousSession,
+  type JumbleErrorCode,
   type JumbleHint,
   type JumbleKind,
   type JumbleOutcome,

@@ -1,8 +1,8 @@
 import { asc, count, eq, inArray, lt } from 'drizzle-orm'
 import type { LibSQLDatabase } from 'drizzle-orm/libsql'
+import { clamp } from 'radashi'
 import type { ZodType } from 'zod'
 import { jumbleMetadataCache, jumbleSchema } from '../database/schemas/jumble.ts'
-import { clamp } from './numbers.ts'
 
 const MAX_CACHE_ENTRIES = 65_536
 const MAX_PAYLOAD_BYTES = 4 * 1024 * 1024

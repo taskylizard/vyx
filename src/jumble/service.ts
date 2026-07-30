@@ -5,9 +5,10 @@ import { getCandidateImageUrls, jumbleCandidateIdentityKey } from './candidate.t
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
 import type {
-  JumbleAction,
   JumbleActionResult,
+  JumbleActivityState,
   JumbleCandidate,
+  JumbleErrorCode,
   JumbleHint,
   JumbleKind,
   JumbleSession,
@@ -22,6 +23,7 @@ import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './tim
 export type {
   JumbleAction,
   JumbleActionResult,
+  JumbleErrorCode,
   JumbleServiceOptions,
   JumbleState,
   StartJumbleInput
@@ -38,28 +40,9 @@ const JUMBLE_CANDIDATE_LIMIT = 600
 const JUMBLE_RECENT_CANDIDATE_LIMIT = 500
 
 export class JumbleError extends Error {
-  readonly code:
-    | 'busy'
-    | 'profile-missing'
-    | 'no-candidates'
-    | 'invalid-candidate'
-    | 'not-found'
-    | 'not-supported'
-    | 'forbidden'
-    | 'configuration'
+  readonly code: JumbleErrorCode
 
-  constructor(
-    message: string,
-    code:
-      | 'busy'
-      | 'profile-missing'
-      | 'no-candidates'
-      | 'invalid-candidate'
-      | 'not-found'
-      | 'not-supported'
-      | 'forbidden'
-      | 'configuration' = 'not-found'
-  ) {
+  constructor(message: string, code: JumbleErrorCode = 'not-found') {
     super(message)
     this.name = 'JumbleError'
     this.code = code
@@ -237,7 +220,8 @@ export class JumbleService {
 
   async revealHint(sessionId: string): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
-    if (live.action !== undefined) return { action: live.action, state: live.state }
+    const completed = completedAction(live)
+    if (completed !== undefined) return completed
     const hint = await this.repository.revealNextHint(sessionId)
     if (hint !== null) {
       const session = live.state.session
@@ -253,7 +237,8 @@ export class JumbleService {
 
   async unblur(sessionId: string): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
-    if (live.action !== undefined) return { action: live.action, state: live.state }
+    const completed = completedAction(live)
+    if (completed !== undefined) return completed
     const session = live.state.session
     if (session.imageUrl === null)
       throw new JumbleError('This Jumble does not use pixelation.', 'not-supported')
@@ -267,7 +252,8 @@ export class JumbleService {
 
   async reshuffle(sessionId: string): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
-    if (live.action !== undefined) return { action: live.action, state: live.state }
+    const completed = completedAction(live)
+    if (completed !== undefined) return completed
     const session = live.state.session
     const shuffledAnswer = shuffleJumbleAnswer(session.answer, this.randomIndex)
     await this.repository.updateMetadata(sessionId, {
@@ -284,7 +270,8 @@ export class JumbleService {
     rawAnswer: string
   ): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
-    if (live.action !== undefined) return { action: live.action, state: live.state }
+    const completed = completedAction(live)
+    if (completed !== undefined) return completed
     const normalizedAnswer = normalizeAnswer(rawAnswer)
     const answerVariants =
       live.state.session.metadata.answerVariants ??
@@ -336,7 +323,8 @@ export class JumbleService {
 
   async cancelContinuousSession(sessionId: string): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
-    if (live.action !== undefined) return { action: live.action, state: live.state }
+    const completed = completedAction(live)
+    if (completed !== undefined) return completed
     if (live.state.session.metadata.continuousSession === undefined) {
       throw new JumbleError('There is no active Jumble session to cancel.', 'not-supported')
     }
@@ -348,7 +336,8 @@ export class JumbleService {
 
   async giveUp(sessionId: string, requesterUserId: string): Promise<JumbleActionResult> {
     const live = await this.ensureActive(sessionId)
-    if (live.action !== undefined) return { action: live.action, state: live.state }
+    const completed = completedAction(live)
+    if (completed !== undefined) return completed
     if (live.state.session.metadata.continuousSession !== undefined) {
       throw new JumbleError('Say "cancel" to stop this Jumble session.', 'not-supported')
     }
@@ -393,18 +382,16 @@ export class JumbleService {
     this.timers.clear()
   }
 
-  private async ensureActive(
-    sessionId: string
-  ): Promise<{ state: JumbleState; action?: JumbleAction }> {
+  private async ensureActive(sessionId: string): Promise<JumbleActivityState> {
     const state = await this.getState(sessionId)
     if (state.session.endedAt !== null) {
-      return { state, action: state.session.outcome ?? 'unchanged' }
+      return { status: 'ended', action: state.session.outcome ?? 'unchanged', state }
     }
-    if (!this.isExpired(state.session)) return { state }
+    if (!this.isExpired(state.session)) return { status: 'active', state }
     const ended = await this.repository.endSession(sessionId, 'expired', this.now())
     this.cancelExpiry(sessionId)
     if (ended !== null) await this.notifyExpired(ended)
-    return { state: await this.getState(sessionId), action: 'expired' }
+    return { status: 'ended', action: 'expired', state: await this.getState(sessionId) }
   }
 
   private async clearActiveChannel(channelId: string): Promise<void> {
@@ -511,7 +498,7 @@ export class JumbleService {
               // eslint-disable-next-line no-await-in-loop -- tasky: sequential hydration, tries candidates one at a time until a playable one is found
               hydrated = await this.provider.hydrate(original)
             } catch {
-              // tasky: one broken provider lookup must not make the whole profile unplayable.
+              // tasky: one broken provider lookup should not brick the whole profile
             }
           }
         } finally {
@@ -585,9 +572,17 @@ export class JumbleService {
     try {
       await this.onExpired(await this.getState(session.id))
     } catch {
-      // tasky: expiry owns session state; a failed UI update must not resurrect the game.
+      // tasky: expiry owns session state, failed ui updates cannot resurrect it
     }
   }
+}
+
+function completedAction(activity: JumbleActivityState): JumbleActionResult | undefined {
+  return match(activity)
+    .returnType<JumbleActionResult | undefined>()
+    .with({ status: 'active' }, () => undefined)
+    .with({ status: 'ended' }, ({ action, state }) => ({ action, state }))
+    .exhaustive()
 }
 
 function isCandidateIdentityValid(candidate: JumbleCandidate, kind: JumbleKind): boolean {

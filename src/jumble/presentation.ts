@@ -1,42 +1,31 @@
 import { ButtonStyles, ComponentTypes } from 'oceanic.js'
-import type { InteractionContent, MessageActionRow, TextButton } from 'oceanic.js'
+import type { MessageActionRow, TextButton } from 'oceanic.js'
 import { match, P } from 'ts-pattern'
+import { suppressAllMentions } from '../discord/message-options.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
+import type {
+  JumbleComponentIds,
+  JumbleMessagePayload,
+  JumblePayloadOptions,
+  JumbleReplayButtonState
+} from './presentation-types.ts'
 import type { JumbleAction, JumbleKind, JumbleState } from './types.ts'
 
-export interface JumbleComponentIds {
-  hint: string
-  unblur: string
-  reshuffle: string
-  giveUp: string
-  replay: (kind: string) => string
-  startSession: string
-}
-
-export interface JumblePayloadOptions {
-  componentIds: JumbleComponentIds
-  image?: Buffer
-  action?: JumbleAction
-  warning?: string
-}
-
-export type JumbleReplayButtonState =
-  | { status: 'ready' }
-  | { status: 'playing'; userDisplayName: string }
+export type {
+  JumbleComponentIds,
+  JumbleMessagePayload,
+  JumblePayloadOptions,
+  JumbleReplayButtonState
+} from './presentation-types.ts'
 
 export function buildJumblePayload(
   state: JumbleState,
   options: JumblePayloadOptions
-): InteractionContent {
+): JumbleMessagePayload {
   const { session } = state
   const imageName = `jumble-${session.id}.png`
-  const payload: InteractionContent = {
-    allowedMentions: {
-      everyone: false,
-      repliedUser: false,
-      roles: false,
-      users: false
-    },
+  const payload: JumbleMessagePayload = {
+    allowedMentions: suppressAllMentions,
     content: buildContent(state, options.action, options.warning),
     components: [buildButtons(state, options.componentIds)],
     files: options.image === undefined ? undefined : [{ contents: options.image, name: imageName }],

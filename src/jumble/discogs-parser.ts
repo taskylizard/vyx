@@ -1,28 +1,57 @@
+import { unique } from 'radashi'
 import { match } from 'ts-pattern'
+import { z } from 'zod'
 import { normalizeAnswer, removeEditionSuffix } from './answer.ts'
 import { createAnswerVariants, mergeImageUrlLists } from './candidate.ts'
-import type { DiscogsEnrichment, DiscogsEnvelope, DiscogsSearchResult } from './discogs-types.ts'
+import {
+  DiscogsEnvelopeSchema,
+  type DiscogsEnrichment,
+  type DiscogsEnvelope,
+  type DiscogsSearchResult
+} from './discogs-types.ts'
 import type { JumbleAlbumCandidate, JumbleTrackCandidate } from './types.ts'
 
+const UnknownArraySchema = z.array(z.unknown()).catch([])
+const DiscogsEnvelopeArraySchema = z.array(DiscogsEnvelopeSchema).catch([])
+const OptionalDiscogsTextSchema = z.unknown().transform((value): string | undefined => {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed.length === 0 ? undefined : trimmed.slice(0, 512)
+})
+const DiscogsNumberSchema = z.unknown().transform((value): number => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value !== 'string' || value.trim() === '') return 0
+
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+})
+
 export function parseDiscogsSearch(payload: unknown): DiscogsSearchResult[] {
-  if (!isDiscogsObject(payload) || !Array.isArray(payload.results)) return []
-  return payload.results.slice(0, 20).flatMap((value) => {
-    if (!isDiscogsObject(value)) return []
-    const id = numberValue(value.id)
-    const type = parseResultType(value.type)
-    if (id <= 0 || type === undefined) return []
-    return [
-      {
-        id,
-        type,
-        title: stringValue(value.title),
-        year: stringValue(value.year),
-        resourceUrl: stringValue(value.resource_url),
-        coverImage: stringValue(value.cover_image) ?? stringValue(value.thumb),
-        masterId: numberValue(value.master_id) || undefined
-      }
-    ]
-  })
+  const root = DiscogsEnvelopeSchema.safeParse(payload)
+  if (!root.success) return []
+
+  return UnknownArraySchema.parse(root.data.results)
+    .slice(0, 20)
+    .flatMap((value) => {
+      const entry = DiscogsEnvelopeSchema.safeParse(value)
+      if (!entry.success) return []
+      const id = DiscogsNumberSchema.parse(entry.data.id)
+      const type = parseResultType(entry.data.type)
+      if (id <= 0 || type === undefined) return []
+      return [
+        {
+          id,
+          type,
+          title: OptionalDiscogsTextSchema.parse(entry.data.title),
+          year: OptionalDiscogsTextSchema.parse(entry.data.year),
+          resourceUrl: OptionalDiscogsTextSchema.parse(entry.data.resource_url),
+          coverImage:
+            OptionalDiscogsTextSchema.parse(entry.data.cover_image) ??
+            OptionalDiscogsTextSchema.parse(entry.data.thumb),
+          masterId: DiscogsNumberSchema.parse(entry.data.master_id) || undefined
+        }
+      ]
+    })
 }
 
 export function parseDiscogsRelease(
@@ -30,8 +59,8 @@ export function parseDiscogsRelease(
   candidate: JumbleAlbumCandidate | JumbleTrackCandidate
 ): DiscogsEnrichment | undefined {
   if (payload === null) return undefined
-  const id = numberValue(payload.id)
-  const title = stringValue(payload.title)
+  const id = DiscogsNumberSchema.parse(payload.id)
+  const title = OptionalDiscogsTextSchema.parse(payload.title)
   const releaseTitle = title === undefined ? undefined : titleWithoutArtist(title)
   const titleVariants = releaseTitle === undefined ? [] : discogsTitleVariants(releaseTitle)
   const trackTitle = chooseDiscogsTrackTitle(payload.tracklist, candidate.answer)
@@ -59,9 +88,11 @@ export function parseDiscogsRelease(
   const images = parseDiscogsImages(payload)
   const tags = parseDiscogsTags(payload)
   const label = parseDiscogsLabel(payload.labels)
-  const releaseDate = stringValue(payload.released) ?? stringValue(payload.year)
+  const releaseDate =
+    OptionalDiscogsTextSchema.parse(payload.released) ??
+    OptionalDiscogsTextSchema.parse(payload.year)
   const releaseType = parseDiscogsReleaseType(payload.formats)
-  const summary = stringValue(payload.notes)
+  const summary = OptionalDiscogsTextSchema.parse(payload.notes)
   if (
     aliases.length === 0 &&
     images.length === 0 &&
@@ -85,12 +116,12 @@ export function parseDiscogsRelease(
 
 export function parseDiscogsArtist(payload: DiscogsEnvelope | null): DiscogsEnrichment | undefined {
   if (payload === null) return undefined
-  const nameVariations = arrayValue(payload.namevariations)
-    .map(stringValue)
+  const nameVariations = UnknownArraySchema.parse(payload.namevariations)
+    .map((value) => OptionalDiscogsTextSchema.parse(value))
     .filter((value): value is string => value !== undefined)
   const images = parseDiscogsImages(payload)
-  const id = numberValue(payload.id)
-  const summary = stringValue(payload.profile)
+  const id = DiscogsNumberSchema.parse(payload.id)
+  const summary = OptionalDiscogsTextSchema.parse(payload.profile)
   if (nameVariations.length === 0 && images.length === 0 && summary === undefined) return undefined
   return {
     answerVariants:
@@ -105,9 +136,8 @@ export function chooseDiscogsTrackTitle(
   value: unknown,
   candidateAnswer: string
 ): string | undefined {
-  const titles = arrayValue(value)
-    .filter(isDiscogsObject)
-    .map((entry) => stringValue(entry.title))
+  const titles = DiscogsEnvelopeArraySchema.parse(value)
+    .map((entry) => OptionalDiscogsTextSchema.parse(entry.title))
     .filter((title): title is string => title !== undefined)
     .slice(0, 128)
   const expected = normalizeAnswer(removeEditionSuffix(candidateAnswer))
@@ -128,9 +158,10 @@ export function discogsTitleVariants(value: string): string[] {
     .replace(/^[^\p{Letter}\p{Number}]+/u, '')
     .replace(/[^\p{Letter}\p{Number}]+$/u, '')
     .trim()
-  return [
-    ...new Set([trimmed, withoutEdition, decorative].filter((entry) => entry.length > 0))
-  ].slice(0, 8)
+  return unique([trimmed, withoutEdition, decorative].filter((entry) => entry.length > 0)).slice(
+    0,
+    8
+  )
 }
 
 function titleWithoutArtist(value: string): string {
@@ -139,42 +170,45 @@ function titleWithoutArtist(value: string): string {
 }
 
 function parseDiscogsImages(payload: DiscogsEnvelope): string[] {
-  const imageValues = arrayValue(payload.images).flatMap((entry) => {
-    if (!isDiscogsObject(entry)) return []
-    return [stringValue(entry.uri), stringValue(entry.uri150)].filter(
-      (value): value is string => value !== undefined
-    )
-  })
+  const imageValues = DiscogsEnvelopeArraySchema.parse(payload.images).flatMap((entry) =>
+    [
+      OptionalDiscogsTextSchema.parse(entry.uri),
+      OptionalDiscogsTextSchema.parse(entry.uri150)
+    ].filter((value): value is string => value !== undefined)
+  )
   return mergeImageUrlLists(
     imageValues,
-    [stringValue(payload.cover_image), stringValue(payload.thumb)].filter(
-      (value): value is string => value !== undefined
-    )
+    [
+      OptionalDiscogsTextSchema.parse(payload.cover_image),
+      OptionalDiscogsTextSchema.parse(payload.thumb)
+    ].filter((value): value is string => value !== undefined)
   )
 }
 
 function parseDiscogsTags(payload: DiscogsEnvelope): string[] | undefined {
   const tags = [
-    ...arrayValue(payload.genres),
-    ...arrayValue(payload.styles),
-    ...arrayValue(payload.genre),
-    ...arrayValue(payload.style)
+    ...UnknownArraySchema.parse(payload.genres),
+    ...UnknownArraySchema.parse(payload.styles),
+    ...UnknownArraySchema.parse(payload.genre),
+    ...UnknownArraySchema.parse(payload.style)
   ]
-  const names = tags.map(stringValue).filter((tag): tag is string => tag !== undefined)
-  return names.length === 0 ? undefined : [...new Set(names)].slice(0, 8)
+  const names = tags
+    .map((value) => OptionalDiscogsTextSchema.parse(value))
+    .filter((tag): tag is string => tag !== undefined)
+  return names.length === 0 ? undefined : unique(names).slice(0, 8)
 }
 
 function parseDiscogsLabel(value: unknown): string | undefined {
-  const first = arrayValue(value).find(isDiscogsObject)
-  return first === undefined ? undefined : stringValue(first.name)
+  const first = DiscogsEnvelopeArraySchema.parse(value)[0]
+  return first === undefined ? undefined : OptionalDiscogsTextSchema.parse(first.name)
 }
 
 function parseDiscogsReleaseType(value: unknown): string | undefined {
-  const first = arrayValue(value).find(isDiscogsObject)
+  const first = DiscogsEnvelopeArraySchema.parse(value)[0]
   if (first === undefined) return undefined
-  const name = stringValue(first.name)
-  const descriptions = arrayValue(first.descriptions)
-    .map(stringValue)
+  const name = OptionalDiscogsTextSchema.parse(first.name)
+  const descriptions = UnknownArraySchema.parse(first.descriptions)
+    .map((entry) => OptionalDiscogsTextSchema.parse(entry))
     .filter((description): description is string => description !== undefined)
   if (name === undefined) return descriptions[0]
   return descriptions.length === 0 ? name : `${name} (${descriptions.slice(0, 2).join(', ')})`
@@ -187,27 +221,4 @@ function parseResultType(value: unknown): DiscogsSearchResult['type'] | undefine
     .with('master', () => 'master')
     .with('artist', () => 'artist')
     .otherwise(() => undefined)
-}
-
-function isDiscogsObject(value: unknown): value is DiscogsEnvelope {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : []
-}
-
-function stringValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim().length > 0
-    ? value.trim().slice(0, 512)
-    : undefined
-}
-
-function numberValue(value: unknown): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const parsed = Number(value)
-    if (Number.isFinite(parsed)) return parsed
-  }
-  return 0
 }

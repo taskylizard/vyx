@@ -1,3 +1,4 @@
+import { z } from 'zod'
 import type { MusicBrainzClient } from './musicbrainz.ts'
 import type { DiscogsClient } from './discogs.ts'
 import type { DeezerClient } from './deezer.ts'
@@ -31,13 +32,11 @@ export interface JumbleMusicProvider {
   validateUsername?(username: string): Promise<string>
 }
 
-export interface LastFmEnvelope {
-  error?: number
-  message?: string
-  [key: string]: unknown
-}
+export const LastFmEnvelopeSchema = z
+  .object({
+    error: z.number().optional(),
+    message: z.string().optional()
+  })
+  .catchall(z.unknown())
 
-export interface LastFmImage {
-  '#text'?: unknown
-  size?: unknown
-}
+export type LastFmEnvelope = z.infer<typeof LastFmEnvelopeSchema>

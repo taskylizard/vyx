@@ -46,11 +46,11 @@
     "dotenv": "17.4.2",
     "drizzle-orm": "0.45.2",
     "oceanic.js": "1.14.0",
-    "radashi": "^12.9.1",
+    "radashi": "12.9.1",
     "rosepack": "0.3.0",
     "ts-pattern": "5.9.0",
     "typed-env": "2.0.0",
-    "undici": "^8.9.0",
+    "undici": "8.9.0",
     "zod": "4.4.3"
   },
   "devDependencies": {

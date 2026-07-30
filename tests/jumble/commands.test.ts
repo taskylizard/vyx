@@ -7,7 +7,8 @@ import { slashCommands } from '../../src/commands/index.ts'
 import jumbleCommand from '../../src/commands/jumble.ts'
 import memoryCommand from '../../src/commands/memory.ts'
 import { componentIds, jumbleComponents } from '../../src/jumble/components.ts'
-import { jumblePermissionError } from '../../src/jumble/discord.ts'
+import { jumbleChannelPermissionsGuard, jumbleEnabledGuard } from '../../src/jumble/guards.ts'
+import { jumblePermissionError } from '../../src/jumble/permissions.ts'
 import { modules } from '../../src/modules.ts'
 
 test('keeps Jumble out of global registration until its guild module is enabled', () => {
@@ -28,10 +29,14 @@ test('keeps Jumble out of global registration until its guild module is enabled'
   expect(slashCommandToDiscord(jumbleCommand)).toMatchObject({
     options: [{ name: 'play' }, { name: 'profile' }, { name: 'stats' }]
   })
+  expect(jumbleCommand.subcommands.play.guards).toContain(jumbleChannelPermissionsGuard)
+  for (const component of jumbleComponents) {
+    expect(component.guards).toContain(jumbleEnabledGuard)
+  }
   expect(registry.components).toHaveLength(6)
 })
 
-test('reports every channel permission needed before starting a game', () => {
+test('reports every channel permission needed before starting a game', async () => {
   const allowed = new Permission(
     Permissions.VIEW_CHANNEL |
       Permissions.SEND_MESSAGES |
@@ -48,6 +53,29 @@ test('reports every channel permission needed before starting a game', () => {
   expect(error).toContain('Add Reactions')
   expect(error).toContain('Attach Files')
   expect(jumblePermissionError({ appPermissions: denied, guildID: null })).toBeNull()
+
+  const decision = await jumbleChannelPermissionsGuard({
+    app: {},
+    interaction: { appPermissions: denied, guildID: 'guild-1' }
+  } as never)
+  expect(decision.allowed).toBe(false)
+})
+
+test('component guards stop Jumble when its module is disabled', async () => {
+  const isEnabled = vi.fn(async () => false)
+  const decision = await jumbleEnabledGuard({
+    app: { moduleStore: { isEnabled } },
+    interaction: { applicationID: 'app-1', guildID: 'guild-1' }
+  } as never)
+
+  expect(isEnabled).toHaveBeenCalledWith({
+    applicationID: 'app-1',
+    guildID: 'guild-1',
+    module: modules.jumble.id
+  })
+  expect(decision.allowed).toBe(false)
+  if (decision.allowed) throw new Error('Expected the module guard to deny access.')
+  expect(decision.options.message).toContain('Jumble is disabled here.')
 })
 
 test('slash play does not show a typing indicator', async () => {

@@ -1,4 +1,5 @@
 import type { Tool } from 'ai'
+import { sleep } from 'radashi'
 
 const DEFAULT_MAX_RETRIES = 2
 const DEFAULT_RETRY_DELAY_MS = 250
@@ -36,9 +37,9 @@ export function withToolRecovery(tool: Tool, config: ToolRecoveryConfig = {}): T
             throw error
           }
 
-          const sleep = config.sleep ?? defaultSleep
+          const wait = config.sleep ?? sleep
           // eslint-disable-next-line no-await-in-loop -- tasky: sequential retry, backoff delay before the next attempt
-          await sleep(retryDelayMs * 2 ** attempt)
+          await wait(retryDelayMs * 2 ** attempt)
         }
       }
     }
@@ -68,10 +69,4 @@ export function isTransientToolError(error: unknown): boolean {
 
   const message = error instanceof Error ? error.message : ''
   return /ECONNRESET|ETIMEDOUT|fetch failed|network|socket hang up|timed out/i.test(message)
-}
-
-async function defaultSleep(delayMs: number): Promise<void> {
-  await new Promise<void>((resolve) => {
-    setTimeout(resolve, delayMs)
-  })
 }
