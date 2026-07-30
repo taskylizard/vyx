@@ -5,9 +5,21 @@ import { OPERATIONS_CHANNEL_ID, OPERATIONS_GUILD_ID } from '../../src/discord/id
 import {
   isOperationsScope,
   MintlifyMcpToolProvider,
-  OperationsToolProvider
+  OperationsToolProvider,
+  type ToolScope
 } from '../../src/llm/mintlify-mcp.ts'
 import { formatThinkingProgress } from '../../src/llm/tool-progress.ts'
+
+function toolScope(overrides: Partial<ToolScope> = {}): ToolScope {
+  return {
+    canManageServer: false,
+    channelID: OPERATIONS_CHANNEL_ID,
+    guildID: OPERATIONS_GUILD_ID,
+    sourceID: 'source-1',
+    userID: 'user-1',
+    ...overrides
+  }
+}
 
 test('matches only the configured operations guild and channel', () => {
   expect(
@@ -34,15 +46,13 @@ test('scopes combined Mintlify and Project Selene tools to operations', async ()
     }
   })
 
-  const outside = await provider.resolve({ channelID: 'other', guildID: OPERATIONS_GUILD_ID })
+  const outside = await provider.resolve(toolScope({ channelID: 'other' }))
   expect(outside).toEqual({ tools: {} })
-  const operations = await provider.resolve({
-    channelID: OPERATIONS_CHANNEL_ID,
-    guildID: OPERATIONS_GUILD_ID
-  })
+  const operations = await provider.resolve(toolScope())
   expect(Object.keys(operations.tools)).toEqual(['docs_search', 'seleneSearchCode'])
   expect(operations.instructions).toContain('Mintlify operations only.')
   expect(operations.instructions).toContain('Project Selene operations only.')
+  expect(operations.maxToolIterations).toBeNull()
 })
 
 test('connects lazily and exposes namespaced MCP tools only in operations', async () => {
@@ -62,19 +72,11 @@ test('connects lazily and exposes namespaced MCP tools only in operations', asyn
     createClient
   })
 
-  expect(
-    (await provider.resolve({ channelID: 'other', guildID: OPERATIONS_GUILD_ID })).tools
-  ).toEqual({})
+  expect((await provider.resolve(toolScope({ channelID: 'other' }))).tools).toEqual({})
   expect(createClient).not.toHaveBeenCalled()
 
-  const first = await provider.resolve({
-    channelID: OPERATIONS_CHANNEL_ID,
-    guildID: OPERATIONS_GUILD_ID
-  })
-  const second = await provider.resolve({
-    channelID: OPERATIONS_CHANNEL_ID,
-    guildID: OPERATIONS_GUILD_ID
-  })
+  const first = await provider.resolve(toolScope())
+  const second = await provider.resolve(toolScope())
 
   expect(Object.keys(first.tools)).toEqual(['docs_search'])
   expect(first.instructions).toContain('documentation operations')
@@ -124,10 +126,7 @@ test('removes non-string enums from nested MCP schemas for provider compatibilit
     })
   })
 
-  const resolved = await provider.resolve({
-    channelID: OPERATIONS_CHANNEL_ID,
-    guildID: OPERATIONS_GUILD_ID
-  })
+  const resolved = await provider.resolve(toolScope())
   const readTool = resolved.tools.docs_read
   expect(readTool).toBeDefined()
   const schema = await asSchema(readTool!.inputSchema).jsonSchema

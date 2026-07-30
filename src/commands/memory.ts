@@ -8,6 +8,7 @@ import {
   type ForgetMemoryResult,
   type MemoryEntry
 } from '../memory/markdown-memory.ts'
+import { previewMemory } from '../memory/preview.ts'
 import { modules } from '../modules.ts'
 
 const RESPONSE_MAX_LENGTH = 1_900
@@ -180,7 +181,7 @@ export default slash({
               context.interaction.id
             )
             await context.editResponse(
-              `Added server memory \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content)}`
+              `Added server memory \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
             )
           }
         })
@@ -235,7 +236,7 @@ export default slash({
           context.interaction.id
         )
         await context.editResponse(
-          `Remembered \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content)}`
+          `Remembered \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
         )
       }
     })
@@ -252,7 +253,8 @@ function formatForgetMemoryResult(result: ForgetMemoryResult, identifier: string
     )
     .with(
       { outcome: 'forgotten' },
-      ({ entry }) => `Forgot \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content)}`
+      ({ entry }) =>
+        `Forgot \`${entry.id.slice(0, 8)}\`: ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
     )
     .exhaustive()
 }
@@ -265,7 +267,7 @@ function formatMemoryList(title: string, entries: readonly MemoryEntry[]): strin
   const lines = [`**${title} (${entries.length}/${MEMORY_ENTRY_LIMIT})**`]
   let responseLength = lines[0]!.length
   for (const entry of entries) {
-    const line = `\`${entry.id.slice(0, 8)}\` — ${previewMemory(entry.content)}`
+    const line = `\`${entry.id.slice(0, 8)}\` — ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
     if (responseLength + line.length + 1 > RESPONSE_MAX_LENGTH) {
       const remaining = entries.length - (lines.length - 1)
       lines.push(`…and ${remaining} more. Use the Export command to download everything.`)
@@ -275,11 +277,4 @@ function formatMemoryList(title: string, entries: readonly MemoryEntry[]): strin
     responseLength += line.length + 1
   }
   return lines.join('\n')
-}
-
-function previewMemory(content: string): string {
-  const normalized = content.replaceAll(/\s+/g, ' ').trim()
-  return normalized.length <= MEMORY_PREVIEW_MAX_LENGTH
-    ? normalized
-    : `${normalized.slice(0, MEMORY_PREVIEW_MAX_LENGTH - 1)}…`
 }

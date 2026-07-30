@@ -46,6 +46,17 @@ export { type KanikouToolsConfig as SearchToolsConfig }
 export { createParallelExtractTool, PARALLEL_EXTRACT_TOOL_NAME } from './parallel-extract.ts'
 export { createParallelSearchTool, PARALLEL_SEARCH_TOOL_NAME } from './parallel-search.ts'
 export {
+  createMemoryTools,
+  FORGET_TOOL_NAME,
+  LIST_MEMORIES_TOOL_NAME,
+  MEMORY_LIST_MAX_LENGTH,
+  MEMORY_TOOL_PREVIEW_MAX_LENGTH,
+  MEMORY_TOOLS_INSTRUCTIONS,
+  MemoryToolProvider,
+  REMEMBER_TOOL_NAME,
+  type MemoryToolProviderConfig
+} from './memory.ts'
+export {
   createProjectSeleneTools,
   PROJECT_SELENE_LIST_FILES_TOOL_NAME,
   PROJECT_SELENE_READ_FILE_TOOL_NAME,

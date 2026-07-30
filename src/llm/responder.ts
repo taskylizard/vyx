@@ -6,7 +6,7 @@ import type { BotContext } from '../bot/context.ts'
 import { errorMessage, logAgentTrace } from './agent-trace.ts'
 import { generateKanikouResponse } from './generation.ts'
 import { buildMessagePrompt, buildSlashPrompt } from './message-input.ts'
-import type { ScopedToolProvider, ToolScope } from './mintlify-mcp.ts'
+import type { ScopedToolProvider, ScopedToolSet, ToolScope } from './mintlify-mcp.ts'
 import {
   formatCompletedResponse,
   formatThinkingProgress,
@@ -36,7 +36,13 @@ export class KanikouResponder {
         kind: 'message',
         placeholder
       },
-      { channelID: message.channelID, guildID: message.guildID }
+      {
+        canManageServer: message.member?.permissions.has('MANAGE_GUILD') ?? false,
+        channelID: message.channelID,
+        guildID: message.guildID,
+        sourceID: message.id,
+        userID: message.author.id
+      }
     )
   }
 
@@ -51,8 +57,11 @@ export class KanikouResponder {
     } satisfies ResponseTarget
     await sendResponse(context, target, THINKING_RESPONSE)
     await this.#complete(context, await buildSlashPrompt(context, interaction, prompt), target, {
+      canManageServer: interaction.memberPermissions?.has('MANAGE_GUILD') ?? false,
       channelID: interaction.channelID,
-      guildID: interaction.guildID
+      guildID: interaction.guildID,
+      sourceID: interaction.id,
+      userID: interaction.user.id
     })
   }
 
@@ -85,14 +94,16 @@ export class KanikouResponder {
         })
 
         try {
-          const scoped = (await this.#scopedToolProvider?.resolve(scope)) ?? { tools: {} }
+          const scoped: ScopedToolSet = (await this.#scopedToolProvider?.resolve(scope)) ?? {
+            tools: {}
+          }
           const content = await generateKanikouResponse(
             this.#model,
             messages,
             { ...this.#tools, ...scoped.tools },
             {
               instructions: scoped.instructions,
-              maxToolIterations: Object.keys(scoped.tools).length === 0 ? undefined : null,
+              maxToolIterations: scoped.maxToolIterations,
               onStepEnd: (event) => {
                 logAgentTrace(context.logger, { event: 'step.end', traceId, ...event })
               },

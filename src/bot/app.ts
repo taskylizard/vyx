@@ -5,10 +5,12 @@ import { slashCommands } from '../commands/index.ts'
 import { createKanikouModel } from '../llm/client.ts'
 import { MintlifyMcpToolProvider, OperationsToolProvider } from '../llm/mintlify-mcp.ts'
 import { KanikouResponder } from '../llm/responder.ts'
+import { CompositeToolProvider } from '../llm/scoped-tools.ts'
 import { MarkdownMemoryStore, type MemoryStore } from '../memory/markdown-memory.ts'
 import {
   createKanikouTools,
   createProjectSeleneTools,
+  MemoryToolProvider,
   PROJECT_SELENE_INSTRUCTIONS
 } from '../llm/tools/index.ts'
 import { startKanikouObservability } from '../observability/axiom.ts'
@@ -211,11 +213,14 @@ function createBotDependencies(config: KanikouEnv, client: Client, logger: Kanik
       supadata:
         config.SUPADATA_API_KEY === undefined ? undefined : { apiKey: config.SUPADATA_API_KEY }
     }),
-    new OperationsToolProvider({
-      instructions: PROJECT_SELENE_INSTRUCTIONS,
-      provider: mintlifyMcp,
-      tools: createProjectSeleneTools({ token: config.GITHUB_TOKEN })
-    })
+    new CompositeToolProvider([
+      new MemoryToolProvider({ store: memory }),
+      new OperationsToolProvider({
+        instructions: PROJECT_SELENE_INSTRUCTIONS,
+        provider: mintlifyMcp,
+        tools: createProjectSeleneTools({ token: config.GITHUB_TOKEN })
+      })
+    ])
   )
   const database = createKanikouDatabase({
     url: config.KANIKOU_DATABASE_URL,

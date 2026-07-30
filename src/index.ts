@@ -142,6 +142,7 @@ export {
   type ToolScope
 } from './llm/mintlify-mcp.ts'
 export { MintlifyFileOAuthProvider } from './llm/mintlify-oauth.ts'
+export { CompositeToolProvider } from './llm/scoped-tools.ts'
 export {
   MarkdownMemoryStore,
   MemoryStoreError,
@@ -155,14 +156,22 @@ export {
   type MemoryScope,
   type MemoryStore
 } from './memory/markdown-memory.ts'
+export { previewMemory } from './memory/preview.ts'
 export {
   createKanikouTools,
+  createMemoryTools,
   createParallelExtractTool,
   createParallelSearchTool,
   createProjectSeleneTools,
   createSearchTools,
   createSupadataTranscriptTool,
   executeSupadataTranscript,
+  FORGET_TOOL_NAME,
+  LIST_MEMORIES_TOOL_NAME,
+  MEMORY_LIST_MAX_LENGTH,
+  MEMORY_TOOL_PREVIEW_MAX_LENGTH,
+  MEMORY_TOOLS_INSTRUCTIONS,
+  MemoryToolProvider,
   PARALLEL_EXTRACT_TOOL_NAME,
   PARALLEL_SEARCH_TOOL_NAME,
   PROJECT_SELENE_LIST_FILES_TOOL_NAME,
@@ -170,9 +179,11 @@ export {
   PROJECT_SELENE_SEARCH_CODE_TOOL_NAME,
   PROJECT_SELENE_INSTRUCTIONS,
   ProjectSeleneRepository,
+  REMEMBER_TOOL_NAME,
   SUPADATA_TRANSCRIPT_TOOL_NAME,
   isTransientToolError,
   type KanikouToolsConfig,
+  type MemoryToolProviderConfig,
   type ParallelToolsConfig,
   type ProjectSeleneConfig,
   type SearchToolsConfig,

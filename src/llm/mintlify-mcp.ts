@@ -38,6 +38,7 @@ export class OperationsToolProvider implements ScopedToolProvider {
       instructions: [provided.instructions, this.#config.instructions]
         .filter((value) => value !== undefined && value.length > 0)
         .join('\n\n'),
+      maxToolIterations: null,
       tools: { ...provided.tools, ...this.#config.tools }
     }
   }
@@ -99,7 +100,7 @@ export class MintlifyMcpToolProvider implements ScopedToolProvider {
   }
 }
 
-export function isOperationsScope(scope: ToolScope): boolean {
+export function isOperationsScope(scope: Pick<ToolScope, 'channelID' | 'guildID'>): boolean {
   return scope.guildID === OPERATIONS_GUILD_ID && scope.channelID === OPERATIONS_CHANNEL_ID
 }
 

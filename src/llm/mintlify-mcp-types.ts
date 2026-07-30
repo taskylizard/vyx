@@ -1,12 +1,16 @@
 import type { ToolSet } from 'ai'
 
 export interface ToolScope {
+  canManageServer: boolean
   channelID: string
   guildID: string | null
+  sourceID: string
+  userID: string
 }
 
 export interface ScopedToolSet {
   instructions?: string
+  maxToolIterations?: number | null
   tools: ToolSet
 }
 
