@@ -23,7 +23,9 @@ export interface AxiomObservabilityConfig {
   endpoint: string
   level: LogLevel
   logsDataset: string
+  metricsDataset: string
   serviceName: string
+  serviceVersion: string
   token: string
   tracesDataset: string
 }
