@@ -237,6 +237,41 @@ test('preserves hydrated metadata when a stale generation is replaced', async ()
   await rm(directory, { force: true, recursive: true })
 })
 
+test.each(['artist', 'album', 'track'] satisfies readonly JumbleKind[])(
+  'keeps hydrated metadata scoped to one %s candidate',
+  async (kind) => {
+    const directory = await mkdtemp(join(tmpdir(), 'kanikou-library-'))
+    const database = createKanikouDatabase({ url: `file:${join(directory, 'test.db')}` })
+    await database.initialize()
+    const candidates = [candidate('first', kind), candidate('second', kind)]
+    const library = new JumbleLibrary(
+      new JumbleRepository(database.db),
+      {
+        async getCandidates() {
+          return candidates
+        },
+        async getHints() {
+          return []
+        }
+      },
+      { freshMs: 10_000 }
+    )
+
+    await library.get('user', kind, 'name')
+    library.remember('user', kind, 'name', { ...candidates[0]!, listeners: 123 })
+    await library.drain()
+
+    const restored = await library.get('user', kind, 'name')
+    expect(restored).toHaveLength(2)
+    expect(restored[0]).toMatchObject({ answer: 'first', listeners: 123 })
+    expect(restored[1]).toEqual(candidates[1])
+
+    library.stop()
+    database.close()
+    await rm(directory, { force: true, recursive: true })
+  }
+)
+
 test('fences obsolete-generation cleanup across a lease handoff', async () => {
   const database = createKanikouDatabase({ url: ':memory:' })
   await database.initialize()
@@ -268,7 +303,7 @@ test('fences obsolete-generation cleanup across a lease handoff', async () => {
         (
           'user',
           'artist',
-          'artist' || char(0) || 'b',
+          '["artist","b"]',
           '{"kind":"artist","answer":"b","imageUrl":"https://example.test/b.png"}',
           0,
           'version-b',

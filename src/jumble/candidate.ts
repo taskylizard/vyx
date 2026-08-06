@@ -20,12 +20,13 @@ export function jumbleCandidateIdentityKey(candidate: {
   artistName?: string | null
 }): string {
   return match(candidate.kind)
-    .with('artist', () => `artist\u0000${normalizeAnswer(candidate.answer)}`)
-    .with(
-      'album',
-      'track',
-      (kind) =>
-        `${kind}\u0000${normalizeAnswer(candidate.answer)}\u0000${normalizeAnswer(candidate.artistName ?? '')}`
+    .with('artist', () => JSON.stringify(['artist', normalizeAnswer(candidate.answer)]))
+    .with('album', 'track', (kind) =>
+      JSON.stringify([
+        kind,
+        normalizeAnswer(candidate.answer),
+        normalizeAnswer(candidate.artistName ?? '')
+      ])
     )
     .exhaustive()
 }

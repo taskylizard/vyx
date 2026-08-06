@@ -63,7 +63,7 @@ export class JumbleLibraryRepository {
     const metadata = new Map<string, JumbleCandidate>()
     for (const row of metadataRows) {
       const parsed = parseCandidate(row.candidate, kind)
-      if (parsed !== undefined) metadata.set(row.identityKey, parsed)
+      if (parsed !== undefined) metadata.set(jumbleCandidateIdentityKey(parsed), parsed)
     }
     const candidates: JumbleCandidate[] = []
     const corrupt: string[] = []
@@ -73,7 +73,7 @@ export class JumbleLibraryRepository {
         corrupt.push(row.identityKey)
         continue
       }
-      const enriched = metadata.get(row.identityKey)
+      const enriched = metadata.get(jumbleCandidateIdentityKey(parsed))
       candidates.push(enriched === undefined ? parsed : mergeJumbleCandidates(parsed, enriched))
     }
     if (corrupt.length > 0) {
