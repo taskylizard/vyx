@@ -60,7 +60,11 @@ async function downloadAutoembedAsset(
     throw new Error('Autoembed asset exceeds the upload size limit')
   }
 
-  const extension = autoembedAssetExtension(response.headers.get('content-type'), url)
+  const extension = autoembedAssetExtension(
+    response.headers.get('content-type'),
+    response.headers.get('content-disposition'),
+    url
+  )
   if (extension === undefined) {
     throw new Error('Autoembed asset has an unsupported media type')
   }
@@ -72,13 +76,24 @@ async function downloadAutoembedAsset(
   }
 }
 
-function autoembedAssetExtension(contentType: string | null, url: string): string | undefined {
+function autoembedAssetExtension(
+  contentType: string | null,
+  contentDisposition: string | null,
+  url: string
+): string | undefined {
   const normalizedContentType = contentType?.split(';', 1)[0]?.trim().toLowerCase()
   const contentTypeExtension = normalizedContentType
     ? assetExtensions.get(normalizedContentType)
     : undefined
   if (contentTypeExtension !== undefined) {
     return contentTypeExtension
+  }
+
+  const contentDispositionExtension = contentDisposition
+    ?.match(/filename\*?=(?:UTF-8'')?[^;\r\n]*\.([a-z0-9]{2,5})(?:"|;|$)/iu)?.[1]
+    ?.toLowerCase()
+  if (contentDispositionExtension && supportedExtensions.has(contentDispositionExtension)) {
+    return contentDispositionExtension
   }
 
   try {

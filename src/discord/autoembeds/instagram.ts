@@ -3,6 +3,7 @@ import {
   ComponentTypes,
   MessageFlags,
   type ContainerComponent,
+  type MediaGalleryItem,
   type Message,
   type MessageComponent
 } from 'oceanic.js'
@@ -11,12 +12,17 @@ import type { BotContext } from '../../bot/context.ts'
 import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
 import { safeCreateMessage } from '../safe-actions.ts'
 import { escapeMarkdown, textDisplay, trimComponentText, unfurledMedia } from './components.ts'
-import { BROWSER_USER_AGENT, MAX_DISCORD_ATTACHMENTS } from './media.ts'
+import {
+  BROWSER_USER_AGENT,
+  MAX_DISCORD_ATTACHMENTS,
+  downloadAutoembedAssetSafely
+} from './media.ts'
 import type {
   InstagramCacheEntry,
   InstagramComponentAssets,
   InstagramPost,
-  InstagramResolution
+  InstagramResolution,
+  PreparedInstagramMediaAssets
 } from './instagram-types.ts'
 import { InstagramPostResponseSchema, InstagramSharerResponseSchema } from './instagram-types.ts'
 import { resolveAxInstagramMedia } from './vendor/axinstagram.ts'
@@ -53,10 +59,16 @@ export async function sendInstagramAutoembed(
   await match(resolution)
     .returnType<Promise<void>>()
     .with({ kind: 'media' }, async ({ media, strategy }) => {
+      const assets = await prepareInstagramMediaAssets(context, media)
+      if (assets.mediaItems.length === 0) {
+        throw new Error('Instagram fallback media download failed')
+      }
+
       context.logger.info('instagram autoembed resolved via fallback', { strategy })
       await safeCreateMessage(context.client, message.channelID, {
         allowedMentions: suppressAllMentions,
-        components: instagramMediaComponents(realURL, media),
+        components: instagramMediaComponents(realURL, assets),
+        files: assets.files,
         flags: MessageFlags.IS_COMPONENTS_V2,
         messageReference: replyMessageReference(message)
       })
@@ -76,16 +88,13 @@ export async function sendInstagramAutoembed(
 
 export function instagramMediaComponents(
   realURL: string,
-  media: ResolvedInstagramMedia
+  assets: InstagramComponentAssets
 ): Array<MessageComponent> {
-  const mediaItems = media.items.slice(0, MAX_DISCORD_ATTACHMENTS).map((item) => ({
-    media: unfurledMedia(item.url)
-  }))
   const containerComponents: ContainerComponent['components'] = [
     textDisplay('## Instagram\n-# Media preview')
   ]
-  if (mediaItems.length > 0) {
-    containerComponents.push({ items: mediaItems, type: ComponentTypes.MEDIA_GALLERY })
+  if (assets.mediaItems.length > 0) {
+    containerComponents.push({ items: assets.mediaItems, type: ComponentTypes.MEDIA_GALLERY })
   }
   containerComponents.push({
     accessory: {
@@ -190,6 +199,27 @@ function prepareInstagramAssets(post: InstagramPost): InstagramComponentAssets {
   const mediaURLs = instagramMediaURLs(post).slice(0, MAX_DISCORD_ATTACHMENTS)
   return {
     mediaItems: mediaURLs.map((url) => ({ media: unfurledMedia(url) }))
+  }
+}
+
+async function prepareInstagramMediaAssets(
+  context: BotContext,
+  media: ResolvedInstagramMedia
+): Promise<PreparedInstagramMediaAssets> {
+  const assets = await Promise.all(
+    media.items
+      .slice(0, MAX_DISCORD_ATTACHMENTS)
+      .map((item, index) =>
+        downloadAutoembedAssetSafely(context, item.url, `instagram-media-${index + 1}`)
+      )
+  )
+
+  return {
+    files: assets.flatMap((asset) => (asset === undefined ? [] : [asset.file])),
+    mediaItems: assets.flatMap(
+      (asset): Array<MediaGalleryItem> =>
+        asset === undefined ? [] : [{ media: unfurledMedia(asset.reference) }]
+    )
   }
 }
 

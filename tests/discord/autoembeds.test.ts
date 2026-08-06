@@ -364,6 +364,11 @@ test('uses the vendored Instagram-native strategy after rich lookup rate limits'
         ]
       })
     }
+    if (url.href === 'https://cdn.example/native.mp4') {
+      return new Response(Uint8Array.from([1, 2, 3]), {
+        headers: { 'content-type': 'video/mp4' }
+      })
+    }
     throw new Error(`unexpected fetch: ${url.href}`)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -384,14 +389,17 @@ test('uses the vendored Instagram-native strategy after rich lookup rate limits'
   await handleAutoembeds(context, message)
 
   const options = createMessage.mock.calls[0]?.[1]
-  expect(options?.files).toBeUndefined()
-  expect(JSON.stringify(options?.components)).toContain('https://cdn.example/native.mp4')
+  expect(options?.files).toEqual([
+    { contents: Buffer.from([1, 2, 3]), name: 'instagram-media-1.mp4' }
+  ])
+  expect(JSON.stringify(options?.components)).toContain('attachment://instagram-media-1.mp4')
+  expect(JSON.stringify(options?.components)).not.toContain('cdn.example')
   expect(info).toHaveBeenCalledWith('instagram autoembed resolved via fallback', {
     strategy: 'native'
   })
 })
 
-test('uses the vendored SnapSave strategy after native resolution fails', async () => {
+test('downloads and uploads SnapSave media after native resolution fails', async () => {
   const createMessage = vi.fn(async (_channelID: string, _options: CreateMessageOptions) => ({}))
   const editMessage = vi.fn(async () => ({}))
   const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -406,11 +414,19 @@ test('uses the vendored SnapSave strategy after native resolution fails', async 
               <img src="https://cdn.example/poster.jpg">
             </div>
             <div class="download-items__btn">
-              <a href="https://cdn.example/snapsave.mp4"><span>Download Video</span></a>
+              <a href="https://cdn.example/v2"><span>Download Video</span></a>
             </div>
           </div>
         `)
       )
+    }
+    if (url.href === 'https://cdn.example/v2') {
+      return new Response(Uint8Array.from([4, 5, 6]), {
+        headers: {
+          'content-disposition': 'attachment; filename=snapsave-video.mp4',
+          'content-type': 'application/octet-stream'
+        }
+      })
     }
     return new Response('unavailable', { status: 404 })
   })
@@ -432,17 +448,84 @@ test('uses the vendored SnapSave strategy after native resolution fails', async 
   await handleAutoembeds(context, message)
 
   const options = createMessage.mock.calls[0]?.[1]
-  expect(options?.files).toBeUndefined()
-  expect(JSON.stringify(options?.components)).toContain('https://cdn.example/snapsave.mp4')
+  expect(options?.files).toEqual([
+    { contents: Buffer.from([4, 5, 6]), name: 'instagram-media-1.mp4' }
+  ])
+  expect(JSON.stringify(options?.components)).toContain('attachment://instagram-media-1.mp4')
+  expect(JSON.stringify(options?.components)).not.toContain('cdn.example')
   expect(
     fetchMock.mock.calls.some(([input]) => {
       const requestedURL =
         typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
       return requestedURL.includes('cdn.example')
     })
-  ).toBe(false)
+  ).toBe(true)
   expect(info).toHaveBeenCalledWith('instagram autoembed resolved via fallback', {
     strategy: 'snapsave'
+  })
+})
+
+test('uses the rewritten link when resolved Instagram media cannot be downloaded', async () => {
+  const createMessage = vi.fn(async (_channelID: string, _options: CreateMessageOptions) => ({}))
+  const editMessage = vi.fn(async () => ({}))
+  const fetchMock = vi.fn(async (input: string | URL | Request) => {
+    const url = new URL(
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    )
+    if (
+      url.hostname === 'www.instagram.com' &&
+      url.searchParams.get('doc_id') === '26130443479876713'
+    ) {
+      return new Response('rate limited', { status: 401 })
+    }
+    if (url.hostname === 'i.instagram.com' && url.pathname === '/api/v1/oembed/') {
+      return Response.json({ media_id: '123' })
+    }
+    if (url.hostname === 'i.instagram.com' && url.pathname === '/api/v1/media/123/info/') {
+      return Response.json({
+        items: [
+          {
+            video_versions: [
+              { height: 1_920, url: 'https://cdn.example/unavailable.mp4', width: 1_080 }
+            ]
+          }
+        ]
+      })
+    }
+    if (url.href === 'https://cdn.example/unavailable.mp4') {
+      return new Response('unavailable', { status: 503 })
+    }
+    throw new Error(`unexpected fetch: ${url.href}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  const warn = vi.fn()
+  const context = {
+    client: { rest: { channels: { createMessage, editMessage } } },
+    env: {},
+    logger: { warn }
+  } as unknown as BotContext
+  const message = {
+    channelID: 'channel',
+    content: 'https://instagram.com/reel/unavailable/',
+    flags: 0,
+    guildID: 'guild',
+    id: 'message'
+  } as Message
+
+  await handleAutoembeds(context, message)
+
+  expect(createMessage).toHaveBeenCalledTimes(1)
+  expect(createMessage).toHaveBeenCalledWith(
+    'channel',
+    expect.objectContaining({ content: 'https://vxinstagram.com/reel/unavailable/' })
+  )
+  expect(warn).toHaveBeenCalledWith('failed to download autoembed asset', {
+    error: expect.any(Error),
+    filenameBase: 'instagram-media-1'
+  })
+  expect(warn).toHaveBeenCalledWith('component autoembed failed', {
+    error: expect.any(Error),
+    service: 'instagram'
   })
 })
 
