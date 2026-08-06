@@ -11,7 +11,9 @@ const events = [
     recentLookupMs: 3.1,
     hydrationMs: 2_443.3,
     candidateCount: 100,
-    attempts: 1
+    playableCandidateCount: 92,
+    attempts: 1,
+    deferredEnrichment: true
   },
   {
     type: 'start',

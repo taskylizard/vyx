@@ -107,6 +107,14 @@ export interface JumbleTrackCandidate extends JumbleReleaseCandidateBase {
 
 export type JumbleCandidate = JumbleArtistCandidate | JumbleAlbumCandidate | JumbleTrackCandidate
 
+export type JumbleStartHydration =
+  | { status: 'complete'; candidate: JumbleCandidate }
+  | {
+      status: 'deferred'
+      candidate: JumbleCandidate
+      completion: Promise<JumbleCandidate>
+    }
+
 export interface JumbleSessionMetadata {
   candidate: JumbleCandidate
   shuffledAnswer?: string

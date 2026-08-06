@@ -22,6 +22,7 @@ export type JumbleTimingEvent =
       type: 'provider'
       provider: 'musicbrainz' | 'discogs' | 'deezer'
       operation: 'enrichment'
+      phase: 'foreground' | 'background'
       kind: JumbleKind
       outcome: 'success' | 'unchanged' | 'failed'
       durationMs: number
@@ -36,7 +37,9 @@ export type JumbleTimingEvent =
       recentLookupMs: number
       hydrationMs: number
       candidateCount: number
+      playableCandidateCount: number
       attempts: number
+      deferredEnrichment: boolean
     }
   | {
       type: 'start'

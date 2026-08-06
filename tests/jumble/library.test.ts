@@ -185,6 +185,112 @@ test('saved profiles use the warm index while explicit usernames bypass it', asy
   await rm(directory, { force: true, recursive: true })
 })
 
+test('persists deferred start enrichment after the foreground game begins', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kanikou-library-'))
+  const database = createKanikouDatabase({ url: `file:${join(directory, 'test.db')}` })
+  await database.initialize()
+  const base = {
+    kind: 'album',
+    answer: 'Foreground Album',
+    artistName: 'Indexed Artist',
+    imageUrl: 'https://example.test/art.png'
+  } satisfies JumbleCandidate
+  let finishEnrichment!: (value: JumbleCandidate) => void
+  const completion = new Promise<JumbleCandidate>((resolve) => {
+    finishEnrichment = resolve
+  })
+  const provider = {
+    async getCandidates() {
+      return [base]
+    },
+    async hydrateForStart(selected: JumbleCandidate) {
+      return { status: 'deferred' as const, candidate: selected, completion }
+    },
+    async getHints() {
+      return []
+    }
+  }
+  const repository = new JumbleRepository(database.db)
+  await repository.setProfile('user', 'saved')
+  const library = new JumbleLibrary(repository, provider)
+  await library.get('user', 'album', 'saved')
+  const service = new JumbleService(repository, provider, { library, randomIndex: () => 0 })
+
+  const started = await service.start({
+    starterUserId: 'user',
+    guildId: 'guild',
+    channelId: 'channel',
+    kind: 'album'
+  })
+  expect(started.state.session.metadata.candidate.releaseDate).toBeUndefined()
+
+  finishEnrichment({ ...base, releaseDate: '2026-08-06' })
+  await service.drain()
+  await expect(library.get('user', 'album', 'saved')).resolves.toMatchObject([
+    { answer: 'Foreground Album', releaseDate: '2026-08-06' }
+  ])
+
+  service.stop()
+  database.close()
+  await rm(directory, { force: true, recursive: true })
+})
+
+test('does not persist deferred enrichment under a different candidate identity', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'kanikou-library-'))
+  const database = createKanikouDatabase({ url: `file:${join(directory, 'test.db')}` })
+  await database.initialize()
+  const base = {
+    kind: 'album',
+    answer: 'Expected Album',
+    artistName: 'Indexed Artist',
+    imageUrl: 'https://example.test/art.png',
+    listeners: 123
+  } satisfies JumbleCandidate
+  let finishEnrichment!: (value: JumbleCandidate) => void
+  const completion = new Promise<JumbleCandidate>((resolve) => {
+    finishEnrichment = resolve
+  })
+  const provider = {
+    async getCandidates() {
+      return [base]
+    },
+    async hydrateForStart(selected: JumbleCandidate) {
+      return { status: 'deferred' as const, candidate: selected, completion }
+    },
+    async getHints() {
+      return []
+    }
+  }
+  const repository = new JumbleRepository(database.db)
+  await repository.setProfile('user', 'saved')
+  const library = new JumbleLibrary(repository, provider)
+  await library.get('user', 'album', 'saved')
+  const service = new JumbleService(repository, provider, { library, randomIndex: () => 0 })
+
+  await service.start({
+    starterUserId: 'user',
+    guildId: 'guild',
+    channelId: 'channel',
+    kind: 'album'
+  })
+  finishEnrichment({
+    kind: 'album',
+    answer: 'Wrong Album',
+    artistName: 'Indexed Artist',
+    imageUrl: 'https://example.test/art.png',
+    releaseDate: '2026-08-06'
+  } satisfies JumbleCandidate)
+  await service.drain()
+
+  const restored = await library.get('user', 'album', 'saved')
+  expect(restored).toMatchObject([{ answer: 'Expected Album', listeners: 123 }])
+  expect(restored[0]?.releaseDate).toBeUndefined()
+
+  service.stop()
+  database.close()
+  await rm(directory, { force: true, recursive: true })
+})
+
 test('profile saves enqueue a bounded refresh for every Jumble kind', async () => {
   const { database, directory, getCandidates, library, provider, repository } = await fixture()
   const service = new JumbleService(repository, provider, { library })

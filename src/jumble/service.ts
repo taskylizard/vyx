@@ -1,7 +1,12 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { match, P } from 'ts-pattern'
 import { answerMatchesAny, normalizeAnswer, shuffleCharacters } from './answer.ts'
-import { getCandidateImageUrls, jumbleCandidateIdentityKey } from './candidate.ts'
+import {
+  getCandidateImageUrls,
+  isJumbleCandidateIdentityValid,
+  isPlayableJumbleCandidate,
+  jumbleCandidateIdentityKey
+} from './candidate.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
 import type {
@@ -13,6 +18,7 @@ import type {
   JumbleKind,
   JumbleSession,
   JumbleServiceOptions,
+  JumbleStartHydration,
   JumbleState,
   JumbleStats,
   StartJumbleInput
@@ -52,6 +58,7 @@ export class JumbleError extends Error {
 
 type HydratableProvider = JumbleMusicProvider & {
   hydrate?(candidate: JumbleCandidate): Promise<JumbleCandidate>
+  hydrateForStart?(candidate: JumbleCandidate): Promise<JumbleStartHydration>
 }
 
 /** Coordinates selection, answer checking, persistence, and expiry. */
@@ -66,6 +73,7 @@ export class JumbleService {
   private readonly enqueueProfileRefresh: boolean
   private readonly startingChannels = new Set<string>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly pendingHydrations = new Set<Promise<void>>()
 
   constructor(
     repository: JumbleRepository,
@@ -402,6 +410,10 @@ export class JumbleService {
   }
 
   async drain(): Promise<void> {
+    while (this.pendingHydrations.size > 0) {
+      // eslint-disable-next-line no-await-in-loop -- tasky: starts can join the set while shutdown waits for every hydration
+      await Promise.allSettled(this.pendingHydrations)
+    }
     await this.library.drain()
   }
 
@@ -478,7 +490,9 @@ export class JumbleService {
     let recentLookupMs = 0
     let hydrationMs = 0
     let candidateCount = 0
+    let playableCandidateCount = 0
     let attemptedCount = 0
+    let deferredEnrichment = false
     let outcome: 'success' | 'failed' = 'failed'
     try {
       const candidateFetchStartedAt = performance.now()
@@ -488,7 +502,7 @@ export class JumbleService {
           ...(await (useLibrary
             ? this.library.get(starterUserId, kind, username)
             : this.provider.getCandidates(kind, username, JUMBLE_CANDIDATE_LIMIT)))
-        ].filter((candidate) => isCandidateIdentityValid(candidate, kind))
+        ].filter((candidate) => isJumbleCandidateIdentityValid(candidate, kind))
       } finally {
         candidateFetchMs = jumbleDurationMs(candidateFetchStartedAt)
       }
@@ -508,38 +522,46 @@ export class JumbleService {
         recentLookupMs = jumbleDurationMs(recentLookupStartedAt)
       }
       const pool = buildCandidatePool(candidates, recent)
-      const startIndex = this.randomIndex(pool.length)
-      const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, pool.length)
-      let selected: JumbleCandidate | undefined
+      const playablePool = pool.filter((candidate) => isPlayableJumbleCandidate(candidate, kind))
+      playableCandidateCount = playablePool.length
+      const hydrationPool = playablePool.length > 0 ? playablePool : pool
+      const startIndex = this.randomIndex(hydrationPool.length)
+      const attempts = Math.min(MAX_CANDIDATE_HYDRATION_ATTEMPTS, hydrationPool.length)
 
       for (let offset = 0; offset < attempts; offset += 1) {
         attemptedCount += 1
-        const original = pool[(startIndex + offset) % pool.length]!
-        let hydrated = original
+        const original = hydrationPool[(startIndex + offset) % hydrationPool.length]!
+        let hydration: JumbleStartHydration = { status: 'complete', candidate: original }
         const hydrationStartedAt = performance.now()
         try {
-          if (this.provider.hydrate !== undefined) {
-            try {
-              // eslint-disable-next-line no-await-in-loop -- tasky: sequential hydration, tries candidates one at a time until a playable one is found
-              hydrated = await this.provider.hydrate(original)
-            } catch {
-              // tasky: one broken provider lookup should not brick the whole profile
-            }
-          }
+          // eslint-disable-next-line no-await-in-loop -- tasky: candidates hydrate in order until one is actually playable
+          hydration = await this.hydrateCandidateForStart(original, kind)
         } finally {
           hydrationMs += jumbleDurationMs(hydrationStartedAt)
         }
-        if (isPlayableCandidate(hydrated, kind)) {
-          selected = hydrated
-          if (useLibrary) this.library.remember(starterUserId, kind, username, hydrated)
-          break
+
+        if (isPlayableJumbleCandidate(hydration.candidate, kind)) {
+          match(hydration)
+            .with({ status: 'complete' }, ({ candidate }) => {
+              if (useLibrary) this.library.remember(starterUserId, kind, username, candidate)
+            })
+            .with({ status: 'deferred' }, ({ candidate, completion }) => {
+              deferredEnrichment = true
+              this.trackDeferredHydration(completion, {
+                expected: candidate,
+                kind,
+                starterUserId,
+                username,
+                useLibrary
+              })
+            })
+            .exhaustive()
+          outcome = 'success'
+          return hydration.candidate
         }
       }
 
-      if (selected === undefined)
-        throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
-      outcome = 'success'
-      return selected
+      throw new JumbleError('No playable music was found for that profile.', 'no-candidates')
     } finally {
       emitJumbleTiming(this.onTiming, {
         type: 'selection',
@@ -550,9 +572,73 @@ export class JumbleService {
         recentLookupMs,
         hydrationMs,
         candidateCount,
-        attempts: attemptedCount
+        playableCandidateCount,
+        attempts: attemptedCount,
+        deferredEnrichment
       })
     }
+  }
+
+  private async hydrateCandidateForStart(
+    original: JumbleCandidate,
+    kind: JumbleKind
+  ): Promise<JumbleStartHydration> {
+    let hydration: JumbleStartHydration = { status: 'complete', candidate: original }
+    if (this.provider.hydrateForStart !== undefined) {
+      try {
+        hydration = await this.provider.hydrateForStart(original)
+      } catch {
+        // tasky: one broken provider lookup should not brick the whole profile
+      }
+    } else if (this.provider.hydrate !== undefined) {
+      try {
+        hydration = { status: 'complete', candidate: await this.provider.hydrate(original) }
+      } catch {
+        // tasky: one broken provider lookup should not brick the whole profile
+      }
+    }
+
+    return match(hydration)
+      .returnType<Promise<JumbleStartHydration>>()
+      .with({ status: 'complete' }, async (result) => result)
+      .with({ status: 'deferred' }, async (result) =>
+        isPlayableJumbleCandidate(result.candidate, kind)
+          ? result
+          : { status: 'complete', candidate: await result.completion }
+      )
+      .exhaustive()
+  }
+
+  private trackDeferredHydration(
+    completion: Promise<JumbleCandidate>,
+    input: {
+      expected: JumbleCandidate
+      kind: JumbleKind
+      starterUserId: string
+      username: string
+      useLibrary: boolean
+    }
+  ): void {
+    const expectedIdentity = jumbleCandidateIdentityKey(input.expected)
+    const work = completion
+      .then(
+        (candidate) => {
+          if (!input.useLibrary) return
+          const remembered =
+            isPlayableJumbleCandidate(candidate, input.kind) &&
+            jumbleCandidateIdentityKey(candidate) === expectedIdentity
+              ? candidate
+              : input.expected
+          this.library.remember(input.starterUserId, input.kind, input.username, remembered)
+        },
+        () => {
+          if (input.useLibrary) {
+            this.library.remember(input.starterUserId, input.kind, input.username, input.expected)
+          }
+        }
+      )
+      .finally(() => this.pendingHydrations.delete(work))
+    this.pendingHydrations.add(work)
   }
 
   private rethrowStartError(error: unknown): never {
@@ -609,24 +695,6 @@ function completedAction(activity: JumbleActivityState): JumbleActionResult | un
     .with({ status: 'active' }, () => undefined)
     .with({ status: 'ended' }, ({ action, state }) => ({ action, state }))
     .exhaustive()
-}
-
-function isCandidateIdentityValid(candidate: JumbleCandidate, kind: JumbleKind): boolean {
-  if (
-    candidate.kind !== kind ||
-    candidate.answer.trim().length < 2 ||
-    candidate.answer.length > 120
-  )
-    return false
-  return true
-}
-
-function isPlayableCandidate(candidate: JumbleCandidate, kind: JumbleKind): boolean {
-  if (!isCandidateIdentityValid(candidate, kind)) return false
-  const hasSemanticAnswer =
-    normalizeAnswer(candidate.answer).length > 0 ||
-    (candidate.answerVariants ?? []).some((variant) => normalizeAnswer(variant.value).length > 0)
-  return hasSemanticAnswer && getCandidateImageUrls(candidate).length > 0
 }
 
 function buildCandidatePool(

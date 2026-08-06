@@ -39,6 +39,23 @@ export function getCandidateImageUrls(candidate: JumbleCandidate): string[] {
   )
 }
 
+export function isJumbleCandidateIdentityValid(
+  candidate: JumbleCandidate,
+  kind: JumbleKind
+): boolean {
+  return (
+    candidate.kind === kind && candidate.answer.trim().length >= 2 && candidate.answer.length <= 120
+  )
+}
+
+export function isPlayableJumbleCandidate(candidate: JumbleCandidate, kind: JumbleKind): boolean {
+  if (!isJumbleCandidateIdentityValid(candidate, kind)) return false
+  const hasSemanticAnswer =
+    normalizeAnswer(candidate.answer).length > 0 ||
+    (candidate.answerVariants ?? []).some((variant) => normalizeAnswer(variant.value).length > 0)
+  return hasSemanticAnswer && getCandidateImageUrls(candidate).length > 0
+}
+
 export function mergeImageUrlLists(...lists: readonly (readonly string[] | undefined)[]): string[] {
   const urls: string[] = []
   for (const list of lists) {

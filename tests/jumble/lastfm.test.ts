@@ -178,6 +178,89 @@ test('uses Deezer artwork for Cloudy Hollow when Last.fm and MusicBrainz have no
   expect(JSON.stringify(timing)).not.toContain('Pretty Patterns')
 })
 
+test('defers optional deep enrichment after Last.fm makes an album playable', async () => {
+  let finishEnrichment!: () => void
+  const enrichmentBlocked = new Promise<void>((resolve) => {
+    finishEnrichment = resolve
+  })
+  const client = new LastFmClient({
+    apiKey: 'test-key',
+    fetchImpl: async (input) => {
+      const url =
+        input instanceof URL ? input : new URL(typeof input === 'string' ? input : input.url)
+      return url.searchParams.get('method') === 'album.getinfo'
+        ? jsonResponse({
+            album: {
+              name: 'Homogenic',
+              artist: 'Björk',
+              listeners: '1000',
+              image: [
+                {
+                  '#text': 'https://example.test/homogenic.png',
+                  size: 'extralarge'
+                }
+              ]
+            }
+          })
+        : jsonResponse({ artist: { name: 'Björk', listeners: '2000' } })
+    },
+    musicBrainz: {
+      async enrich(candidate) {
+        await enrichmentBlocked
+        return { ...candidate, sourceUrl: 'https://musicbrainz.test/release' }
+      }
+    }
+  })
+
+  const result = await client.hydrateForStart({
+    kind: 'album',
+    answer: 'Homogenic',
+    artistName: 'Björk',
+    imageUrl: 'https://example.test/top-list.png'
+  })
+
+  expect(result).toMatchObject({
+    status: 'deferred',
+    candidate: {
+      answer: 'Homogenic',
+      imageUrl: 'https://example.test/top-list.png',
+      listeners: 1000
+    }
+  })
+  if (result.status !== 'deferred') throw new Error('Expected optional enrichment to be deferred.')
+
+  finishEnrichment()
+  await expect(result.completion).resolves.toMatchObject({
+    sourceUrl: 'https://musicbrainz.test/release'
+  })
+})
+
+test('awaits deep enrichment when Last.fm still has no playable artwork', async () => {
+  let enrichments = 0
+  const client = new LastFmClient({
+    apiKey: 'test-key',
+    fetchImpl: async () => jsonResponse({ album: { name: 'Missing Art', image: [] } }),
+    musicBrainz: {
+      async enrich(candidate) {
+        enrichments += 1
+        return { ...candidate, imageUrl: 'https://example.test/musicbrainz.png' }
+      }
+    }
+  })
+
+  await expect(
+    client.hydrateForStart({
+      kind: 'album',
+      answer: 'Missing Art',
+      artistName: 'Unknown Artist'
+    })
+  ).resolves.toMatchObject({
+    status: 'complete',
+    candidate: { imageUrl: 'https://example.test/musicbrainz.png' }
+  })
+  expect(enrichments).toBe(1)
+})
+
 function jsonResponse(value: unknown): Response {
   return new Response(JSON.stringify(value), {
     status: 200,

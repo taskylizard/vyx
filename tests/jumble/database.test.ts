@@ -298,6 +298,118 @@ test('hydrates candidates before artwork checks and persists accepted aliases', 
   ).resolves.toMatchObject({ action: 'won' })
 })
 
+test('prefers an existing playable candidate before hydrating image-less candidates', async () => {
+  service.stop()
+  const hydratedAnswers: string[] = []
+  const timing: JumbleTimingEvent[] = []
+  service = new JumbleService(
+    repository,
+    {
+      async getCandidates() {
+        return [
+          {
+            kind: 'album',
+            answer: 'Missing Artwork',
+            artistName: 'Slow Artist'
+          },
+          {
+            kind: 'album',
+            answer: 'Ready Album',
+            artistName: 'Fast Artist',
+            imageUrl: 'https://example.test/ready.png'
+          }
+        ] satisfies readonly JumbleCandidate[]
+      },
+      async hydrate(candidate) {
+        hydratedAnswers.push(candidate.answer)
+        return candidate
+      },
+      async getHints() {
+        return []
+      }
+    },
+    { now: () => now, randomIndex: () => 0, onTiming: (event) => timing.push(event) }
+  )
+
+  const started = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'album',
+    username: 'tasky'
+  })
+
+  expect(started.state.session.answer).toBe('Ready Album')
+  expect(hydratedAnswers).toEqual(['Ready Album'])
+  expect(timing).toContainEqual(
+    expect.objectContaining({ type: 'selection', outcome: 'success', attempts: 1 })
+  )
+})
+
+test('returns a playable foreground candidate before deferred enrichment finishes', async () => {
+  service.stop()
+  let finishEnrichment!: () => void
+  const enrichmentBlocked = new Promise<void>((resolve) => {
+    finishEnrichment = resolve
+  })
+  service = new JumbleService(
+    repository,
+    {
+      async getCandidates() {
+        return [
+          {
+            kind: 'album',
+            answer: 'Foreground Album',
+            artistName: 'Foreground Artist',
+            imageUrl: 'https://example.test/foreground.png'
+          }
+        ] satisfies readonly JumbleCandidate[]
+      },
+      async hydrateForStart(candidate) {
+        return {
+          status: 'deferred' as const,
+          candidate,
+          completion: enrichmentBlocked.then(() =>
+            match(candidate)
+              .returnType<JumbleCandidate>()
+              .with({ kind: 'album' }, (album) => ({
+                ...album,
+                releaseDate: '2026-08-06'
+              }))
+              .with({ kind: 'artist' }, (artist) => artist)
+              .with({ kind: 'track' }, (track) => track)
+              .exhaustive()
+          )
+        }
+      },
+      async getHints() {
+        return []
+      }
+    },
+    { now: () => now, randomIndex: () => 0 }
+  )
+
+  const started = await service.start({
+    starterUserId: 'user-1',
+    guildId: null,
+    channelId: 'channel-1',
+    kind: 'album',
+    username: 'tasky'
+  })
+  expect(started.state.session.metadata.candidate.releaseDate).toBeUndefined()
+
+  let drained = false
+  const drain = service.drain().then(() => {
+    drained = true
+  })
+  await Promise.resolve()
+  expect(drained).toBe(false)
+
+  finishEnrichment()
+  await drain
+  expect(drained).toBe(true)
+})
+
 test('bounds failed candidate hydration attempts', async () => {
   service.stop()
   let hydrations = 0

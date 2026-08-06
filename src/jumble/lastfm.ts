@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { normalizeAnswer } from './answer.ts'
 import {
   getCandidateImageUrls,
+  isPlayableJumbleCandidate,
   jumbleCandidateIdentityKey,
   mergeJumbleCandidates
 } from './candidate.ts'
@@ -32,6 +33,7 @@ import type {
   JumbleCandidate,
   JumbleHint,
   JumbleKind,
+  JumbleStartHydration,
   JumbleTrackCandidate
 } from './types.ts'
 
@@ -298,6 +300,30 @@ export class LastFmClient implements JumbleMusicProvider {
 
   /** Enriches one selected item without making the whole top-list request expensive. */
   async hydrate(candidate: JumbleCandidate): Promise<JumbleCandidate> {
+    return this.enrichCandidate(await this.hydrateLastFmDetails(candidate), 'foreground')
+  }
+
+  async hydrateForStart(candidate: JumbleCandidate): Promise<JumbleStartHydration> {
+    const detailed = await this.hydrateLastFmDetails(candidate)
+    if (
+      !this.hasDeepEnrichmentProvider() ||
+      !isPlayableJumbleCandidate(detailed, detailed.kind) ||
+      hasNonLatinLetters(detailed.answer)
+    ) {
+      return {
+        status: 'complete',
+        candidate: await this.enrichCandidate(detailed, 'foreground')
+      }
+    }
+
+    return {
+      status: 'deferred',
+      candidate: detailed,
+      completion: this.enrichCandidate(detailed, 'background')
+    }
+  }
+
+  private async hydrateLastFmDetails(candidate: JumbleCandidate): Promise<JumbleCandidate> {
     let hydrated = candidate
     const detailStartedAt = performance.now()
     let detailOutcome: 'success' | 'partial' | 'failed' = 'failed'
@@ -356,6 +382,14 @@ export class LastFmClient implements JumbleMusicProvider {
         imageCount: getCandidateImageUrls(hydrated).length
       })
     }
+    return hydrated
+  }
+
+  private async enrichCandidate(
+    candidate: JumbleCandidate,
+    phase: 'foreground' | 'background'
+  ): Promise<JumbleCandidate> {
+    let hydrated = candidate
     const needsDiscogs =
       this.options.discogs !== undefined &&
       (getCandidateImageUrls(hydrated).length === 0 ||
@@ -369,12 +403,14 @@ export class LastFmClient implements JumbleMusicProvider {
     const [musicBrainzResult, discogsResult, deezerResult] = await Promise.allSettled([
       musicBrainz === undefined
         ? Promise.resolve(undefined)
-        : this.measureEnrichment('musicbrainz', hydrated, () => musicBrainz.enrich(hydrated)),
+        : this.measureEnrichment('musicbrainz', phase, hydrated, () =>
+            musicBrainz.enrich(hydrated)
+          ),
       needsDiscogs && discogs !== undefined
-        ? this.measureEnrichment('discogs', hydrated, () => discogs.enrich(hydrated))
+        ? this.measureEnrichment('discogs', phase, hydrated, () => discogs.enrich(hydrated))
         : Promise.resolve(undefined),
       needsDeezer && deezer !== undefined
-        ? this.measureEnrichment('deezer', hydrated, () => deezer.enrich(hydrated))
+        ? this.measureEnrichment('deezer', phase, hydrated, () => deezer.enrich(hydrated))
         : Promise.resolve(undefined)
     ])
     const musicBrainzCandidate = match(musicBrainzResult)
@@ -395,8 +431,17 @@ export class LastFmClient implements JumbleMusicProvider {
     return hydrated
   }
 
+  private hasDeepEnrichmentProvider(): boolean {
+    return (
+      this.options.musicBrainz !== undefined ||
+      this.options.discogs !== undefined ||
+      this.options.deezer !== undefined
+    )
+  }
+
   private async measureEnrichment(
     provider: 'musicbrainz' | 'discogs' | 'deezer',
+    phase: 'foreground' | 'background',
     candidate: JumbleCandidate,
     task: () => Promise<JumbleCandidate>
   ): Promise<JumbleCandidate> {
@@ -407,6 +452,7 @@ export class LastFmClient implements JumbleMusicProvider {
         type: 'provider',
         provider,
         operation: 'enrichment',
+        phase,
         kind: candidate.kind,
         outcome: enriched === candidate ? 'unchanged' : 'success',
         durationMs: jumbleDurationMs(startedAt),
@@ -418,6 +464,7 @@ export class LastFmClient implements JumbleMusicProvider {
         type: 'provider',
         provider,
         operation: 'enrichment',
+        phase,
         kind: candidate.kind,
         outcome: 'failed',
         durationMs: jumbleDurationMs(startedAt),
