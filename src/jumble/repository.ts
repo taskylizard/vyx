@@ -50,7 +50,7 @@ export interface JumbleAnswerRecord {
 }
 
 export class JumbleRepository {
-  private readonly db: JumbleRepositoryDatabase
+  readonly db: JumbleRepositoryDatabase
 
   constructor(db: JumbleRepositoryDatabase) {
     this.db = db
@@ -79,6 +79,16 @@ export class JumbleRepository {
         target: jumbleProfiles.discordUserId,
         set: { lastfmUsername, updatedAt: now }
       })
+  }
+
+  async listProfiles(): Promise<readonly { discordUserId: string; username: string }[]> {
+    return this.db
+      .select({
+        discordUserId: jumbleProfiles.discordUserId,
+        username: jumbleProfiles.lastfmUsername
+      })
+      .from(jumbleProfiles)
+      .orderBy(asc(jumbleProfiles.discordUserId))
   }
 
   async findActiveForChannel(channelId: string): Promise<JumbleSession | null> {

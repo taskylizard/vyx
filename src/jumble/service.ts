@@ -18,6 +18,7 @@ import type {
   StartJumbleInput
 } from './types.ts'
 import { LastFmError, type JumbleMusicProvider } from './lastfm.ts'
+import { JumbleLibrary } from './library.ts'
 import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './timing.ts'
 
 export type {
@@ -61,6 +62,8 @@ export class JumbleService {
   private readonly randomIndex: (maxExclusive: number) => number
   private readonly onExpired?: (state: JumbleState) => void | Promise<void>
   private readonly onTiming?: JumbleTimingSink
+  private readonly library: JumbleLibrary
+  private readonly enqueueProfileRefresh: boolean
   private readonly startingChannels = new Set<string>()
   private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
 
@@ -75,6 +78,10 @@ export class JumbleService {
     this.randomIndex = options.randomIndex ?? ((maxExclusive) => randomInt(maxExclusive))
     this.onExpired = options.onExpired
     this.onTiming = options.onTiming
+    this.library =
+      options.library ??
+      new JumbleLibrary(repository, provider, { now: this.now, onTiming: this.onTiming })
+    this.enqueueProfileRefresh = options.library !== undefined
   }
 
   async setProfile(discordUserId: string, username: string): Promise<string> {
@@ -86,6 +93,7 @@ export class JumbleService {
     if (normalized.length < 1)
       throw new JumbleError('Last.fm returned an invalid username.', 'profile-missing')
     await this.repository.setProfile(discordUserId, normalized)
+    if (this.enqueueProfileRefresh) this.library.enqueueProfile(discordUserId, normalized)
     return normalized
   }
 
@@ -93,6 +101,11 @@ export class JumbleService {
     return this.repository.getProfile(discordUserId)
   }
 
+  startLibrarySweep(): void {
+    this.library.startSweep()
+  }
+
+  // oxlint-disable-next-line clippy(too-many-lines) -- tasky: timing phases stay local so start telemetry cannot drift from orchestration
   async start(input: StartJumbleInput): Promise<JumbleActionResult<'started'>> {
     if (this.startingChannels.has(input.channelId))
       throw new JumbleError('A Jumble is already starting in this channel.', 'busy')
@@ -118,7 +131,12 @@ export class JumbleService {
       const selectionStartedAt = performance.now()
       let candidate: JumbleCandidate
       try {
-        candidate = await this.selectPlayableCandidate(input.kind, input.starterUserId, username)
+        candidate = await this.selectPlayableCandidate(
+          input.kind,
+          input.starterUserId,
+          username,
+          input.username === undefined
+        )
       } finally {
         selectionMs = jumbleDurationMs(selectionStartedAt)
       }
@@ -378,8 +396,13 @@ export class JumbleService {
   }
 
   stop(): void {
+    this.library.stop()
     for (const timer of this.timers.values()) clearTimeout(timer)
     this.timers.clear()
+  }
+
+  async drain(): Promise<void> {
+    await this.library.drain()
   }
 
   private async ensureActive(sessionId: string): Promise<JumbleActivityState> {
@@ -440,7 +463,6 @@ export class JumbleService {
       guildId: completed.session.guildId,
       channelId: completed.session.channelId,
       kind: completed.session.kind,
-      username,
       continuousSession
     })
   }
@@ -448,7 +470,8 @@ export class JumbleService {
   private async selectPlayableCandidate(
     kind: JumbleKind,
     starterUserId: string,
-    username: string
+    username: string,
+    useLibrary: boolean
   ): Promise<JumbleCandidate> {
     const startedAt = performance.now()
     let candidateFetchMs = 0
@@ -462,7 +485,9 @@ export class JumbleService {
       let candidates: JumbleCandidate[]
       try {
         candidates = [
-          ...(await this.provider.getCandidates(kind, username, JUMBLE_CANDIDATE_LIMIT))
+          ...(await (useLibrary
+            ? this.library.get(starterUserId, kind, username)
+            : this.provider.getCandidates(kind, username, JUMBLE_CANDIDATE_LIMIT)))
         ].filter((candidate) => isCandidateIdentityValid(candidate, kind))
       } finally {
         candidateFetchMs = jumbleDurationMs(candidateFetchStartedAt)
@@ -506,6 +531,7 @@ export class JumbleService {
         }
         if (isPlayableCandidate(hydrated, kind)) {
           selected = hydrated
+          if (useLibrary) this.library.remember(starterUserId, kind, username, hydrated)
           break
         }
       }

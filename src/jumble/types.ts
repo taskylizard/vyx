@@ -184,6 +184,7 @@ export interface JumbleServiceOptions {
   randomIndex?: (maxExclusive: number) => number
   onExpired?: (state: JumbleState) => void | Promise<void>
   onTiming?: JumbleTimingSink
+  library?: import('./library.ts').JumbleLibrary
 }
 
 export function isJumbleKind(value: string): value is JumbleKind {

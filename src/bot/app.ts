@@ -23,6 +23,7 @@ import { LastFmClient, MissingLastFmProvider } from '../jumble/lastfm.ts'
 import { DiscogsClient } from '../jumble/discogs.ts'
 import { DeezerClient } from '../jumble/deezer.ts'
 import { JumbleMetadataCache } from '../jumble/metadata-cache.ts'
+import { JumbleLibrary } from '../jumble/library.ts'
 import { MusicBrainzClient } from '../jumble/musicbrainz.ts'
 import { JumbleImageRenderer } from '../jumble/renderer.ts'
 import { JumbleRepository } from '../jumble/repository.ts'
@@ -87,7 +88,10 @@ function createJumbleInfrastructure(
           onError: (error) => logger.warn('Last.fm candidate cache error', { error })
         })
     )
-  const jumble = new JumbleService(new JumbleRepository(database.db), jumbleProvider, {
+  const jumbleRepository = new JumbleRepository(database.db)
+  const jumbleLibrary = new JumbleLibrary(jumbleRepository, jumbleProvider, { onTiming })
+  const jumble = new JumbleService(jumbleRepository, jumbleProvider, {
+    library: jumbleLibrary,
     onTiming,
     onExpired: (state) =>
       traceOperation(
@@ -154,6 +158,7 @@ async function performReadySetup(
   await traceOperation('jumble.restore_active', { parent: 'active' }, async () =>
     deps.jumble.restoreActive()
   )
+  deps.jumble.startLibrarySweep()
   const context: BotContext = {
     applicationID: client.application.id,
     botUserID: client.user.id,
@@ -312,6 +317,7 @@ export function createKanikouApp(
       await traceOperation('bot.stop', { parent: 'root' }, async () => {
         client.disconnect(false)
         jumble.stop()
+        await jumble.drain()
         database.close()
       })
       const results = await Promise.allSettled([mintlifyMcp?.close()])

@@ -95,12 +95,81 @@ export const jumbleMetadataCache = sqliteTable(
   (table) => [index('jumble_metadata_cache_expiry_idx').on(table.expiresAt, table.fetchedAt)]
 )
 
+export const jumbleLibraryItems = sqliteTable(
+  'jumble_library_items',
+  {
+    discordUserId: text('discord_user_id').notNull(),
+    kind: text('kind').notNull(),
+    identityKey: text('identity_key').notNull(),
+    candidate: text('candidate').notNull(),
+    rank: integer('rank').notNull(),
+    refreshVersion: text('refresh_version').notNull(),
+    syncedAt: integer('synced_at', { mode: 'number' }).notNull()
+  },
+  (table) => [
+    uniqueIndex('jumble_library_items_generation_identity_idx').on(
+      table.discordUserId,
+      table.kind,
+      table.refreshVersion,
+      table.identityKey
+    ),
+    index('jumble_library_items_generation_rank_idx').on(
+      table.discordUserId,
+      table.kind,
+      table.refreshVersion,
+      table.rank
+    )
+  ]
+)
+
+export const jumbleLibrarySync = sqliteTable(
+  'jumble_library_sync',
+  {
+    discordUserId: text('discord_user_id').notNull(),
+    kind: text('kind').notNull(),
+    canonicalUsername: text('canonical_username').notNull(),
+    refreshedAt: integer('refreshed_at', { mode: 'number' }),
+    refreshAfter: integer('refresh_after', { mode: 'number' }).notNull(),
+    activeRefreshVersion: text('active_refresh_version'),
+    leaseOwner: text('lease_owner'),
+    leaseExpiresAt: integer('lease_expires_at', { mode: 'number' }),
+    failureCount: integer('failure_count').notNull().default(0)
+  },
+  (table) => [
+    uniqueIndex('jumble_library_sync_user_kind_idx').on(table.discordUserId, table.kind),
+    index('jumble_library_sync_refresh_idx').on(table.refreshAfter)
+  ]
+)
+
+export const jumbleLibraryMetadata = sqliteTable(
+  'jumble_library_metadata',
+  {
+    discordUserId: text('discord_user_id').notNull(),
+    kind: text('kind').notNull(),
+    canonicalUsername: text('canonical_username').notNull(),
+    identityKey: text('identity_key').notNull(),
+    candidate: text('candidate').notNull(),
+    updatedAt: integer('updated_at', { mode: 'number' }).notNull()
+  },
+  (table) => [
+    uniqueIndex('jumble_library_metadata_identity_idx').on(
+      table.discordUserId,
+      table.kind,
+      table.canonicalUsername,
+      table.identityKey
+    )
+  ]
+)
+
 export const jumbleSchema = {
   jumbleProfiles,
   jumbleSessions,
   jumbleAnswers,
   jumbleHints,
-  jumbleMetadataCache
+  jumbleMetadataCache,
+  jumbleLibraryItems,
+  jumbleLibrarySync,
+  jumbleLibraryMetadata
 }
 
 export type JumbleProfileRow = typeof jumbleProfiles.$inferSelect

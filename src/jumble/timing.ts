@@ -2,6 +2,14 @@ import type { JumbleKind } from './types.ts'
 
 export type JumbleTimingEvent =
   | {
+      type: 'library'
+      kind: JumbleKind
+      source: 'hit' | 'stale' | 'refreshed' | 'fallback'
+      outcome: 'success' | 'failed'
+      durationMs: number
+      candidateCount: number
+    }
+  | {
       type: 'provider'
       provider: 'lastfm'
       operation: 'details'
