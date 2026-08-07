@@ -5,6 +5,7 @@ import { rosepack } from '../../src/bot/rosepack.ts'
 import askCommand from '../../src/commands/ask.ts'
 import { slashCommands } from '../../src/commands/index.ts'
 import jumbleCommand from '../../src/commands/jumble.ts'
+import jumbleProfileSubcommand from '../../src/commands/jumble-profile.ts'
 import memoryCommand from '../../src/commands/memory.ts'
 import { componentIds, jumbleComponents } from '../../src/jumble/components.ts'
 import { jumbleChannelPermissionsGuard, jumbleEnabledGuard } from '../../src/jumble/guards.ts'
@@ -27,7 +28,7 @@ test('keeps Jumble out of global registration until its guild module is enabled'
   expect(askCommand.installations).toEqual(['user'])
   expect(memoryCommand.module).toBe(modules.ai)
   expect(slashCommandToDiscord(jumbleCommand)).toMatchObject({
-    options: [{ name: 'play' }, { name: 'profile' }, { name: 'stats' }]
+    options: [{ name: 'play' }, { name: 'profile' }]
   })
   expect(jumbleCommand.subcommands.play.guards).toContain(jumbleChannelPermissionsGuard)
   for (const component of jumbleComponents) {
@@ -95,6 +96,133 @@ test('slash play does not show a typing indicator', async () => {
 
   expect(editResponse).toHaveBeenCalledWith('That Jumble type is not available.')
   expect(sendTyping).not.toHaveBeenCalled()
+})
+
+test('slash play treats an explicit username as a one-game override', async () => {
+  const editResponse = vi.fn(async () => undefined)
+  const setProfile = vi.fn(async () => 'taskyliz')
+  const start = vi.fn(async () => ({
+    action: 'started' as const,
+    state: {
+      session: {
+        id: '12345678-1234-4234-8234-123456789abc',
+        starterUserId: 'user-1',
+        guildId: 'guild-1',
+        channelId: 'channel-1',
+        messageId: null,
+        kind: 'album' as const,
+        sourceUsername: 'lastfm',
+        answer: 'Album',
+        artistName: 'Artist',
+        albumName: 'Album',
+        imageUrl: null,
+        metadata: {
+          candidate: { kind: 'album' as const, answer: 'Album', artistName: 'Artist' },
+          hints: []
+        },
+        startedAt: 0,
+        endedAt: null,
+        outcome: null,
+        blurStage: 0,
+        reshuffleCount: 0
+      },
+      hints: []
+    }
+  }))
+
+  await jumbleCommand.subcommands.play.execute({
+    app: {
+      jumble: { setProfile, start, attachMessage: vi.fn(async () => undefined) },
+      jumbleRenderer: {}
+    },
+    defer: vi.fn(async () => undefined),
+    editResponse,
+    interaction: {
+      channelID: 'channel-1',
+      guildID: 'guild-1',
+      user: { id: 'user-1' },
+      getOriginal: vi.fn(async () => ({ id: 'message-1' }))
+    },
+    options: { kind: 'album', username: 'lastfm' }
+  } as never)
+
+  expect(setProfile).not.toHaveBeenCalled()
+  expect(start).toHaveBeenCalledWith(
+    expect.objectContaining({ starterUserId: 'user-1', kind: 'album', username: 'lastfm' })
+  )
+  expect(editResponse).toHaveBeenCalled()
+})
+
+test('jumble profile without a username renders the saved profile and all stats', async () => {
+  const editResponse = vi.fn(async () => undefined)
+  const profileSummary = vi.fn(async () => ({
+    username: 'taskyliz',
+    tracked: { all: 6, artist: 2, album: 3, track: 1 },
+    stats: {
+      all: {
+        played: 4,
+        won: 2,
+        gaveUp: 1,
+        expired: 1,
+        guesses: 5,
+        correctGuesses: 2,
+        averageSeconds: 12.5,
+        averageHints: 1,
+        averageReshuffles: 0
+      },
+      artist: {
+        played: 1,
+        won: 1,
+        gaveUp: 0,
+        expired: 0,
+        guesses: 1,
+        correctGuesses: 1,
+        averageSeconds: 8,
+        averageHints: 0,
+        averageReshuffles: 0
+      },
+      album: {
+        played: 2,
+        won: 1,
+        gaveUp: 1,
+        expired: 0,
+        guesses: 3,
+        correctGuesses: 1,
+        averageSeconds: 15,
+        averageHints: 1.5,
+        averageReshuffles: 0
+      },
+      track: {
+        played: 1,
+        won: 0,
+        gaveUp: 0,
+        expired: 1,
+        guesses: 1,
+        correctGuesses: 0,
+        averageSeconds: null,
+        averageHints: 1,
+        averageReshuffles: 1
+      }
+    }
+  }))
+
+  await jumbleProfileSubcommand.execute({
+    app: { jumble: { profileSummary } },
+    defer: vi.fn(async () => undefined),
+    editResponse,
+    interaction: { user: { id: 'user-1' } },
+    options: {}
+  } as never)
+
+  expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('Last.fm: `taskyliz`'))
+  expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('All: **6**'))
+  expect(editResponse).toHaveBeenCalledWith(
+    expect.stringContaining('Artists: **2** · Albums: **3** · Tracks: **1**')
+  )
+  expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('All — Played **4**'))
+  expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('Artists — Played **1**'))
+  expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('Albums — Played **2**'))
+  expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('Tracks — Played **1**'))
 })
 
 test('enabling the Jumble module reconciles its guild command', async () => {

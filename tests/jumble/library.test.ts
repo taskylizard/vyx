@@ -140,6 +140,24 @@ test('does not serve old rows after a username change', async () => {
   await rm(directory, { force: true, recursive: true })
 })
 
+test('reports tracked counts for the active profile generations', async () => {
+  const { database, directory, library } = await fixture()
+  await Promise.all(
+    (['artist', 'album', 'track'] as const).map((kind) => library.get('user', kind, 'tasky'))
+  )
+
+  await expect(library.trackedCounts('user', 'tasky')).resolves.toEqual({
+    all: 3,
+    artist: 1,
+    album: 1,
+    track: 1
+  })
+
+  library.stop()
+  database.close()
+  await rm(directory, { force: true, recursive: true })
+})
+
 test('deletes corrupt active rows and repairs them from the provider', async () => {
   const { database, directory, getCandidates, library } = await fixture()
   await library.get('user', 'artist', 'name')
@@ -179,6 +197,36 @@ test('saved profiles use the warm index while explicit usernames bypass it', asy
   })
   expect(getCandidates).toHaveBeenCalledTimes(2)
   expect(getCandidates).toHaveBeenLastCalledWith('artist', 'explicit', 600)
+
+  service.stop()
+  database.close()
+  await rm(directory, { force: true, recursive: true })
+})
+
+test('an explicit override leaves the saved profile and its index untouched', async () => {
+  const { database, directory, getCandidates, library, provider, repository } = await fixture()
+  await repository.setProfile('user', 'taskyliz')
+  await library.get('user', 'album', 'taskyliz')
+  const service = new JumbleService(repository, provider, { library, randomIndex: () => 0 })
+
+  const override = await service.start({
+    starterUserId: 'user',
+    guildId: 'guild',
+    channelId: 'override-channel',
+    kind: 'album',
+    username: 'lastfm'
+  })
+  const saved = await service.start({
+    starterUserId: 'user',
+    guildId: 'guild',
+    channelId: 'saved-channel',
+    kind: 'album'
+  })
+
+  expect(override.state.session.sourceUsername).toBe('lastfm')
+  expect(saved.state.session.sourceUsername).toBe('taskyliz')
+  await expect(service.getProfile('user')).resolves.toBe('taskyliz')
+  expect(getCandidates).toHaveBeenCalledTimes(2)
 
   service.stop()
   database.close()

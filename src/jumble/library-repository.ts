@@ -7,12 +7,14 @@ import {
 import { jumbleCandidateIdentityKey, mergeJumbleCandidates } from './candidate.ts'
 import { JumbleCandidateSchema } from './schemas.ts'
 import type { JumbleRepositoryDatabase } from './repository.ts'
-import type { JumbleCandidate, JumbleKind } from './types.ts'
+import type { JumbleCandidate, JumbleKind, JumbleTrackedCounts } from './types.ts'
 
 export interface LibrarySnapshot {
   candidates: JumbleCandidate[]
   refreshAfter: number | null
 }
+
+type JumbleKindTrackedCounts = Omit<JumbleTrackedCounts, 'all'>
 
 export class JumbleLibraryRepository {
   constructor(private readonly db: JumbleRepositoryDatabase) {}
@@ -113,6 +115,41 @@ export class JumbleLibraryRepository {
       .limit(1)
     const state = rows[0]
     return state === undefined || state.activeRefreshVersion === null || state.refreshAfter <= now
+  }
+
+  async trackedCounts(
+    discordUserId: string,
+    canonicalUsername: string
+  ): Promise<JumbleKindTrackedCounts> {
+    const rows = await this.db
+      .select({
+        kind: jumbleLibrarySync.kind,
+        count: sql<number>`count(*)`
+      })
+      .from(jumbleLibrarySync)
+      .innerJoin(
+        jumbleLibraryItems,
+        and(
+          eq(jumbleLibraryItems.discordUserId, jumbleLibrarySync.discordUserId),
+          eq(jumbleLibraryItems.kind, jumbleLibrarySync.kind),
+          eq(jumbleLibraryItems.refreshVersion, jumbleLibrarySync.activeRefreshVersion)
+        )
+      )
+      .where(
+        and(
+          eq(jumbleLibrarySync.discordUserId, discordUserId),
+          eq(jumbleLibrarySync.canonicalUsername, canonicalUsername)
+        )
+      )
+      .groupBy(jumbleLibrarySync.kind)
+
+    const counts: JumbleKindTrackedCounts = { artist: 0, album: 0, track: 0 }
+    for (const row of rows) {
+      if (row.kind === 'artist' || row.kind === 'album' || row.kind === 'track') {
+        counts[row.kind] = Number(row.count)
+      }
+    }
+    return counts
   }
 
   async acquireLease(input: {

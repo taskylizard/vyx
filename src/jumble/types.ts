@@ -155,6 +155,26 @@ export interface JumbleStats {
   averageReshuffles: number | null
 }
 
+export interface JumbleStatsByKind {
+  all: JumbleStats
+  artist: JumbleStats
+  album: JumbleStats
+  track: JumbleStats
+}
+
+export interface JumbleTrackedCounts {
+  all: number
+  artist: number
+  album: number
+  track: number
+}
+
+export interface JumbleProfileSummary {
+  username: string | null
+  stats: JumbleStatsByKind
+  tracked: JumbleTrackedCounts
+}
+
 export interface JumbleState {
   session: JumbleSession
   hints: readonly (JumbleHint & { shown: boolean; order: number })[]

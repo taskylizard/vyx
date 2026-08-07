@@ -10,6 +10,7 @@ import {
 } from './candidate.ts'
 import { PIXELATION_LEVELS } from './renderer.ts'
 import { JumbleRepository } from './repository.ts'
+import { JUMBLE_KINDS } from './types.ts'
 import type {
   JumbleActionResult,
   JumbleActivityState,
@@ -17,6 +18,7 @@ import type {
   JumbleErrorCode,
   JumbleHint,
   JumbleKind,
+  JumbleProfileSummary,
   JumbleSession,
   JumbleServiceOptions,
   JumbleStartHydration,
@@ -402,6 +404,23 @@ export class JumbleService {
 
   async stats(discordUserId: string, kind?: JumbleKind): Promise<JumbleStats> {
     return this.repository.statsForUser(discordUserId, kind)
+  }
+
+  async profileSummary(discordUserId: string): Promise<JumbleProfileSummary> {
+    const username = await this.repository.getProfile(discordUserId)
+    const [all, artist, album, track] = await Promise.all([
+      this.repository.statsForUser(discordUserId),
+      ...JUMBLE_KINDS.map((kind) => this.repository.statsForUser(discordUserId, kind))
+    ])
+    const tracked =
+      username === null
+        ? { all: 0, artist: 0, album: 0, track: 0 }
+        : await this.library.trackedCounts(discordUserId, username)
+    return {
+      username,
+      stats: { all, artist, album, track },
+      tracked
+    }
   }
 
   stop(): void {

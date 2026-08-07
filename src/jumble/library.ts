@@ -1,7 +1,12 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { sleep } from 'radashi'
 import { runDetached, traceBackgroundOperation } from '../observability/tracing.ts'
-import { JUMBLE_KINDS, type JumbleCandidate, type JumbleKind } from './types.ts'
+import {
+  JUMBLE_KINDS,
+  type JumbleCandidate,
+  type JumbleKind,
+  type JumbleTrackedCounts
+} from './types.ts'
 import type { JumbleMusicProvider } from './lastfm.ts'
 import { JumbleLibraryRepository } from './library-repository.ts'
 import type { JumbleRepository } from './repository.ts'
@@ -102,6 +107,17 @@ export class JumbleLibrary {
         }
       })
     )
+  }
+
+  async trackedCounts(discordUserId: string, username: string): Promise<JumbleTrackedCounts> {
+    const counts = await this.persistence.trackedCounts(
+      discordUserId,
+      canonicalLastFmUsername(username)
+    )
+    return {
+      ...counts,
+      all: JUMBLE_KINDS.reduce((total, kind) => total + counts[kind], 0)
+    }
   }
 
   remember(

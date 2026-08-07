@@ -60,7 +60,6 @@ export { default as memoryCommand } from './commands/memory.ts'
 export { default as jumbleCommand } from './commands/jumble.ts'
 export { default as modulesCommand } from './commands/modules.ts'
 export { default as jumbleProfileSubcommand } from './commands/jumble-profile.ts'
-export { default as jumbleStatsSubcommand } from './commands/jumble-stats.ts'
 export { slashCommands } from './commands/index.ts'
 export { GuildSettingsStore } from './database/guild-settings.ts'
 export {
@@ -126,8 +125,11 @@ export {
   type JumbleHint,
   type JumbleKind,
   type JumbleOutcome,
+  type JumbleProfileSummary,
   type JumbleSession,
-  type JumbleStats
+  type JumbleStats,
+  type JumbleStatsByKind,
+  type JumbleTrackedCounts
 } from './jumble/types.ts'
 export { formatCitations } from './llm/citations.ts'
 export { errorMessage, logAgentTrace, type AgentTraceEvent } from './llm/agent-trace.ts'

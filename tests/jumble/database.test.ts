@@ -157,6 +157,20 @@ test('persists a text-and-art artist session, hints, guesses, and a solved outco
   await expect(service.stats('user-2')).resolves.toMatchObject({ played: 1, won: 1 })
 })
 
+test('explicit usernames do not replace the saved profile', async () => {
+  await service.setProfile('user-1', 'taskyliz')
+
+  await service.start({
+    starterUserId: 'user-1',
+    guildId: 'guild-1',
+    channelId: 'channel-1',
+    kind: 'album',
+    username: 'lastfm'
+  })
+
+  await expect(service.getProfile('user-1')).resolves.toBe('taskyliz')
+})
+
 test('reveals hints, advances pixel stages, and allows reshuffles without daily limits', async () => {
   const started = await service.start({
     starterUserId: 'user-1',

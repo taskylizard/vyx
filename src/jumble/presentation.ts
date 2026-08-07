@@ -270,7 +270,7 @@ function kindName(kind: JumbleKind): string {
     .exhaustive()
 }
 
-function safeInline(value: string): string {
+export function safeInline(value: string): string {
   return value
     .replace(/[\\`*_~|]/gu, '\\$&')
     .replace(/@/gu, '@\u200b')

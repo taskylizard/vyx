@@ -6,7 +6,6 @@ import { componentIds } from '../jumble/components.ts'
 import { jumblePlayGuards } from '../jumble/guards.ts'
 import { modules } from '../modules.ts'
 import jumbleProfileSubcommand from './jumble-profile.ts'
-import jumbleStatsSubcommand from './jumble-stats.ts'
 
 export default slash({
   name: 'jumble',
@@ -33,7 +32,7 @@ export default slash({
           ]
         },
         username: {
-          description: 'Last.fm username (uses your saved profile when omitted)',
+          description: 'Last.fm username for this game (uses your saved profile when omitted)',
           kind: 'string',
           maxLength: 64
         }
@@ -49,8 +48,6 @@ export default slash({
           await context.editResponse('That Jumble type is not available.')
           return
         }
-        if (username !== undefined)
-          await context.app.jumble.setProfile(context.interaction.user.id, username)
         const result = await context.app.jumble.start({
           starterUserId: context.interaction.user.id,
           guildId: context.interaction.guildID,
@@ -78,7 +75,6 @@ export default slash({
         }
       }
     }),
-    profile: jumbleProfileSubcommand,
-    stats: jumbleStatsSubcommand
+    profile: jumbleProfileSubcommand
   }
 })
