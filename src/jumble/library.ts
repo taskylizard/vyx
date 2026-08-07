@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { sleep } from 'radashi'
+import { runDetached, traceBackgroundOperation } from '../observability/tracing.ts'
 import { JUMBLE_KINDS, type JumbleCandidate, type JumbleKind } from './types.ts'
 import type { JumbleMusicProvider } from './lastfm.ts'
 import { JumbleLibraryRepository } from './library-repository.ts'
@@ -51,8 +52,15 @@ export class JumbleLibrary {
     const snapshot = await this.persistence.read(discordUserId, kind, canonical)
     if (snapshot.candidates.length > 0) {
       const stale = (snapshot.refreshAfter ?? 0) <= this.now()
-      if (stale && !this.stopped)
-        void this.refresh(discordUserId, kind, canonical).catch(() => undefined)
+      if (stale && !this.stopped) {
+        runDetached(() => {
+          void traceBackgroundOperation(
+            'jumble.library.refresh',
+            { 'jumble.kind': kind, 'jumble.refresh.source': 'stale' },
+            () => this.refresh(discordUserId, kind, canonical)
+          ).catch(() => undefined)
+        })
+      }
       this.timing(kind, stale ? 'stale' : 'hit', 'success', startedAt, snapshot.candidates.length)
       return snapshot.candidates
     }
@@ -81,13 +89,19 @@ export class JumbleLibrary {
 
   enqueueProfile(discordUserId: string, username: string): void {
     const canonical = canonicalLastFmUsername(username)
-    this.backgroundTail = this.backgroundTail.then(async () => {
-      for (const kind of JUMBLE_KINDS) {
-        if (this.stopped) return
-        // eslint-disable-next-line no-await-in-loop -- tasky: one background refresh at a time avoids slamming Last.fm after profile changes
-        await this.refresh(discordUserId, kind, canonical).catch(() => undefined)
-      }
-    })
+    this.backgroundTail = runDetached(() =>
+      this.backgroundTail.then(async () => {
+        for (const kind of JUMBLE_KINDS) {
+          if (this.stopped) return
+          // eslint-disable-next-line no-await-in-loop -- tasky: one background refresh at a time avoids slamming Last.fm after profile changes
+          await traceBackgroundOperation(
+            'jumble.library.refresh',
+            { 'jumble.kind': kind, 'jumble.refresh.source': 'profile' },
+            () => this.refresh(discordUserId, kind, canonical)
+          ).catch(() => undefined)
+        }
+      })
+    )
   }
 
   remember(
@@ -97,10 +111,12 @@ export class JumbleLibrary {
     candidate: JumbleCandidate
   ): void {
     if (this.stopped) return
-    const work = this.persistence
-      .updateCandidate(discordUserId, kind, canonicalLastFmUsername(username), candidate)
-      .catch(() => undefined)
-      .finally(() => this.rememberWrites.delete(work))
+    const work = runDetached(() =>
+      this.persistence
+        .updateCandidate(discordUserId, kind, canonicalLastFmUsername(username), candidate)
+        .catch(() => undefined)
+        .finally(() => this.rememberWrites.delete(work))
+    )
     this.rememberWrites.add(work)
   }
 
@@ -215,16 +231,20 @@ export class JumbleLibrary {
   }
 
   private scheduleSweep(delay: number): void {
-    this.sweepTimer = setTimeout(() => {
-      this.sweepTimer = undefined
-      const work = this.runSweep()
-        .catch(() => undefined)
-        .finally(() => {
-          if (this.activeSweep === work) this.activeSweep = undefined
-          if (!this.stopped) this.scheduleSweep(this.sweepMs())
+    this.sweepTimer = runDetached(() =>
+      setTimeout(() => {
+        runDetached(() => {
+          this.sweepTimer = undefined
+          const work = this.runSweep()
+            .catch(() => undefined)
+            .finally(() => {
+              if (this.activeSweep === work) this.activeSweep = undefined
+              if (!this.stopped) this.scheduleSweep(this.sweepMs())
+            })
+          this.activeSweep = work
         })
-      this.activeSweep = work
-    }, delay)
+      }, delay)
+    )
   }
 
   private async runSweep(): Promise<void> {
@@ -241,7 +261,11 @@ export class JumbleLibrary {
         )
         if (due) {
           // eslint-disable-next-line no-await-in-loop -- tasky: due refreshes stay sequential so startup cannot stampede Last.fm
-          await this.refresh(profile.discordUserId, kind, username).catch(() => undefined)
+          await traceBackgroundOperation(
+            'jumble.library.refresh',
+            { 'jumble.kind': kind, 'jumble.refresh.source': 'sweep' },
+            () => this.refresh(profile.discordUserId, kind, username)
+          ).catch(() => undefined)
         }
       }
     }

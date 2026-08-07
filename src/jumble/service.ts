@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import { match, P } from 'ts-pattern'
+import { runDetached, traceBackgroundOperation } from '../observability/tracing.ts'
 import { answerMatchesAny, normalizeAnswer, shuffleCharacters } from './answer.ts'
 import {
   getCandidateImageUrls,
@@ -620,24 +621,26 @@ export class JumbleService {
     }
   ): void {
     const expectedIdentity = jumbleCandidateIdentityKey(input.expected)
-    const work = completion
-      .then(
-        (candidate) => {
-          if (!input.useLibrary) return
-          const remembered =
-            isPlayableJumbleCandidate(candidate, input.kind) &&
-            jumbleCandidateIdentityKey(candidate) === expectedIdentity
-              ? candidate
-              : input.expected
-          this.library.remember(input.starterUserId, input.kind, input.username, remembered)
-        },
-        () => {
-          if (input.useLibrary) {
-            this.library.remember(input.starterUserId, input.kind, input.username, input.expected)
+    const work = runDetached(() =>
+      completion
+        .then(
+          (candidate) => {
+            if (!input.useLibrary) return
+            const remembered =
+              isPlayableJumbleCandidate(candidate, input.kind) &&
+              jumbleCandidateIdentityKey(candidate) === expectedIdentity
+                ? candidate
+                : input.expected
+            this.library.remember(input.starterUserId, input.kind, input.username, remembered)
+          },
+          () => {
+            if (input.useLibrary) {
+              this.library.remember(input.starterUserId, input.kind, input.username, input.expected)
+            }
           }
-        }
-      )
-      .finally(() => this.pendingHydrations.delete(work))
+        )
+        .finally(() => this.pendingHydrations.delete(work))
+    )
     this.pendingHydrations.add(work)
   }
 
@@ -667,9 +670,15 @@ export class JumbleService {
     if (session.endedAt !== null) return
     this.cancelExpiry(session.id)
     const delay = Math.max(1, session.startedAt + JUMBLE_TIMEOUT_MS[session.kind] - this.now())
-    const timer = setTimeout(() => {
-      void this.expire(session.id).catch(() => undefined)
-    }, delay)
+    const timer = runDetached(() =>
+      setTimeout(() => {
+        runDetached(() => {
+          void traceBackgroundOperation('jumble.expire', { 'jumble.session.id': session.id }, () =>
+            this.expire(session.id)
+          ).catch(() => undefined)
+        })
+      }, delay)
+    )
     this.timers.set(session.id, timer)
   }
 

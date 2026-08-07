@@ -19,6 +19,18 @@ import type { LogFields, TraceOperationConfig } from './types.ts'
 
 const tracer = trace.getTracer('kanikou')
 
+export function runDetached<TResult>(operation: () => TResult): TResult {
+  return context.with(ROOT_CONTEXT, operation)
+}
+
+export function traceBackgroundOperation<TResult>(
+  name: string,
+  attributes: LogFields | undefined,
+  operation: () => Promise<TResult>
+): Promise<TResult> {
+  return traceOperation(name, { attributes, parent: 'root' }, async () => operation())
+}
+
 export async function traceOperation<TResult>(
   name: string,
   config: TraceOperationConfig,

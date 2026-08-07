@@ -198,6 +198,157 @@ test('hedges a slow preferred artwork source after a bounded head start', async 
   ])
 })
 
+test('aborts the losing slow artwork download after fallback succeeds', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  let aborted = false
+  let active = 0
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 10,
+    fetchImpl: async (input, init) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      if (!url.endsWith('/preferred.png')) return new Response(sourceBuffer, { status: 200 })
+
+      active += 1
+      return new Promise<Response>((resolve, reject) => {
+        const signal = init?.signal ?? undefined
+        const onAbort = (): void => {
+          clearTimeout(timer)
+          active -= 1
+          aborted = true
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        }
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', onAbort)
+          active -= 1
+          resolve(new Response('missing', { status: 404 }))
+        }, 500)
+        signal?.addEventListener('abort', onAbort, { once: true })
+      })
+    },
+    size: 32
+  })
+
+  await expect(
+    renderer.renderWithFallback([
+      'https://example.test/preferred.png',
+      'https://example.test/fallback.png'
+    ])
+  ).resolves.toBeInstanceOf(Buffer)
+  await delay(20)
+
+  expect(aborted).toBe(true)
+  expect(active).toBe(0)
+})
+
+test('does not abort a shared artwork download while another render still needs it', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  let sharedFetches = 0
+  let sharedAborts = 0
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 10,
+    fetchImpl: async (input, init) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      if (!url.endsWith('/shared.png')) return new Response(sourceBuffer, { status: 200 })
+
+      sharedFetches += 1
+      return new Promise<Response>((resolve, reject) => {
+        const signal = init?.signal ?? undefined
+        const onAbort = (): void => {
+          clearTimeout(timer)
+          sharedAborts += 1
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        }
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', onAbort)
+          resolve(new Response(sourceBuffer, { status: 200 }))
+        }, 80)
+        signal?.addEventListener('abort', onAbort, { once: true })
+      })
+    },
+    maxConcurrentRenders: 3,
+    size: 32
+  })
+
+  const direct = renderer.render('https://example.test/shared.png')
+  const fallback = renderer.renderWithFallback([
+    'https://example.test/shared.png',
+    'https://example.test/fallback.png'
+  ])
+
+  await expect(Promise.all([direct, fallback])).resolves.toHaveLength(2)
+  expect(sharedFetches).toBe(1)
+  expect(sharedAborts).toBe(0)
+})
+
+test('reports artwork download timeouts distinctly', async () => {
+  const renderer = new JumbleImageRenderer({
+    fetchImpl: async (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => reject(new DOMException('The operation was aborted.', 'AbortError')),
+          { once: true }
+        )
+      }),
+    timeoutMs: 10
+  })
+
+  await expect(renderer.render('https://example.test/slow.png')).rejects.toThrow(
+    'took too long to download'
+  )
+})
+
+test('moves past stalled fallback sources after the per-source deadline', async () => {
+  const source = createCanvas(8, 8)
+  source.getContext('2d').fillRect(0, 0, 8, 8)
+  const sourceBuffer = source.toBuffer('image/png')
+  const fetched: string[] = []
+  let aborted = 0
+  const renderer = new JumbleImageRenderer({
+    fallbackHedgeMs: 5,
+    fallbackTimeoutMs: 20,
+    fetchImpl: async (input, init) => {
+      const url = input instanceof URL ? input.href : typeof input === 'string' ? input : input.url
+      fetched.push(url)
+      if (url.endsWith('/available.png')) return new Response(sourceBuffer, { status: 200 })
+
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          'abort',
+          () => {
+            aborted += 1
+            reject(new DOMException('The operation was aborted.', 'AbortError'))
+          },
+          { once: true }
+        )
+      })
+    },
+    size: 32,
+    timeoutMs: 500
+  })
+
+  await expect(
+    Promise.race([
+      renderer.renderWithFallback([
+        'https://example.test/stalled-large.png',
+        'https://example.test/stalled-medium.png',
+        'https://example.test/available.png'
+      ]),
+      delay(150).then(() => null)
+    ])
+  ).resolves.toBeInstanceOf(Buffer)
+  expect(fetched).toEqual([
+    'https://example.test/stalled-large.png',
+    'https://example.test/stalled-medium.png',
+    'https://example.test/available.png'
+  ])
+  expect(aborted).toBe(2)
+})
+
 test('keeps artwork fallback attempts to two active downloads', async () => {
   let active = 0
   let maxActive = 0

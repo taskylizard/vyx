@@ -13,9 +13,12 @@ import {
 export const PIXELATION_LEVELS = [0.125, 0.085, 0.05, 0.03, 0.02, 0.015, 0.01] as const
 
 export class JumbleImageError extends Error {
-  constructor(message: string) {
+  readonly status: number | undefined
+
+  constructor(message: string, status?: number) {
     super(message)
     this.name = 'JumbleImageError'
+    this.status = status
   }
 }
 
@@ -29,6 +32,7 @@ export interface JumbleImageRendererOptions {
   maxConcurrentRenders?: number
   maxPendingRenders?: number
   fallbackHedgeMs?: number
+  fallbackTimeoutMs?: number
   onTiming?: JumbleTimingSink
 }
 
@@ -41,6 +45,26 @@ type RenderFallbackEvent =
   | { kind: 'rendered'; index: number; buffer: Buffer }
   | { kind: 'failed'; index: number; error: JumbleImageError }
   | { kind: 'hedge' }
+
+interface InflightSource {
+  controller: AbortController
+  consumers: number
+  promise: Promise<Buffer>
+  settled: boolean
+}
+
+interface GateWaiter {
+  onAbort?: () => void
+  reject: (reason?: unknown) => void
+  resolve: () => void
+  signal?: AbortSignal
+}
+
+interface ActiveFallbackAttempt {
+  controller: AbortController
+  promise: Promise<RenderFallbackEvent>
+  timeout: ReturnType<typeof setTimeout>
+}
 
 const MAX_SOURCE_BYTES = 32 * 1024 * 1024
 const MAX_CACHE_BYTES = 128 * 1024 * 1024
@@ -56,9 +80,10 @@ export class JumbleImageRenderer {
   private readonly cacheEntries: number
   private readonly cacheBytes: number
   private readonly fallbackHedgeMs: number
+  private readonly fallbackTimeoutMs: number
   private readonly cache = new Map<string, CachedImage>()
   private cacheSize = 0
-  private readonly inflightSources = new Map<string, Promise<Buffer>>()
+  private readonly inflightSources = new Map<string, InflightSource>()
   private readonly renderGate: AsyncGate
   private readonly onTiming?: JumbleTimingSink
 
@@ -78,6 +103,12 @@ export class JumbleImageRenderer {
       MAX_CACHE_BYTES
     )
     this.fallbackHedgeMs = clamp(Math.trunc(options.fallbackHedgeMs ?? 250), 0, 5_000)
+    const fallbackTimeoutMinimum = Math.min(100, this.timeoutMs)
+    this.fallbackTimeoutMs = clamp(
+      Math.trunc(options.fallbackTimeoutMs ?? Math.min(this.timeoutMs, 3_000)),
+      fallbackTimeoutMinimum,
+      this.timeoutMs
+    )
     this.renderGate = new AsyncGate(
       clamp(Math.trunc(options.maxConcurrentRenders ?? 2), 1, 8),
       clamp(Math.trunc(options.maxPendingRenders ?? 16), 0, 64)
@@ -141,12 +172,19 @@ export class JumbleImageRenderer {
     }
   }
 
-  private async renderImage(url: string, pixelationLevel?: number): Promise<Buffer> {
-    const release = await this.renderGate.acquire()
+  private async renderImage(
+    url: string,
+    pixelationLevel?: number,
+    signal?: AbortSignal
+  ): Promise<Buffer> {
+    const release = await this.renderGate.acquire(signal)
     if (release === null) throw new JumbleImageError('The cover art renderer is busy.')
     try {
-      const source = await this.getSource(url)
+      if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+      const source = await this.getSource(url, signal)
+      if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
       const image = await loadImage(source)
+      if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
       if (
         !Number.isFinite(image.width) ||
         !Number.isFinite(image.height) ||
@@ -190,7 +228,7 @@ export class JumbleImageRenderer {
     if (candidates.length === 0) {
       throw new JumbleImageError('The music service did not return usable cover art.')
     }
-    const active = new Map<number, Promise<RenderFallbackEvent>>()
+    const active = new Map<number, ActiveFallbackAttempt>()
     let nextIndex = 0
     let lastError: JumbleImageError | undefined
     let hedgeTimer: ReturnType<typeof setTimeout> | undefined
@@ -202,25 +240,40 @@ export class JumbleImageRenderer {
       hedge = undefined
     }
 
+    const cancelLosingAttempts = (winnerIndex: number): void => {
+      for (const [index, attempt] of active) {
+        if (index === winnerIndex) continue
+        clearTimeout(attempt.timeout)
+        attempt.controller.abort()
+      }
+    }
+
     const startNext = (): void => {
       const index = nextIndex
       const url = candidates[index]
       if (url === undefined) return
       nextIndex += 1
 
-      const task = this.renderImage(url, pixelationLevel).then(
-        (buffer) => ({ kind: 'rendered', index, buffer }) as const,
-        (error: unknown) =>
-          ({
-            kind: 'failed',
-            index,
-            error:
-              error instanceof JumbleImageError
-                ? error
-                : new JumbleImageError('Cover art could not be rendered.')
-          }) as const
+      const controller = new AbortController()
+      const timeout = setTimeout(
+        () => controller.abort(new DOMException('The fallback source timed out.', 'TimeoutError')),
+        this.fallbackTimeoutMs
       )
-      active.set(index, task)
+      const task = this.renderImage(url, pixelationLevel, controller.signal)
+        .then(
+          (buffer) => ({ kind: 'rendered', index, buffer }) as const,
+          (error: unknown) =>
+            ({
+              kind: 'failed',
+              index,
+              error:
+                error instanceof JumbleImageError
+                  ? error
+                  : new JumbleImageError('Cover art could not be rendered.')
+            }) as const
+        )
+        .finally(() => clearTimeout(timeout))
+      active.set(index, { controller, promise: task, timeout })
     }
 
     const scheduleHedge = (): void => {
@@ -236,14 +289,15 @@ export class JumbleImageRenderer {
     startNext()
     scheduleHedge()
     while (active.size > 0) {
-      const contenders = [...active.values()]
+      const contenders = [...active.values()].map(({ promise }) => promise)
       if (hedge !== undefined) contenders.push(hedge)
       // eslint-disable-next-line no-await-in-loop -- tasky: each result decides whether the two-slot hedge can start another source
       const event = await Promise.race(contenders)
       const rendered = match(event)
         .returnType<Buffer | undefined>()
-        .with({ kind: 'rendered' }, ({ buffer }) => {
+        .with({ kind: 'rendered' }, ({ index, buffer }) => {
           cancelHedge()
+          cancelLosingAttempts(index)
           return buffer
         })
         .with({ kind: 'failed' }, ({ index, error }) => {
@@ -265,7 +319,7 @@ export class JumbleImageRenderer {
     throw lastError ?? new JumbleImageError('Cover art could not be rendered.')
   }
 
-  private async getSource(url: string): Promise<Buffer> {
+  private async getSource(url: string, signal?: AbortSignal): Promise<Buffer> {
     const cached = this.cache.get(url)
     if (cached !== undefined) {
       this.cache.delete(url)
@@ -274,18 +328,55 @@ export class JumbleImageRenderer {
     }
 
     const existing = this.inflightSources.get(url)
-    if (existing !== undefined) return existing
+    if (existing !== undefined) return this.waitForSource(url, existing, signal)
 
-    const task = this.downloadSource(url)
-    this.inflightSources.set(url, task)
+    const controller = new AbortController()
+    let request: InflightSource
+    const task = this.downloadSource(url, controller.signal).then(
+      (buffer) => {
+        request.settled = true
+        if (this.inflightSources.get(url) === request) this.inflightSources.delete(url)
+        return buffer
+      },
+      (error: unknown) => {
+        request.settled = true
+        if (this.inflightSources.get(url) === request) this.inflightSources.delete(url)
+        throw error
+      }
+    )
+    request = { controller, consumers: 0, promise: task, settled: false }
+    this.inflightSources.set(url, request)
+    void task.catch(() => undefined)
+    return this.waitForSource(url, request, signal)
+  }
+
+  private async waitForSource(
+    url: string,
+    request: InflightSource,
+    signal?: AbortSignal
+  ): Promise<Buffer> {
+    request.consumers += 1
+    let onAbort: (() => void) | undefined
     try {
-      return await task
+      if (signal === undefined) return await request.promise
+      if (signal.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
+
+      const aborted = new Promise<never>((_, reject) => {
+        onAbort = () => reject(new DOMException('The operation was aborted.', 'AbortError'))
+        signal.addEventListener('abort', onAbort, { once: true })
+      })
+      return await Promise.race([request.promise, aborted])
     } finally {
-      this.inflightSources.delete(url)
+      if (onAbort !== undefined) signal?.removeEventListener('abort', onAbort)
+      request.consumers -= 1
+      if (request.consumers === 0 && !request.settled) {
+        request.controller.abort(signal?.reason)
+        if (this.inflightSources.get(url) === request) this.inflightSources.delete(url)
+      }
     }
   }
 
-  private async downloadSource(url: string): Promise<Buffer> {
+  private async downloadSource(url: string, signal: AbortSignal): Promise<Buffer> {
     let parsed: URL
     try {
       parsed = new URL(url)
@@ -297,10 +388,19 @@ export class JumbleImageRenderer {
     }
 
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), this.timeoutMs)
+    let timedOut = false
+    const abortDownload = (): void => controller.abort()
+    if (signal.aborted) abortDownload()
+    else signal.addEventListener('abort', abortDownload, { once: true })
+    const timer = setTimeout(() => {
+      timedOut = true
+      abortDownload()
+    }, this.timeoutMs)
     try {
       const response = await this.fetchImpl(parsed, { signal: controller.signal })
-      if (!response.ok) throw new JumbleImageError(`Cover art returned HTTP ${response.status}.`)
+      if (!response.ok) {
+        throw new JumbleImageError(`Cover art returned HTTP ${response.status}.`, response.status)
+      }
       const contentType = response.headers.get('content-type')
       if (contentType !== null && !contentType.toLowerCase().startsWith('image/')) {
         throw new JumbleImageError('Cover art returned an unexpected file type.')
@@ -322,18 +422,26 @@ export class JumbleImageRenderer {
       throw match(error)
         .with(P.instanceOf(JumbleImageError), (value) => value)
         .when(
+          () => timedOut,
+          () => new JumbleImageError('Cover art took too long to download.')
+        )
+        .when(
+          () => signal.reason instanceof DOMException && signal.reason.name === 'TimeoutError',
+          () => new JumbleImageError('Cover art took too long to download.')
+        )
+        .when(
+          () => signal.aborted,
+          () => new JumbleImageError('Cover art download was cancelled.')
+        )
+        .when(
           (value): value is Error =>
             value instanceof Error && value.message.includes('safety limit'),
           () => new JumbleImageError('Cover art is too large to process.')
         )
-        .when(
-          (value): value is DOMException =>
-            value instanceof DOMException && value.name === 'AbortError',
-          () => new JumbleImageError('Cover art took too long to download.')
-        )
         .otherwise(() => new JumbleImageError('Cover art could not be downloaded.'))
     } finally {
       clearTimeout(timer)
+      signal.removeEventListener('abort', abortDownload)
     }
   }
 
@@ -353,17 +461,29 @@ function boundedArtworkUrls(urls: readonly string[]): string[] {
 
 class AsyncGate {
   private active = 0
-  private readonly waiters: Array<() => void> = []
+  private readonly waiters: GateWaiter[] = []
 
   constructor(
     private readonly limit: number,
     private readonly maxPending: number
   ) {}
 
-  async acquire(): Promise<(() => void) | null> {
+  async acquire(signal?: AbortSignal): Promise<(() => void) | null> {
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError')
     if (this.active >= this.limit) {
       if (this.waiters.length >= this.maxPending) return null
-      await new Promise<void>((resolve) => this.waiters.push(resolve))
+      await new Promise<void>((resolve, reject) => {
+        const waiter: GateWaiter = { reject, resolve, signal }
+        if (signal !== undefined) {
+          waiter.onAbort = () => {
+            const index = this.waiters.indexOf(waiter)
+            if (index >= 0) this.waiters.splice(index, 1)
+            reject(new DOMException('The operation was aborted.', 'AbortError'))
+          }
+          signal.addEventListener('abort', waiter.onAbort, { once: true })
+        }
+        this.waiters.push(waiter)
+      })
     }
     this.active += 1
     let released = false
@@ -371,7 +491,12 @@ class AsyncGate {
       if (released) return
       released = true
       this.active -= 1
-      this.waiters.shift()?.()
+      const waiter = this.waiters.shift()
+      if (waiter === undefined) return
+      if (waiter.onAbort !== undefined) {
+        waiter.signal?.removeEventListener('abort', waiter.onAbort)
+      }
+      waiter.resolve()
     }
   }
 }

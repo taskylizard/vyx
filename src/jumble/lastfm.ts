@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { clamp } from 'radashi'
 import { match, P } from 'ts-pattern'
 import { z } from 'zod'
+import { traceBackgroundOperation } from '../observability/tracing.ts'
 import { normalizeAnswer } from './answer.ts'
 import {
   getCandidateImageUrls,
@@ -319,7 +320,11 @@ export class LastFmClient implements JumbleMusicProvider {
     return {
       status: 'deferred',
       candidate: detailed,
-      completion: this.enrichCandidate(detailed, 'background')
+      completion: traceBackgroundOperation(
+        'jumble.enrichment.background',
+        { 'jumble.kind': detailed.kind },
+        () => this.enrichCandidate(detailed, 'background')
+      )
     }
   }
 
