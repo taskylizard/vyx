@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite-plus'
-import oxclippyRecommended from './tooling/oxlint/presets/recommended.ts'
+import lintConfig from './tooling/oxlint/config.ts'
 
 export default defineConfig({
   pack: {
@@ -7,13 +7,20 @@ export default defineConfig({
     entry: ['src/run.ts']
   },
   lint: {
-    ignorePatterns: ['rosepack/**'],
+    ignorePatterns: ['rosepack/**', 'dist/**', 'coverage/**'],
+    env: {
+      builtin: true,
+      node: true
+    },
+    plugins: ['unicorn', 'typescript', 'oxc', 'import', 'node', 'promise'],
     categories: {
-      perf: 'error'
+      correctness: 'error',
+      perf: 'error',
+      suspicious: 'warn'
     },
     jsPlugins: ['./tooling/oxlint/plugin.ts'],
-    extends: [oxclippyRecommended],
-    options: {
+    extends: [lintConfig],    options: {
+      reportUnusedDisableDirectives: 'warn',
       typeAware: true,
       typeCheck: true
     }
@@ -22,6 +29,7 @@ export default defineConfig({
     '*': 'vp check --fix'
   },
   fmt: {
+    ignorePatterns: ['rosepack/**', 'dist/**', 'coverage/**'],
     quoteProps: 'preserve',
     printWidth: 100,
     singleQuote: true,
