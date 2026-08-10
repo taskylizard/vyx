@@ -20,8 +20,7 @@ export async function handleMessageCreate(context: BotContext, message: Message)
   try {
     if (guildID !== null) {
       const handledByJumble = await handleJumbleMessage(context.client, message, {
-        service: context.jumble,
-        renderer: context.jumbleRenderer,
+        jumble: context.jumble,
         idsFor: (state) => componentIds(state.session.id),
         isEnabled: () =>
           context.moduleStore.isEnabled({

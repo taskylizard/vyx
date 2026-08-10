@@ -25,7 +25,6 @@ export interface KanikouDatabase {
 
 const DEFAULT_DATABASE_URL = 'file:./data/kanikou.db'
 
-/** Create Kanikou's libSQL client and apply pending Drizzle migrations. */
 export function createKanikouDatabase(options: KanikouDatabaseOptions = {}): KanikouDatabase {
   const url = options.url ?? DEFAULT_DATABASE_URL
   const ownsClient = options.client === undefined

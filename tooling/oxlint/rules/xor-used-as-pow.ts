@@ -18,8 +18,8 @@ export default {
         // Only flag when both sides are integer literals (strong signal of mistake)
         if (!isIntLiteral(node.left) || !isIntLiteral(node.right)) return
 
-        const base = node.left.value as number
-        const exp = node.right.value as number
+        const base = node.left.value
+        const exp = node.right.value
 
         // Common exponentiation patterns: 2^N, 10^N, small^small
         if (base >= 2 && exp >= 2) {

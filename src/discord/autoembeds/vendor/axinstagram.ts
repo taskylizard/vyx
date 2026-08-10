@@ -1,4 +1,4 @@
-// tasky: vendored and adapted with permission from edideaur/axinstagram@f98affd
+// oxlint-disable no-underscore-dangle
 import { z } from 'zod'
 import type { ResolvedInstagramMedia } from './types.ts'
 
@@ -147,7 +147,7 @@ export function extractFromGQL(data: unknown): AxMediaResult | undefined {
     return undefined
   }
   const media = parsed.data.gql_data?.shortcode_media ?? parsed.data.gql_data?.xdt_shortcode_media
-  if (media == null) return undefined
+  if (!media) return undefined
 
   const sidecar = media.edge_sidecar_to_children
   if (sidecar?.edges.length) {
@@ -168,12 +168,10 @@ export function extractFromGQL(data: unknown): AxMediaResult | undefined {
     return photos.length > 0 ? { isPhoto: true, photos } : undefined
   }
 
-  if (typeof media.video_url === 'string') {
-    return { videoUrl: media.video_url }
-  }
-  if (typeof media.display_url === 'string') {
+  if (typeof media.video_url === 'string') return { videoUrl: media.video_url }
+  if (typeof media.display_url === 'string')
     return { isPhoto: true, thumbUrl: media.display_url, videoUrl: media.display_url }
-  }
+
   return undefined
 }
 
@@ -241,7 +239,7 @@ async function tryHTMLEmbed(postID: string, signal?: AbortSignal): Promise<unkno
     if (!response?.ok) {
       continue
     }
-    // eslint-disable-next-line no-await-in-loop -- tasky: sequential fallback, reads the response body before trying the next endpoint
+    // eslint-disable-next-line no-await-in-loop -- tasky: same reason as ^^, reads the response body before trying the next endpoint
     const html = await response.text()
     const context = parseEmbedContext(html)
     if (context) {
@@ -295,7 +293,7 @@ async function tryGraphQL(postID: string, signal?: AbortSignal): Promise<unknown
     __hs: String(site?.haste_session ?? '20126.HYP:instagram_web_pkg.2.1...0'),
     __hsi: String(site?.hsi ?? '7436540909012459023'),
     __req: 'b',
-    __rev: String(pushInfo.success ? (pushInfo.data.rollout_hash ?? '1019933358') : '1019933358'),
+    __rev: pushInfo.success ? (pushInfo.data.rollout_hash ?? '1019933358') : '1019933358',
     __s: `::${randomBase64url(6)}`,
     __spin_b: String(site?.__spin_b ?? 'trunk'),
     __spin_r: String(site?.__spin_r ?? '1019933358'),

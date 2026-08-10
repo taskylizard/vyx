@@ -48,7 +48,7 @@ export default slash({
           await context.editResponse('That Jumble type is not available.')
           return
         }
-        const result = await context.app.jumble.start({
+        const result = await context.app.jumble.service.start({
           starterUserId: context.interaction.user.id,
           guildId: context.interaction.guildID,
           channelId: context.interaction.channelID,
@@ -57,7 +57,7 @@ export default slash({
         })
         const rendered = await renderJumble(
           result.state,
-          context.app.jumbleRenderer,
+          context.app.jumble.renderer,
           componentIds(result.state.session.id),
           result.action
         )
@@ -69,7 +69,7 @@ export default slash({
         await context.editResponse(rendered.payload)
         try {
           const original = await context.interaction.getOriginal()
-          await context.app.jumble.attachMessage(result.state.session.id, original.id)
+          await context.app.jumble.service.attachMessage(result.state.session.id, original.id)
         } catch (error) {
           context.app.logger.warn('jumble message ID could not be saved', { error })
         }

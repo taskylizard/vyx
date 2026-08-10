@@ -9,8 +9,8 @@ function caseBodySource(caseNode: Node, sourceText: string): string {
   // Exclude break statements from comparison
   const meaningful = stmts.filter((s: Node) => s.type !== 'BreakStatement')
   if (meaningful.length === 0) return ''
-  const first = meaningful[0]!
-  const last = meaningful[meaningful.length - 1]!
+  const first = meaningful[0]
+  const last = meaningful[meaningful.length - 1]
   if (first.start == null || last.end == null) return ''
   return sourceText.slice(first.start, last.end)
 }

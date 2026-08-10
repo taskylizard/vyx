@@ -1,11 +1,6 @@
 import { integer, index, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
-/**
- * The small, intentionally boring schema behind Jumble. Music metadata is
- * copied into a session so a game remains answerable when Last.fm changes or
- * becomes unavailable later.
- */
 export const jumbleProfiles = sqliteTable(
   'jumble_profiles',
   {
@@ -79,11 +74,6 @@ export const jumbleHints = sqliteTable(
   (table) => [index('jumble_hints_session_idx').on(table.sessionId, table.hintOrder)]
 )
 
-/**
- * Compact, provider-agnostic metadata cache entries.  Raw provider responses
- * are deliberately not retained here: callers store only the small normalized
- * object needed to build a game.
- */
 export const jumbleMetadataCache = sqliteTable(
   'jumble_metadata_cache',
   {

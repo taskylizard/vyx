@@ -6,8 +6,8 @@ import type { Context, Node } from '../types.ts'
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length - 1; i++) {
-    const decl = body[i]!
-    const next = body[i + 1]!
+    const decl = body[i]
+    const next = body[i + 1]
 
     if (decl.type !== 'VariableDeclaration' || decl.declarations.length !== 1) continue
     const d = decl.declarations[0]!

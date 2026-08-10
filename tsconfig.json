@@ -17,5 +17,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "tests", "examples/rosepack/src"]
+  "include": ["src", "tests", "tooling"]
 }

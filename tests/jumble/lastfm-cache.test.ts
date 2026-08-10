@@ -273,7 +273,7 @@ test('merges and deduplicates multiple top-list pages for larger candidate windo
     { answer: 'Shared Track' },
     { answer: 'Deep Track' }
   ])
-  expect(pages.sort((first, second) => first - second)).toEqual([1, 2, 3])
+  expect(pages.toSorted((first, second) => first - second)).toEqual([1, 2, 3])
 })
 
 test('keeps the first candidate page when deeper pages fail', async () => {

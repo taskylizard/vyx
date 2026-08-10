@@ -7,9 +7,7 @@ export function formatThinkingProgress(toolNames: readonly string[]): string {
 }
 
 export function formatCompletedResponse(content: string, toolNames: readonly string[]): string {
-  if (toolNames.length === 0) {
-    return content
-  }
+  if (toolNames.length === 0) return content
 
   return `${content}\n-# Tools: ${compactToolNames(toolNames).join(', ')}`
 }

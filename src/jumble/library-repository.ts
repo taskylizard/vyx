@@ -39,7 +39,7 @@ export class JumbleLibraryRepository {
       )
       .limit(1)
     const activeRefreshVersion = state[0]?.activeRefreshVersion
-    if (activeRefreshVersion === null || activeRefreshVersion === undefined)
+    if (activeRefreshVersion === null)
       return { candidates: [], refreshAfter: state[0]?.refreshAfter ?? null }
     const rows = await this.db
       .select()
@@ -146,7 +146,7 @@ export class JumbleLibraryRepository {
     const counts: JumbleKindTrackedCounts = { artist: 0, album: 0, track: 0 }
     for (const row of rows) {
       if (row.kind === 'artist' || row.kind === 'album' || row.kind === 'track') {
-        counts[row.kind] = Number(row.count)
+        counts[row.kind] = row.count
       }
     }
     return counts
@@ -278,7 +278,7 @@ export class JumbleLibraryRepository {
       return false
     }
     const retainedVersions = [version, state[0]?.activeRefreshVersion].filter(
-      (value): value is string => value !== null && value !== undefined
+      (value): value is string => value !== null
     )
     const stillOwnsPublishedGeneration = this.db
       .select({ one: sql`1` })

@@ -12,7 +12,7 @@ function alwaysExits(node: Node): boolean {
     case 'BreakStatement':
       return true
     case 'BlockStatement':
-      return node.body.length > 0 && alwaysExits(node.body[node.body.length - 1]!)
+      return node.body.length > 0 && alwaysExits(node.body[node.body.length - 1])
     case 'IfStatement':
       return !!node.alternate && alwaysExits(node.consequent) && alwaysExits(node.alternate)
     case 'ExpressionStatement':

@@ -1,8 +1,7 @@
 {
   "name": "kanikou",
   "version": "0.0.0",
-  "description": "Kanikou Discord bot library.",
-  "license": "MIT",
+  "description": "W larp",
   "files": [
     "dist",
     "drizzle"
@@ -56,12 +55,14 @@
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.77.0",
     "@types/node": "26.1.1",
     "bumpp": "11.1.0",
     "drizzle-kit": "0.31.10",
     "typescript": "7.0.2",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "zod-compiler": "^1.26.0"
   },
   "devEngines": {
     "packageManager": {

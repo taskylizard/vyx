@@ -11,6 +11,7 @@ import { buildJumblePayload, buildJumbleReplayComponents } from '../../src/jumbl
 import type { JumbleImageRenderer } from '../../src/jumble/renderer.ts'
 import type { JumbleService } from '../../src/jumble/service.ts'
 import type { JumbleCandidate, JumbleKind, JumbleState } from '../../src/jumble/types.ts'
+import type { JumbleMetadataCache } from '../../src/index.ts'
 
 test('play again disables the completed button and uses the cached channel for the new game', async () => {
   const state = jumbleState('track', false)
@@ -269,8 +270,11 @@ test.each([
     } as unknown as JumbleService
 
     const handled = await handleJumbleMessage(client, message, {
-      service,
-      renderer: {} as JumbleImageRenderer,
+      jumble: {
+        service,
+        renderer: {} as JumbleImageRenderer,
+        metadataCache: {} as JumbleMetadataCache
+      },
       idsFor: () => ({
         giveUp: '',
         hint: '',
@@ -352,8 +356,11 @@ test('winning a continuous game automatically sends the next game', async () => 
   } as unknown as JumbleService
 
   await handleJumbleMessage(client, message, {
-    service,
-    renderer: {} as JumbleImageRenderer,
+    jumble: {
+      service,
+      renderer: {} as JumbleImageRenderer,
+      metadataCache: {} as JumbleMetadataCache
+    },
     idsFor: (state) => componentIds(state.session.id)
   })
 
@@ -405,8 +412,11 @@ test('saying cancel stops a continuous game without recording a guess', async ()
   } as unknown as JumbleService
 
   await handleJumbleMessage(client, message, {
-    service,
-    renderer: {} as JumbleImageRenderer,
+    jumble: {
+      service,
+      renderer: {} as JumbleImageRenderer,
+      metadataCache: {} as JumbleMetadataCache
+    },
     idsFor: (state) => componentIds(state.session.id)
   })
 
@@ -454,8 +464,11 @@ test('does not reply or react to an incorrect guess', async () => {
   } as unknown as JumbleService
 
   await handleJumbleMessage(client, message, {
-    service,
-    renderer: {} as JumbleImageRenderer,
+    jumble: {
+      service,
+      renderer: {} as JumbleImageRenderer,
+      metadataCache: {} as JumbleMetadataCache
+    },
     idsFor: () => ({
       giveUp: '',
       hint: '',

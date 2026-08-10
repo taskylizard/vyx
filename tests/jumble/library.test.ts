@@ -412,7 +412,7 @@ test.each(['artist', 'album', 'track'] satisfies readonly JumbleKind[])(
     )
 
     await library.get('user', kind, 'name')
-    library.remember('user', kind, 'name', { ...candidates[0]!, listeners: 123 })
+    library.remember('user', kind, 'name', { ...candidates[0], listeners: 123 })
     await library.drain()
 
     const restored = await library.get('user', kind, 'name')

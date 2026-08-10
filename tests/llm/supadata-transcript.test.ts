@@ -5,7 +5,7 @@ import {
   executeSupadataTranscript,
   type SupadataTranscriptClient
 } from '../../src/llm/tools/supadata-transcript.ts'
-import { createKanikouTools, SUPADATA_TRANSCRIPT_TOOL_NAME } from '../../src/llm/tools/index.ts'
+import { createAiTools, SUPADATA_TRANSCRIPT_TOOL_NAME } from '../../src/llm/tools/index.ts'
 
 const videoUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
 const transcript: Transcript = {
@@ -16,8 +16,8 @@ const transcript: Transcript = {
 
 test('registers Supadata only when it is configured', () => {
   const client = createClient(transcript)
-  const withoutSupadata = createKanikouTools({})
-  const withSupadata = createKanikouTools({
+  const withoutSupadata = createAiTools({})
+  const withSupadata = createAiTools({
     supadata: { apiKey: 'supadata-key', client }
   })
 

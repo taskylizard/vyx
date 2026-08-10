@@ -24,7 +24,7 @@ export interface GuildModuleMutationResult {
 }
 
 /**
- * Stores Rosepack's guild-module selection and command ownership metadata.
+ * Stores rosepack's guild-module selection and command ownership metadata.
  *
  * Module changes use a compare-and-swap update. This keeps read/modify/write
  * operations safe when more than one bot process is connected to the same
@@ -39,7 +39,7 @@ export class GuildSettingsStore {
 
   async read({ applicationID, guildID }: GuildModuleStateScope): Promise<readonly string[]> {
     const row = await this.find(applicationID, guildID)
-    return parseStringArray(row?.enabledModules)
+    return parseStringArray(row.enabledModules)
   }
 
   async isEnabled({
@@ -59,7 +59,7 @@ export class GuildSettingsStore {
     for (let attempt = 0; attempt < MAX_MUTATION_ATTEMPTS; attempt += 1) {
       // eslint-disable-next-line no-await-in-loop -- tasky: sequential optimistic retry, each attempt re-reads current state before mutating
       const row = await this.find(applicationID, guildID)
-      const rawModules = row?.enabledModules ?? '[]'
+      const rawModules = row.enabledModules
       const current = parseStringArray(rawModules)
       const currentlyEnabled = current.includes(module)
       if (currentlyEnabled === enabled) {
@@ -70,22 +70,6 @@ export class GuildSettingsStore {
         .with(true, () => [...current, module])
         .otherwise(() => current.filter((value) => value !== module))
       const encoded = JSON.stringify(next)
-
-      if (row === undefined) {
-        // eslint-disable-next-line no-await-in-loop -- tasky: sequential optimistic retry, insert then re-read on conflict
-        await this.db
-          .insert(guildSettings)
-          .values({
-            applicationId: applicationID,
-            guildId: guildID,
-            enabledModules: '[]',
-            ownedCommandKeys: '[]',
-            updatedAt: Date.now()
-          })
-          .onConflictDoNothing()
-          .run()
-        continue
-      }
 
       // eslint-disable-next-line no-await-in-loop -- tasky: sequential optimistic retry, update then check rowsAffected
       const result = await this.db
@@ -112,7 +96,7 @@ export class GuildSettingsStore {
     guildID
   }: GuildModuleStateScope): Promise<readonly ApplicationCommandKey[]> {
     const row = await this.find(applicationID, guildID)
-    return parseCommandKeys(row?.ownedCommandKeys)
+    return parseCommandKeys(row.ownedCommandKeys)
   }
 
   async writeOwnedCommandKeys({

@@ -1,3 +1,4 @@
+import type { JumbleLibrary } from './library.ts'
 import type { JumbleTimingSink } from './timing.ts'
 
 export const JUMBLE_KINDS = ['artist', 'album', 'track'] as const
@@ -212,7 +213,7 @@ export interface JumbleServiceOptions {
   randomIndex?: (maxExclusive: number) => number
   onExpired?: (state: JumbleState) => void | Promise<void>
   onTiming?: JumbleTimingSink
-  library?: import('./library.ts').JumbleLibrary
+  library?: JumbleLibrary
 }
 
 export function isJumbleKind(value: string): value is JumbleKind {

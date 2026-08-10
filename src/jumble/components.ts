@@ -27,7 +27,7 @@ export const jumbleHintButton = button({
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
-    const result = await context.app.jumble.revealHint(context.params.sessionId)
+    const result = await context.app.jumble.service.revealHint(context.params.sessionId)
     await updateJumbleComponent(context, result)
   }
 })
@@ -39,7 +39,7 @@ export const jumbleUnblurButton = button({
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
-    const result = await context.app.jumble.unblur(context.params.sessionId)
+    const result = await context.app.jumble.service.unblur(context.params.sessionId)
     await updateJumbleComponent(context, result)
   }
 })
@@ -51,7 +51,7 @@ export const jumbleReshuffleButton = button({
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
-    const result = await context.app.jumble.reshuffle(context.params.sessionId)
+    const result = await context.app.jumble.service.reshuffle(context.params.sessionId)
     await updateJumbleComponent(context, result)
   }
 })
@@ -63,7 +63,7 @@ export const jumbleGiveUpButton = button({
   async execute(context) {
     await context.deferUpdate()
     await assertComponentSession(context, context.params.sessionId)
-    const result = await context.app.jumble.giveUp(
+    const result = await context.app.jumble.service.giveUp(
       context.params.sessionId,
       context.interaction.user.id
     )
@@ -82,17 +82,14 @@ export const jumbleReplayButton = button({
     }
 
     const replayCustomID = jumbleReplayButton.buildID({ params: { kind } })
-    const userDisplayName =
-      context.interaction.member.displayName ??
-      context.interaction.user.globalName ??
-      context.interaction.user.username
+    const userDisplayName = context.interaction.member.displayName
     await startJumbleFromCompletedMessage(context, {
       pendingComponents: buildJumbleReplayComponents(replayCustomID, undefined, {
         status: 'playing',
         userDisplayName
       }),
       start: () =>
-        context.app.jumble.start({
+        context.app.jumble.service.start({
           starterUserId: context.interaction.user.id,
           guildId: context.interaction.guildID,
           channelId: context.interaction.channelID,
@@ -112,13 +109,10 @@ export const jumbleStartSessionButton = button({
     const customID = jumbleStartSessionButton.buildID({
       params: { sessionId: context.params.sessionId }
     })
-    const userDisplayName =
-      context.interaction.member.displayName ??
-      context.interaction.user.globalName ??
-      context.interaction.user.username
+    const userDisplayName = context.interaction.member.displayName
     await startJumbleFromCompletedMessage(context, {
       pendingComponents: buildJumbleSessionStartingComponents(customID, userDisplayName),
-      start: () => context.app.jumble.startContinuousSession(context.params.sessionId)
+      start: () => context.app.jumble.service.startContinuousSession(context.params.sessionId)
     })
   }
 })
@@ -143,7 +137,7 @@ async function startJumbleFromCompletedMessage<TRoute extends string>(
     const created = await createJumbleGameMessage(
       context.client,
       result,
-      context.app.jumbleRenderer,
+      context.app.jumble.renderer,
       componentIds(result.state.session.id)
     )
     if (created.imageError !== undefined) {
@@ -152,14 +146,14 @@ async function startJumbleFromCompletedMessage<TRoute extends string>(
       })
     }
     try {
-      await context.app.jumble.attachMessage(result.state.session.id, created.message.id)
+      await context.app.jumble.service.attachMessage(result.state.session.id, created.message.id)
     } catch (error) {
       context.app.logger.warn('jumble message ID could not be saved', { error })
     }
   } catch (error) {
     if (startedSessionId !== undefined) {
       try {
-        await context.app.jumble.expire(startedSessionId)
+        await context.app.jumble.service.expire(startedSessionId)
       } catch (expiryError) {
         context.app.logger.warn('failed component-started Jumble could not be expired', {
           error: expiryError
@@ -205,7 +199,7 @@ async function updateJumbleComponent<TRoute extends string>(
 ): Promise<void> {
   const rendered = await renderJumble(
     result.state,
-    context.app.jumbleRenderer,
+    context.app.jumble.renderer,
     componentIds(result.state.session.id),
     result.action
   )
@@ -219,7 +213,7 @@ async function assertComponentSession<TRoute extends string>(
   context: JumbleComponentContext<TRoute>,
   sessionId: string
 ): Promise<JumbleState> {
-  const state = await context.app.jumble.getState(sessionId)
+  const state = await context.app.jumble.service.getState(sessionId)
   if (
     state.session.channelId !== context.interaction.channelID ||
     (state.session.messageId !== null && state.session.messageId !== context.interaction.message.id)

@@ -8,8 +8,8 @@ import { getFunctionBody } from '../types.ts'
 function checkBody(body: Node[], context: Context) {
   if (body.length < 2) return
 
-  const last = body[body.length - 1]!
-  const secondLast = body[body.length - 2]!
+  const last = body[body.length - 1]
+  const secondLast = body[body.length - 2]
 
   // Last must be: return x;
   if (last.type !== 'ReturnStatement' || !last.argument || last.argument.type !== 'Identifier')

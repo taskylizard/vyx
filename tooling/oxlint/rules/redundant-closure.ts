@@ -56,7 +56,7 @@ export default {
         const { paramName, bodyExpr } = extracted
 
         if (bodyExpr.type !== 'CallExpression' || bodyExpr.arguments.length !== 1) return
-        if (!isIdentifier(bodyExpr.arguments[0]!, paramName)) return
+        if (!isIdentifier(bodyExpr.arguments[0], paramName)) return
 
         const fnCallee = bodyExpr.callee
         if (isIdentifier(fnCallee) && SAFE_SINGLE_ARG.has(fnCallee.name)) {

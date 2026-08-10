@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite-plus'
 import lintConfig from './tooling/oxlint/config.ts'
+import zodCompiler from 'zod-compiler/rolldown'
 
 export default defineConfig({
   pack: {
-    dts: false,
-    entry: ['src/run.ts']
+    entry: ['src/run.ts'],
+    plugins: [zodCompiler()],
+    dts: false
   },
   lint: {
     ignorePatterns: ['rosepack/**', 'dist/**', 'coverage/**'],
@@ -19,11 +21,20 @@ export default defineConfig({
       suspicious: 'warn'
     },
     jsPlugins: ['./tooling/oxlint/plugin.ts'],
-    extends: [lintConfig],    options: {
+    extends: [lintConfig],
+    options: {
       reportUnusedDisableDirectives: 'warn',
       typeAware: true,
       typeCheck: true
-    }
+    },
+    overrides: [
+      {
+        files: ['tests/**'],
+        rules: {
+          'typescript/no-unsafe-type-assertion': 'off'
+        }
+      }
+    ]
   },
   staged: {
     '*': 'vp check --fix'

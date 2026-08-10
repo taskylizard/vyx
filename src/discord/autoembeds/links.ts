@@ -18,12 +18,10 @@ export interface AutoembedLink {
 export function findAutoembedLinks(content: string): Array<AutoembedLink> {
   const links: Array<AutoembedLink> = []
 
-  for (const match of content.matchAll(AUTOEMBED_URL_PATTERN)) {
-    const rawURL = match[0]
-    const host = match.groups?.host?.toLowerCase()
-    if (rawURL === undefined || host === undefined) {
-      continue
-    }
+  for (const matched of content.matchAll(AUTOEMBED_URL_PATTERN)) {
+    const rawURL = matched[0]
+    const host = matched.groups?.host.toLowerCase()
+    if (!rawURL || !host) continue
 
     const url = cleanURL(rawURL)
     const service = serviceForURL(host, url)
@@ -88,11 +86,11 @@ function statusIDFromURL(url: string): string | undefined {
   }
 }
 
-function replaceHost(url: string, replacementHost: string): string {
+function replaceHost(url: string, host: string): string {
   const schemeEnd = url.indexOf('://') + 3
   const pathStart = url.slice(schemeEnd).search(/[/?#]/u)
   const hostEnd = pathStart === -1 ? url.length : schemeEnd + pathStart
-  return `${url.slice(0, schemeEnd)}${replacementHost}${url.slice(hostEnd)}`
+  return `${url.slice(0, schemeEnd)}${host}${url.slice(hostEnd)}`
 }
 
 function cleanURL(url: string): string {

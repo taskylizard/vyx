@@ -9,9 +9,10 @@ import {
   buildJumbleWinnerAnnouncement,
   type JumbleComponentIds
 } from './presentation.ts'
-import { JumbleError, type JumbleService } from './service.ts'
+import { JumbleError } from './service.ts'
 import type { JumbleAction, JumbleActionResult, JumbleState } from './types.ts'
 import { startJumbleTyping } from './typing.ts'
+import type { Jumble } from './index.ts'
 
 export interface JumbleComponentIdFactory {
   hint(sessionId: string): string
@@ -28,8 +29,7 @@ export interface RenderedJumble {
 }
 
 export interface HandleJumbleMessageOptions {
-  service: JumbleService
-  renderer: JumbleImageRenderer
+  jumble: Jumble
   idsFor: (state: JumbleState) => JumbleComponentIds
   isEnabled?: () => Promise<boolean>
   onImageError?: (error: Error) => void
@@ -56,10 +56,10 @@ export async function renderJumble(
       image =
         state.session.endedAt === null
           ? imageUrls.length === 1
-            ? await renderer.render(imageUrls[0]!, state.session.blurStage)
+            ? await renderer.render(imageUrls[0], state.session.blurStage)
             : await renderer.renderWithFallback(imageUrls, state.session.blurStage)
           : imageUrls.length === 1
-            ? await renderer.reveal(imageUrls[0]!)
+            ? await renderer.reveal(imageUrls[0])
             : await renderer.revealWithFallback(imageUrls)
     } catch (error) {
       imageError = error instanceof Error ? error : new Error(String(error))
@@ -96,9 +96,9 @@ export async function handleJumbleMessage(
   message: Message,
   options: HandleJumbleMessageOptions
 ): Promise<boolean> {
-  const { service, renderer, idsFor, isEnabled } = options
+  const { jumble, idsFor, isEnabled } = options
   if (message.author.bot || message.content.trim().length === 0) return false
-  const active = await service.activeForChannel(message.channelID)
+  const active = await jumble.service.activeForChannel(message.channelID)
   if (active === null) return false
   if (isEnabled !== undefined && !(await isEnabled())) return false
 
@@ -106,7 +106,7 @@ export async function handleJumbleMessage(
     result: JumbleActionResult,
     action: 'won' | 'expired' | 'gave_up' | 'cancelled'
   ): Promise<void> => {
-    const rendered = await renderJumble(result.state, renderer, idsFor(result.state), action)
+    const rendered = await renderJumble(result.state, jumble.renderer, idsFor(result.state), action)
     if (result.state.session.messageId !== null) {
       await safeEditMessage(
         client,
@@ -121,13 +121,17 @@ export async function handleJumbleMessage(
     active.session.metadata.continuousSession !== undefined &&
     message.content.trim().toLowerCase() === 'cancel'
   ) {
-    const cancelled = await service.cancelContinuousSession(active.session.id)
+    const cancelled = await jumble.service.cancelContinuousSession(active.session.id)
     await renderFinished(cancelled, 'cancelled')
     await safeCreateReaction(message, '🛑')
     return true
   }
 
-  const result = await service.submitGuess(active.session.id, message.author.id, message.content)
+  const result = await jumble.service.submitGuess(
+    active.session.id,
+    message.author.id,
+    message.content
+  )
   await match(result.action)
     .with('won', async (action) => {
       await renderFinished(result, action)
@@ -158,25 +162,25 @@ async function continueJumbleSession(
   const stopTyping = startJumbleTyping(client, completed.session.channelId)
   let startedSessionId: string | undefined
   try {
-    const next = await options.service.continueContinuousSession(completed.session.id)
+    const next = await options.jumble.service.continueContinuousSession(completed.session.id)
     if (next === null) return
     startedSessionId = next.state.session.id
     const created = await createJumbleGameMessage(
       client,
       next,
-      options.renderer,
+      options.jumble.renderer,
       options.idsFor(next.state)
     )
     if (created.imageError !== undefined) options.onImageError?.(created.imageError)
     try {
-      await options.service.attachMessage(next.state.session.id, created.message.id)
+      await options.jumble.service.attachMessage(next.state.session.id, created.message.id)
     } catch (error) {
       options.onSessionError?.(error)
     }
   } catch (error) {
     if (startedSessionId !== undefined) {
       try {
-        await options.service.expire(startedSessionId)
+        await options.jumble.service.expire(startedSessionId)
       } catch (expiryError) {
         options.onSessionError?.(expiryError)
       }

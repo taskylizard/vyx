@@ -10,13 +10,13 @@ import {
 } from './supadata-transcript.ts'
 import { withToolRecovery } from './tool-recovery.ts'
 
-export interface KanikouToolsConfig {
+export interface ToolsConfig {
   parallel?: ParallelToolsConfig
   projectSelene?: ProjectSeleneConfig
   supadata?: SupadataTranscriptConfig
 }
 
-export function createKanikouTools(config: KanikouToolsConfig): ToolSet {
+export function createAiTools(config: ToolsConfig): ToolSet {
   const tools: ToolSet = {}
 
   if (config.parallel !== undefined) {
@@ -36,12 +36,6 @@ export function createKanikouTools(config: KanikouToolsConfig): ToolSet {
 
   return tools
 }
-
-/** @deprecated Use createKanikouTools. */
-export { createKanikouTools as createSearchTools }
-
-/** @deprecated Use KanikouToolsConfig. */
-export { type KanikouToolsConfig as SearchToolsConfig }
 
 export { createParallelExtractTool, PARALLEL_EXTRACT_TOOL_NAME } from './parallel-extract.ts'
 export { createParallelSearchTool, PARALLEL_SEARCH_TOOL_NAME } from './parallel-search.ts'

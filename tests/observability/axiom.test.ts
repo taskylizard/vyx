@@ -79,7 +79,7 @@ test('exports correlated logs, errors, and AI traces to separate Axiom datasets'
 })
 
 function traceIds(payload: string): string[] {
-  return [...payload.matchAll(/"traceId":"([a-f\d]{32})"/gu)].map((match) => match[1]!)
+  return [...payload.matchAll(/"traceId":"([a-f\d]{32})"/gu)].map((match) => match[1])
 }
 
 function expectTelemetryExports(requests: readonly ExportRequest[], resultText: string): void {

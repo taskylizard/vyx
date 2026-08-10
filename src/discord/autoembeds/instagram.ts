@@ -123,7 +123,7 @@ export function instagramComponents(
   sharer?: string
 ): Array<MessageComponent> {
   const username = post.user.username
-  const displayName = post.user.full_name || username
+  const displayName = post.user.full_name ?? username
   const verified = post.user.is_verified ? ' ✓' : ''
   const coauthors = (post.coauthor_producers ?? [])
     .flatMap((coauthor) => (coauthor.username ? [coauthor.username] : []))

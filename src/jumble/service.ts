@@ -116,7 +116,6 @@ export class JumbleService {
     this.library.startSweep()
   }
 
-  // oxlint-disable-next-line clippy(too-many-lines) -- tasky: timing phases stay local so start telemetry cannot drift from orchestration
   async start(input: StartJumbleInput): Promise<JumbleActionResult<'started'>> {
     if (this.startingChannels.has(input.channelId))
       throw new JumbleError('A Jumble is already starting in this channel.', 'busy')
@@ -550,7 +549,7 @@ export class JumbleService {
 
       for (let offset = 0; offset < attempts; offset += 1) {
         attemptedCount += 1
-        const original = hydrationPool[(startIndex + offset) % hydrationPool.length]!
+        const original = hydrationPool[(startIndex + offset) % hydrationPool.length]
         let hydration: JumbleStartHydration = { status: 'complete', candidate: original }
         const hydrationStartedAt = performance.now()
         try {
@@ -750,7 +749,7 @@ function buildCandidatePool(
 function shuffle<T>(items: T[], randomIndex: (maxExclusive: number) => number): T[] {
   for (let index = items.length - 1; index > 0; index -= 1) {
     const swapIndex = randomIndex(index + 1)
-    ;[items[index], items[swapIndex]] = [items[swapIndex]!, items[index]!]
+    ;[items[index], items[swapIndex]] = [items[swapIndex], items[index]]
   }
   return items
 }
@@ -766,6 +765,6 @@ function shuffleJumbleAnswer(value: string, randomIndex: (maxExclusive: number) 
     (letter, index) => index > first && !/\s/u.test(letter) && letter !== letters[first]
   )
   if (second < 0) return value.toUpperCase()
-  ;[letters[first], letters[second]] = [letters[second]!, letters[first]!]
+  ;[letters[first], letters[second]] = [letters[second], letters[first]]
   return letters.join('').toUpperCase()
 }

@@ -138,5 +138,5 @@ async function replyChain(context: BotContext, source: Message): Promise<Message
     current = referenced
   }
 
-  return chain.reverse()
+  return chain.toReversed()
 }

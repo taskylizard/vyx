@@ -4,7 +4,7 @@ import { expect, test, vi } from 'vite-plus/test'
 import { z } from 'zod'
 import { generateKanikouResponse } from '../../src/llm/generation.ts'
 import {
-  createKanikouTools,
+  createAiTools,
   PARALLEL_EXTRACT_TOOL_NAME,
   PARALLEL_SEARCH_TOOL_NAME
 } from '../../src/llm/tools/index.ts'
@@ -43,7 +43,7 @@ test('runs the Parallel package tool through the OpenRouter model loop', async (
 
   try {
     const openrouter = createOpenRouter({ apiKey: 'openrouter-key', fetch: modelFetch })
-    const tools = createKanikouTools({ parallel: { apiKey: 'parallel-key' } })
+    const tools = createAiTools({ parallel: { apiKey: 'parallel-key' } })
 
     expect(Object.keys(tools)).toEqual([PARALLEL_SEARCH_TOOL_NAME, PARALLEL_EXTRACT_TOOL_NAME])
     const response = await generateKanikouResponse(

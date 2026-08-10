@@ -160,12 +160,11 @@ export {
 } from './memory/markdown-memory.ts'
 export { previewMemory } from './memory/preview.ts'
 export {
-  createKanikouTools,
+  createAiTools as createKanikouTools,
   createMemoryTools,
   createParallelExtractTool,
   createParallelSearchTool,
   createProjectSeleneTools,
-  createSearchTools,
   createSupadataTranscriptTool,
   executeSupadataTranscript,
   FORGET_TOOL_NAME,
@@ -184,11 +183,10 @@ export {
   REMEMBER_TOOL_NAME,
   SUPADATA_TRANSCRIPT_TOOL_NAME,
   isTransientToolError,
-  type KanikouToolsConfig,
+  type ToolsConfig as KanikouToolsConfig,
   type MemoryToolProviderConfig,
   type ParallelToolsConfig,
   type ProjectSeleneConfig,
-  type SearchToolsConfig,
   type SupadataTranscriptArgs,
   type SupadataTranscriptClient,
   type SupadataTranscriptConfig,

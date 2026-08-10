@@ -59,8 +59,8 @@ export function twitterComponents(
 ): Array<MessageComponent> {
   const timestamp = discordTimestamp(status.created_at) ?? 'unknown time'
   const account = status.account
-  const displayName = account?.display_name || account?.username || 'Twitter'
-  const username = account?.username || account?.acct?.split('@')[0]
+  const displayName = account?.display_name ?? account?.username ?? 'Twitter'
+  const username = account?.username ?? account?.acct?.split('@')[0]
   const handle = username ? `@${username}` : '@unknown'
   const authorURL = username ? `https://x.com/${username}` : realURL
   const content = cleanedStatusContent(status.content ?? '')
@@ -119,7 +119,7 @@ async function prepareTwitterAssets(
   context: BotContext,
   status: TwitterStatus
 ): Promise<PreparedTwitterAssets> {
-  const avatarURL = status.account?.avatar || undefined
+  const avatarURL = status.account?.avatar ?? undefined
   const mediaLimit = avatarURL ? MAX_DISCORD_ATTACHMENTS - 1 : MAX_DISCORD_ATTACHMENTS
   const mediaAttachments = (status.media_attachments ?? [])
     .flatMap((attachment) => {
@@ -180,7 +180,7 @@ async function fetchTwitterStatus(statusID: string, faunaURL?: string): Promise<
 
 function normalizePrivateAPIURL(privateAPIURL?: string): string {
   const defaultHost = Buffer.from(DEFAULT_PRIVATE_API_HOST_BASE64, 'base64').toString('utf8')
-  const value = privateAPIURL?.trim() || defaultHost
+  const value = privateAPIURL?.trim() ?? defaultHost
   const withoutTrailingSlash = value.replace(/\/+$/gu, '')
   return /^https?:\/\//iu.test(withoutTrailingSlash)
     ? withoutTrailingSlash

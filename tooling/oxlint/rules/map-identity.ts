@@ -54,7 +54,7 @@ export default {
         const args = node.arguments
         if (!args || args.length !== 1) return
 
-        if (isIdentityClosure(args[0]!)) {
+        if (isIdentityClosure(args[0])) {
           context.report({
             message:
               'Map identity: `.map(x => x)` is a no-op. Remove it, or use `.slice()` / `[...arr]` to copy. (clippy::map_identity)',

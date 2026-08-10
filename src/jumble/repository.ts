@@ -311,7 +311,7 @@ export class JumbleRepository {
     const sessionMap = new Map(
       [...startedSessions, ...answeredSessions].map((session) => [session.id, session])
     )
-    const sessions = [...sessionMap.values()].sort(
+    const sessions = [...sessionMap.values()].toSorted(
       (first, second) => first.startedAt - second.startedAt
     )
     const answers = allAnswers.filter((answer) => sessionMap.has(answer.sessionId))

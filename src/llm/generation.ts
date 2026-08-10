@@ -45,15 +45,15 @@ export async function generateKanikouResponse(
         : `${kanikouSystemPrompt()}\n\n${hooks.instructions}`,
     messages,
     model,
-    onStepEnd: async ({ callId, finishReason, model, performance, stepNumber, usage }) =>
+    onStepEnd: async ({ callId, finishReason, model: m, performance, stepNumber, usage }) =>
       hooks.onStepEnd?.({
         callId,
         durationMs: performance.stepTimeMs,
         finishReason,
         inputTokens: usage.inputTokens,
-        modelId: model.modelId,
+        modelId: m.modelId,
         outputTokens: usage.outputTokens,
-        provider: model.provider,
+        provider: m.provider,
         responseTimeMs: performance.responseTimeMs,
         stepNumber,
         totalTokens: usage.totalTokens
@@ -61,7 +61,7 @@ export async function generateKanikouResponse(
     onStepStart: async ({ callId, modelId, provider, stepNumber }) =>
       hooks.onStepStart?.({ callId, modelId, provider, stepNumber }),
     onToolExecutionEnd: async ({ callId, toolCall, toolExecutionMs, toolOutput }) => {
-      const result = match(toolOutput)
+      const toolOutputResult = match(toolOutput)
         .returnType<GenerationToolOutcome>()
         .with({ type: 'tool-error' }, ({ error }) => ({
           error: errorText(error),
@@ -73,7 +73,7 @@ export async function generateKanikouResponse(
       await hooks.onToolExecutionEnd?.({
         callId,
         durationMs: toolExecutionMs,
-        ...result,
+        ...toolOutputResult,
         toolCallId: toolCall.toolCallId,
         toolName: toolCall.toolName
       })

@@ -54,11 +54,11 @@ export function chooseArtist(
           sensitivity: 'base'
         }) === 0 || aliasMatches(artist.aliases, name)
     )
-    .sort(
+    .toSorted(
       (first, second) =>
         MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
     )[0]
-  return parseArtist(exact ?? null)
+  return parseArtist(exact)
 }
 
 export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetadata | undefined {
@@ -66,7 +66,7 @@ export function parseRelease(payload: MusicBrainzEnvelope | null): ReleaseMetada
   const groupResult = MusicBrainzEnvelopeSchema.safeParse(payload['release-group'])
   const group = groupResult.success ? groupResult.data : undefined
   const labelInfo = MusicBrainzEnvelopeArraySchema.parse(payload['label-info'])[0]
-  const labelResult = MusicBrainzEnvelopeSchema.safeParse(labelInfo?.label)
+  const labelResult = MusicBrainzEnvelopeSchema.safeParse(labelInfo.label)
   const label = labelResult.success
     ? OptionalMusicBrainzTextSchema.parse(labelResult.data.name)
     : undefined
@@ -171,7 +171,7 @@ export function chooseReleaseGroup(
     .filter(
       (group) => artistName === undefined || artistCreditMatches(group['artist-credit'], artistName)
     )
-    .sort(
+    .toSorted(
       (first, second) =>
         MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
     )[0]
@@ -195,17 +195,13 @@ export function chooseRecording(
         (recording) =>
           artistName === undefined || artistCreditMatches(recording['artist-credit'], artistName)
       )
-      .sort((first, second) => {
-        const firstLive = OptionalMusicBrainzTextSchema.parse(first.disambiguation)
-          ?.toLowerCase()
-          .includes('live')
-          ? 1
-          : 0
-        const secondLive = OptionalMusicBrainzTextSchema.parse(second.disambiguation)
-          ?.toLowerCase()
-          .includes('live')
-          ? 1
-          : 0
+      .toSorted((first, second) => {
+        const firstLive = Number(
+          OptionalMusicBrainzTextSchema.parse(first.disambiguation)?.toLowerCase().includes('live')
+        )
+        const secondLive = Number(
+          OptionalMusicBrainzTextSchema.parse(second.disambiguation)?.toLowerCase().includes('live')
+        )
         return (
           firstLive - secondLive ||
           MusicBrainzNumberSchema.parse(second.score) - MusicBrainzNumberSchema.parse(first.score)
@@ -270,11 +266,13 @@ function chooseEarliestRelease(
 ): MusicBrainzEnvelope | undefined {
   return [...releases]
     .filter((release) => OptionalMusicBrainzTextSchema.parse(release.date) !== undefined)
-    .sort((first, second) => {
-      const firstOfficial =
-        OptionalMusicBrainzTextSchema.parse(first.status)?.toLowerCase() === 'official' ? 0 : 1
-      const secondOfficial =
-        OptionalMusicBrainzTextSchema.parse(second.status)?.toLowerCase() === 'official' ? 0 : 1
+    .toSorted((first, second) => {
+      const firstOfficial = Number(
+        OptionalMusicBrainzTextSchema.parse(first.status)?.toLowerCase() === 'official'
+      )
+      const secondOfficial = Number(
+        OptionalMusicBrainzTextSchema.parse(second.status)?.toLowerCase() === 'official'
+      )
       return firstOfficial - secondOfficial || String(first.date).localeCompare(String(second.date))
     })[0]
 }

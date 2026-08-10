@@ -236,7 +236,6 @@ export class JumbleLibrary {
     const deadline = performance.now() + (this.options.contentionWaitMs ?? CONTENTION_WAIT_MS)
     const pollMs = this.options.contentionPollMs ?? CONTENTION_POLL_MS
     while (performance.now() < deadline) {
-      if (this.stopped) return []
       // eslint-disable-next-line no-await-in-loop -- tasky: another process owns the refresh, poll the durable generation instead of duplicating provider work
       await sleep(pollMs)
       // eslint-disable-next-line no-await-in-loop -- tasky: each poll checks whether the lease owner atomically published its generation

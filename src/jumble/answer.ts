@@ -52,12 +52,12 @@ export function levenshteinDistance(first: string, second: string): number {
   for (let row = 1; row <= first.length; row += 1) {
     current[0] = row
     for (let column = 1; column <= second.length; column += 1) {
-      const substitution = previous[column - 1]! + (first[row - 1] === second[column - 1] ? 0 : 1)
-      current[column] = Math.min(previous[column]! + 1, current[column - 1]! + 1, substitution)
+      const substitution = previous[column - 1] + Number(first[row - 1] !== second[column - 1])
+      current[column] = Math.min(previous[column] + 1, current[column - 1] + 1, substitution)
     }
     ;[previous, current] = [current, previous]
   }
-  return previous[second.length]!
+  return previous[second.length]
 }
 
 export function answerMatches(correctAnswer: string, guess: string): boolean {
@@ -126,7 +126,7 @@ function normalizedAnswerWords(value: string): string[] {
 }
 
 function maximumAnswerDistance(length: number): number {
-  return length > 10 ? 2 : length > 4 ? 1 : 0
+  return length > 10 ? 2 : Number(length > 4)
 }
 
 export type RandomIndex = (maxExclusive: number) => number
@@ -143,7 +143,7 @@ function shuffleWord(value: string, randomIndex: RandomIndex): string {
   for (let attempt = 0; attempt < 8 && shuffled === value; attempt += 1) {
     for (let index = letters.length - 1; index > 0; index -= 1) {
       const swapIndex = randomIndex(index + 1)
-      ;[letters[index], letters[swapIndex]] = [letters[swapIndex]!, letters[index]!]
+      ;[letters[index], letters[swapIndex]] = [letters[swapIndex], letters[index]]
     }
     shuffled = letters.join('')
   }

@@ -8,7 +8,7 @@ function checkLoopBody(body: Node, context: Context) {
   if (body.type !== 'BlockStatement' || body.body.length === 0) return
 
   const stmts: Node[] = body.body
-  const last = stmts[stmts.length - 1]!
+  const last = stmts[stmts.length - 1]
 
   // Direct: last statement is bare continue
   if (last.type === 'ContinueStatement' && !last.label) {

@@ -18,9 +18,9 @@ function exprName(node: Node): string | null {
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length - 2; i++) {
-    const s1 = body[i]!
-    const s2 = body[i + 1]!
-    const s3 = body[i + 2]!
+    const s1 = body[i]
+    const s2 = body[i + 1]
+    const s3 = body[i + 2]
 
     // s1: const tmp = a;
     if (s1.type !== 'VariableDeclaration' || s1.declarations.length !== 1) continue

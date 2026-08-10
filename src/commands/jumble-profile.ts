@@ -18,8 +18,11 @@ export default slashSub({
     const savedUsername =
       context.options.username === undefined
         ? undefined
-        : await context.app.jumble.setProfile(context.interaction.user.id, context.options.username)
-    const summary = await context.app.jumble.profileSummary(context.interaction.user.id)
+        : await context.app.jumble.service.setProfile(
+            context.interaction.user.id,
+            context.options.username
+          )
+    const summary = await context.app.jumble.service.profileSummary(context.interaction.user.id)
     await context.editResponse(buildJumbleProfileMessage(summary, savedUsername))
   }
 })

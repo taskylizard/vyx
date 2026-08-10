@@ -103,12 +103,12 @@ function reportSimilarPairs(names: Map<string, Node>, context: Context) {
 
   for (let i = 0; i < nameList.length; i++) {
     for (let j = i + 1; j < nameList.length; j++) {
-      const [nameA] = nameList[i]!
-      const [nameB, nodeB] = nameList[j]!
+      const [nameA] = nameList[i]
+      const [nameB, nodeB] = nameList[j]
 
       if (nameA.length < 3 || nameB.length < 3) continue
 
-      const pair = [nameA, nameB].sort().join(',')
+      const pair = [nameA, nameB].toSorted().join(',')
       if (ALLOWED_PAIRS.has(pair) || reported.has(pair)) continue
 
       if (areSimilar(nameA.toLowerCase(), nameB.toLowerCase())) {

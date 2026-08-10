@@ -142,7 +142,7 @@ export class JumbleMetadataCache {
       await this.db.delete(jumbleMetadataCache).where(lt(jumbleMetadataCache.expiresAt, now))
 
       const rows = await this.db.select({ total: count() }).from(jumbleMetadataCache)
-      let remaining = Math.max(0, Number(rows[0]?.total ?? 0) - this.maxEntries)
+      let remaining = Math.max(0, (rows[0]?.total ?? 0) - this.maxEntries)
       for (let pass = 0; pass < 8 && remaining > 0; pass += 1) {
         const batchSize = Math.min(remaining, 512)
         // eslint-disable-next-line no-await-in-loop -- tasky: sequential batch pruning, each pass evicts the next oldest batch after the prior deletion

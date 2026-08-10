@@ -19,7 +19,7 @@ function isReturnNullish(stmt: Node): boolean {
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length; i++) {
-    const stmt = body[i]!
+    const stmt = body[i]
     if (stmt.type !== 'ForOfStatement') continue
 
     const loopVar = getForOfVar(stmt)

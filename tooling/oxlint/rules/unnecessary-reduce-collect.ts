@@ -48,12 +48,12 @@ export default {
         if (!isMethodCall(node, 'reduce')) return
         const args = node.arguments
         if (!args || args.length !== 2) return
-        if (!isEmptyArray(args[1]!)) return
+        if (!isEmptyArray(args[1])) return
 
-        const body = getReduceBody(args[0]!)
+        const body = getReduceBody(args[0])
         if (!body || body.stmts.length !== 2) return
 
-        const [firstStmt, returnStmt] = body.stmts as [Node, Node]
+        const [firstStmt, returnStmt] = body.stmts
         if (!returnsAcc(returnStmt, body.accName)) return
 
         // Pattern: { acc.push(expr); return acc; } → .map()

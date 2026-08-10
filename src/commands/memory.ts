@@ -265,7 +265,7 @@ function formatMemoryList(title: string, entries: readonly MemoryEntry[]): strin
   }
 
   const lines = [`**${title} (${entries.length}/${MEMORY_ENTRY_LIMIT})**`]
-  let responseLength = lines[0]!.length
+  let responseLength = lines[0].length
   for (const entry of entries) {
     const line = `\`${entry.id.slice(0, 8)}\` — ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
     if (responseLength + line.length + 1 > RESPONSE_MAX_LENGTH) {

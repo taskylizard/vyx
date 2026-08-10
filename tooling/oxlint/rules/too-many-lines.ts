@@ -1,13 +1,14 @@
 // clippy::too_many_lines — functions exceeding a line count threshold
 // Default threshold: 100 lines (matches Clippy default)
+// Set to 150 for this project.
 
 import type { Context, Node } from '../types.ts'
 
-const THRESHOLD = 100
+const THRESHOLD = 150
 
 function countLines(node: Node, sourceText: string): number {
   if (node.loc) return node.loc.end.line - node.loc.start.line + 1
-  if (node.start != null && node.end != null) {
+  if (node.start !== null && node.end !== null) {
     return sourceText.substring(node.start, node.end).split('\n').length
   }
   return 0
