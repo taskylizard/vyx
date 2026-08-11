@@ -39,7 +39,6 @@ function isSliceCall(node: Node, strName: string): boolean {
 const SKIP_KEYS = new Set(['type', 'loc', 'range', 'parent', 'start', 'end'])
 
 function bodyContainsSlice(node: Node, strName: string): boolean {
-  if (!node || typeof node !== 'object') return false
   if (isSliceCall(node, strName)) return true
 
   for (const key of Object.keys(node)) {

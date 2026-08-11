@@ -4,7 +4,7 @@
 import type { Context, Node } from '../types.ts'
 
 function sourceRange(node: Node, text: string): string {
-  if (node.start != null && node.end != null) {
+  if (node.start !== null && node.end !== null) {
     return text.slice(node.start, node.end)
   }
   return ''

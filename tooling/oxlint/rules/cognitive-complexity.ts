@@ -29,7 +29,7 @@ function calculateComplexity(node: Node): number {
   let complexity = 0
 
   function walk(n: Node, nesting: number) {
-    if (!n || typeof n !== 'object') return
+    if (!n.type) return
 
     switch (n.type) {
       case 'IfStatement':

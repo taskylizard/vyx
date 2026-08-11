@@ -4,8 +4,6 @@
 import type { Context, Node } from '../types.ts'
 
 function alwaysExits(node: Node): boolean {
-  if (!node) return false
-
   switch (node.type) {
     case 'ReturnStatement':
     case 'ThrowStatement':
@@ -24,7 +22,7 @@ function alwaysExits(node: Node): boolean {
 
 function checkLoop(node: Node, context: Context) {
   const body = node.body
-  if (!body) return
+  if (!body?.type) return
 
   if (alwaysExits(body)) {
     context.report({

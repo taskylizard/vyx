@@ -7,7 +7,7 @@ const THRESHOLD = 5
 
 function checkParams(node: Node, context: Context) {
   const params: Node[] = node.params
-  if (!params || params.length <= THRESHOLD) return
+  if (params.length <= THRESHOLD) return
 
   const name =
     node.id?.name ??

@@ -5,6 +5,27 @@
 import type { Context, Node } from '../types.ts'
 import { isLiteral, isMethodCall } from '../types.ts'
 
+function extractReduceCallback(callback: Node): { accName: string; bodyExpr: Node } | null {
+  if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
+    return null
+  if (callback.params.length !== 2) return null
+  const accParam = callback.params[0]
+  if (accParam === undefined || accParam.type !== 'Identifier') return null
+
+  let bodyExpr: Node | null = null
+  if (callback.body.type === 'BlockStatement') {
+    const stmt = callback.body.body[0]
+    if (callback.body.body.length === 1 && stmt !== undefined && stmt.type === 'ReturnStatement') {
+      bodyExpr = stmt.argument ?? null
+    }
+  } else {
+    bodyExpr = callback.body
+  }
+  if (!bodyExpr || bodyExpr.type !== 'LogicalExpression') return null
+
+  return { accName: accParam.name, bodyExpr }
+}
+
 export default {
   create(context: Context) {
     return {
@@ -13,31 +34,15 @@ export default {
         const args = node.arguments
         if (!args || args.length !== 2) return
 
-        const callback = args[0]!
-        const initial = args[1]!
+        const callback = args[0]
+        if (callback === undefined) return
+        const initial = args[1]
+        if (initial === undefined) return
 
-        // Callback must be (acc, x) => acc OP expr
-        if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
-          return
-        if (callback.params.length !== 2) return
-        const accParam = callback.params[0]!
-        if (accParam.type !== 'Identifier') return
-        const accName = accParam.name
+        const extracted = extractReduceCallback(callback)
+        if (!extracted) return
 
-        // Get the body expression
-        let bodyExpr: Node | null = null
-        if (callback.body.type === 'BlockStatement') {
-          if (
-            callback.body.body.length === 1 &&
-            callback.body.body[0]!.type === 'ReturnStatement'
-          ) {
-            bodyExpr = callback.body.body[0]!.argument
-          }
-        } else {
-          bodyExpr = callback.body
-        }
-        if (!bodyExpr || bodyExpr.type !== 'LogicalExpression') return
-
+        const { accName, bodyExpr } = extracted
         const isAccLeft = bodyExpr.left.type === 'Identifier' && bodyExpr.left.name === accName
 
         // acc || expr with initial false → .some()

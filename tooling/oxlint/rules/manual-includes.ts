@@ -38,8 +38,8 @@ function checkBody(body: Node[], context: Context) {
     )
       continue
 
-    const next: Node | undefined = body[i + 1]
-    if (next && next.type === 'ReturnStatement' && isLiteral(next.argument, false)) {
+    const next = body[i + 1]
+    if (next.type === 'ReturnStatement' && isLiteral(next.argument, false)) {
       context.report({
         message:
           'Manual includes: this loop can be replaced with `.includes()`. (clippy::manual_find)',

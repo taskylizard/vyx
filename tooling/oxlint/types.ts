@@ -3,6 +3,7 @@
 export interface Node {
   type: string
   loc?: { start: { line: number; column: number }; end: { line: number; column: number } }
+  // eslint-disable-next-line typescript/no-explicit-any -- AST nodes have varying shapes; index signature allows property access
   [key: string]: any
 }
 
@@ -18,13 +19,17 @@ export interface Rule {
 
 // --- Helpers ---
 
-export function isLiteral(node: Node | null | undefined, value?: unknown): boolean {
-  if (!node || node.type !== 'Literal') return false
-  return value === undefined ? true : node.value === value
+export function isLiteral(node: unknown, value?: unknown): node is Node & { value: unknown } {
+  if (!node || typeof node !== 'object' || (node as { type?: string }).type !== 'Literal')
+    return false
+
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+  const literalNode = node as { value: unknown }
+  return value === undefined ? true : literalNode.value === value
 }
 
 export function isBoolLiteral(node: Node | null | undefined): node is Node {
-  return isLiteral(node) && typeof node!.value === 'boolean'
+  return isLiteral(node) && typeof node.value === 'boolean'
 }
 
 export function isIdentifier(node: Node | null | undefined, name?: string): boolean {

@@ -47,14 +47,14 @@ test('uses the Parallel AI SDK package extract tool', async () => {
     expect(fetcher).toHaveBeenCalledOnce()
 
     const request = fetcher.mock.calls[0]
-    const requestInput = request?.[0]
+    const requestInput = request[0]
     const requestUrl =
       requestInput instanceof Request
         ? requestInput.url
         : requestInput instanceof URL
           ? requestInput.href
           : requestInput
-    const requestBody = request?.[1]?.body
+    const requestBody = request[1]?.body
     expect(requestUrl).toContain('/v1/extract')
     expect(typeof requestBody === 'string' ? requestBody : '').toContain(
       '"urls":["https://viteplus.dev/guide/"]'

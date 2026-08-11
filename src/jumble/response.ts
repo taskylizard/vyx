@@ -14,19 +14,22 @@ export async function readBoundedBytes(response: Response, maxBytes: number): Pr
   const reader = body.getReader()
   const chunks: Uint8Array[] = []
   let total = 0
+  let done: boolean
   try {
-    while (true) {
+    do {
       // eslint-disable-next-line no-await-in-loop -- tasky: sequential stream consumption, chunks must be read in order from the reader
       const next = await reader.read()
-      if (next.done) break
-      total += next.value.byteLength
-      if (total > limit) {
-        // eslint-disable-next-line no-await-in-loop -- tasky: cancel the stream before throwing the limit error
-        await reader.cancel().catch(() => undefined)
-        throw new Error('Response exceeded the safety limit.')
+      done = next.done
+      if (!done) {
+        total += next.value.byteLength
+        if (total > limit) {
+          // eslint-disable-next-line no-await-in-loop -- tasky: cancel the stream before throwing the limit error
+          await reader.cancel().catch(() => undefined)
+          throw new Error('Response exceeded the safety limit.')
+        }
+        chunks.push(next.value)
       }
-      chunks.push(next.value)
-    }
+    } while (!done)
   } finally {
     reader.releaseLock()
   }

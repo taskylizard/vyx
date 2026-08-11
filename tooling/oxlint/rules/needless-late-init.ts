@@ -10,7 +10,8 @@ function checkBody(body: Node[], context: Context) {
     const next = body[i + 1]
 
     if (decl.type !== 'VariableDeclaration' || decl.declarations.length !== 1) continue
-    const d = decl.declarations[0]!
+    const d = decl.declarations[0]
+    if (d === undefined) continue
     if (d.id?.type !== 'Identifier' || d.init !== null) continue
     const varName = d.id.name
 

@@ -35,8 +35,8 @@ function getReduceBody(callback: Node): { stmts: Node[]; accName: string } | nul
   if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
     return null
   if (callback.params.length !== 2) return null
-  const accParam = callback.params[0]!
-  if (accParam.type !== 'Identifier') return null
+  const accParam = callback.params[0]
+  if (accParam === undefined || accParam.type !== 'Identifier') return null
   if (callback.body.type !== 'BlockStatement') return null
   return { stmts: callback.body.body, accName: accParam.name }
 }
@@ -71,7 +71,7 @@ export default {
           const consequent = firstStmt.consequent
           let pushExpr: Node | null = null
           if (consequent.type === 'BlockStatement' && consequent.body.length === 1) {
-            pushExpr = consequent.body[0]!
+            pushExpr = consequent.body[0] ?? null
           } else if (consequent.type === 'ExpressionStatement') {
             pushExpr = consequent
           }

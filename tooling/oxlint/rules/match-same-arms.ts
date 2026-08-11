@@ -5,13 +5,13 @@ import type { Context, Node } from '../types.ts'
 
 function caseBodySource(caseNode: Node, sourceText: string): string {
   const stmts: Node[] = caseNode.consequent
-  if (!stmts || stmts.length === 0) return ''
+  if (stmts.length === 0) return ''
   // Exclude break statements from comparison
   const meaningful = stmts.filter((s: Node) => s.type !== 'BreakStatement')
   if (meaningful.length === 0) return ''
   const first = meaningful[0]
   const last = meaningful[meaningful.length - 1]
-  if (first.start == null || last.end == null) return ''
+  if (first.start === null || last.end === null) return ''
   return sourceText.slice(first.start, last.end)
 }
 
@@ -20,7 +20,7 @@ export default {
     return {
       SwitchStatement(node: Node) {
         const cases: Node[] = node.cases
-        if (!cases || cases.length < 2) return
+        if (cases.length < 2) return
 
         const seen = new Map<string, Node>()
 

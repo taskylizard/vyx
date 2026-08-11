@@ -24,7 +24,8 @@ function checkBody(body: Node[], context: Context) {
 
     // s1: const tmp = a;
     if (s1.type !== 'VariableDeclaration' || s1.declarations.length !== 1) continue
-    const decl = s1.declarations[0]!
+    const decl = s1.declarations[0]
+    if (decl === undefined) continue
     if (decl.id?.type !== 'Identifier' || !decl.init) continue
     const tmpName = decl.id.name
     const firstName = exprName(decl.init)

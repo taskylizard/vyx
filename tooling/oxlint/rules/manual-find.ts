@@ -31,8 +31,8 @@ function checkBody(body: Node[], context: Context) {
     if (inner.type === 'IfStatement' && !inner.alternate) {
       const consequent = unwrapBlock(inner.consequent)
       if (consequent && isReturnOfVar(consequent, loopVar)) {
-        const next: Node | undefined = body[i + 1]
-        if (next && isReturnNullish(next)) {
+        const next = body[i + 1]
+        if (isReturnNullish(next)) {
           context.report({
             message: 'Manual find: this loop can be replaced with `.find()`. (clippy::manual_find)',
             node: stmt

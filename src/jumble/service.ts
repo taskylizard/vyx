@@ -202,6 +202,7 @@ export class JumbleService {
       return { action: 'started', state: complete }
     } catch (error) {
       this.rethrowStartError(error)
+      throw error
     } finally {
       emitJumbleTiming(this.onTiming, {
         type: 'start',
@@ -643,18 +644,20 @@ export class JumbleService {
       completion
         .then(
           (candidate) => {
-            if (!input.useLibrary) return
+            if (!input.useLibrary) return undefined
             const remembered =
               isPlayableJumbleCandidate(candidate, input.kind) &&
               jumbleCandidateIdentityKey(candidate) === expectedIdentity
                 ? candidate
                 : input.expected
             this.library.remember(input.starterUserId, input.kind, input.username, remembered)
+            return undefined
           },
           () => {
             if (input.useLibrary) {
               this.library.remember(input.starterUserId, input.kind, input.username, input.expected)
             }
+            return undefined
           }
         )
         .finally(() => this.pendingHydrations.delete(work))

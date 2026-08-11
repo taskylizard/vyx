@@ -415,6 +415,7 @@ test('returns a playable foreground candidate before deferred enrichment finishe
   let drained = false
   const drain = service.drain().then(() => {
     drained = true
+    return undefined
   })
   await Promise.resolve()
   expect(drained).toBe(false)

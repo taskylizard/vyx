@@ -61,7 +61,7 @@ export class JumbleMetadataCache {
         .where(eq(jumbleMetadataCache.cacheKey, cacheKey))
         .limit(1)
       const row = rows[0]
-      if (row === undefined) return null
+      if (rows.length === 0) return null
       if (Buffer.byteLength(row.payload, 'utf8') > this.maxPayloadBytes) {
         await this.delete(cacheKey)
         return null
@@ -93,7 +93,7 @@ export class JumbleMetadataCache {
     }
   }
 
-  async set<T>(cacheKey: string, value: T, ttlMs: number): Promise<boolean> {
+  async set(cacheKey: string, value: unknown, ttlMs: number): Promise<boolean> {
     if (cacheKey.trim().length === 0 || cacheKey.length > 512) return false
     let payload: string
     try {
@@ -102,8 +102,7 @@ export class JumbleMetadataCache {
       this.report(error)
       return false
     }
-    if (payload === undefined || Buffer.byteLength(payload, 'utf8') > this.maxPayloadBytes)
-      return false
+    if (Buffer.byteLength(payload, 'utf8') > this.maxPayloadBytes) return false
 
     const fetchedAt = this.now()
     const expiresAt = fetchedAt + Math.max(1, Math.trunc(ttlMs))

@@ -24,11 +24,11 @@ function checkLoopBody(body: Node, context: Context) {
   if (last.type === 'IfStatement' && last.alternate) {
     const alt = last.alternate
     const altBody = alt.type === 'BlockStatement' ? alt.body : [alt]
-    if (altBody.length === 1 && altBody[0]!.type === 'ContinueStatement' && !altBody[0]!.label) {
+    if (altBody.length === 1 && altBody[0]?.type === 'ContinueStatement' && !altBody[0]?.label) {
       context.report({
         message:
           'Needless continue: `else { continue; }` at the end of a loop is redundant. Remove the else branch. (clippy::needless_continue)',
-        node: altBody[0]!
+        node: altBody[0]
       })
     }
   }

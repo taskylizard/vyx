@@ -71,10 +71,9 @@ test('runs the Parallel package tool through the OpenRouter model loop', async (
     )
     expect(modelFetch).toHaveBeenCalledTimes(2)
     const firstRequest = modelFetch.mock.calls[0]
-    expect(requestUrl(firstRequest?.[0])).toBe('https://openrouter.ai/api/v1/chat/completions')
-    expect(new Headers(firstRequest?.[1]?.headers).get('authorization')).toBe(
-      'Bearer openrouter-key'
-    )
+    const init = firstRequest[1]
+    expect(requestUrl(firstRequest[0])).toBe('https://openrouter.ai/api/v1/chat/completions')
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer openrouter-key')
     expect(requestBody(firstRequest)).toMatchObject({
       model: 'google/gemini-3-flash-preview',
       temperature: 0.4,

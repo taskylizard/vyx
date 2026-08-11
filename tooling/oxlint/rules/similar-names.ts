@@ -71,7 +71,7 @@ function collectParams(node: Node, names: Map<string, Node>) {
 }
 
 function collectNames(node: Node, names: Map<string, Node>) {
-  if (!node || typeof node !== 'object' || !node.type) return
+  if (!node.type) return
 
   if (node.type === 'VariableDeclarator' && node.id?.type === 'Identifier') {
     names.set(node.id.name, node.id)

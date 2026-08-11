@@ -21,8 +21,8 @@ function checkBody(body: Node[], context: Context) {
     )
       continue
 
-    const next: Node | undefined = body[i + 1]
-    if (next && next.type === 'ReturnStatement' && isLiteral(next.argument, true)) {
+    const next = body[i + 1]
+    if (next.type === 'ReturnStatement' && isLiteral(next.argument, true)) {
       context.report({
         message: 'Manual every: this loop can be replaced with `.every()`. (clippy::manual_find)',
         node: stmt

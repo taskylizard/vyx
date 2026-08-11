@@ -233,12 +233,12 @@ function serializeMemoryFile(scope: MemoryScope, entries: readonly MemoryEntry[]
 
 function parseMemoryEntries(markdown: string): MemoryEntry[] {
   const entries: MemoryEntry[] = []
-  for (const match of markdown.matchAll(MEMORY_ENTRY_PATTERN)) {
+  for (const entry of markdown.matchAll(MEMORY_ENTRY_PATTERN)) {
     entries.push({
-      content: match[4].trim(),
-      createdAt: match[2],
-      id: match[1],
-      sourceInteractionID: match[3]
+      content: entry[4].trim(),
+      createdAt: entry[2],
+      id: entry[1],
+      sourceInteractionID: entry[3]
     })
   }
   return entries

@@ -6,7 +6,8 @@ import type { Context, Node } from '../types.ts'
 
 function isZeroInit(init: Node): string | null {
   if (init.type !== 'VariableDeclaration' || init.declarations.length !== 1) return null
-  const decl = init.declarations[0]!
+  const decl = init.declarations[0]
+  if (decl === undefined) return null
   if (decl.id?.type !== 'Identifier') return null
   if (decl.init?.type !== 'Literal' || decl.init.value !== 0) return null
   return decl.id.name
@@ -66,7 +67,7 @@ function onlyUsedAsIndex(body: Node, indexVar: string, arrName: string): boolean
   let onlyIndexAccess = true
 
   function walk(n: Node) {
-    if (!n || typeof n !== 'object' || !n.type || !onlyIndexAccess) return
+    if (!n.type || !onlyIndexAccess) return
 
     if (n.type === 'Identifier' && n.name === indexVar) {
       onlyIndexAccess = false

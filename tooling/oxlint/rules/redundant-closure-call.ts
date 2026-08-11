@@ -28,7 +28,8 @@ export default {
           }
           // (() => { return expr; })()
           if (fn.body.body.length === 1) {
-            const stmt = fn.body.body[0]!
+            const stmt = fn.body.body[0]
+            if (stmt === undefined) return
             if (stmt.type === 'ReturnStatement' && stmt.argument) {
               context.report({
                 message:
@@ -46,7 +47,8 @@ export default {
           fn.body.type === 'BlockStatement' &&
           fn.body.body.length === 1
         ) {
-          const stmt = fn.body.body[0]!
+          const stmt = fn.body.body[0]
+          if (stmt === undefined) return
           if (stmt.type === 'ReturnStatement' && stmt.argument) {
             context.report({
               message:

@@ -18,7 +18,8 @@ function checkBody(body: Node[], context: Context) {
 
   // Second-to-last must be: const/let x = expr;
   if (secondLast.type !== 'VariableDeclaration' || secondLast.declarations.length !== 1) return
-  const decl = secondLast.declarations[0]!
+  const decl = secondLast.declarations[0]
+  if (decl === undefined) return
   if (decl.id?.type !== 'Identifier' || decl.id.name !== returnedName || !decl.init) return
 
   context.report({

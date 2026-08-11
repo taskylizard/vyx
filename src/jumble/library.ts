@@ -97,7 +97,7 @@ export class JumbleLibrary {
     this.backgroundTail = runDetached(() =>
       this.backgroundTail.then(async () => {
         for (const kind of JUMBLE_KINDS) {
-          if (this.stopped) return
+          if (this.stopped) return undefined
           // eslint-disable-next-line no-await-in-loop -- tasky: one background refresh at a time avoids slamming Last.fm after profile changes
           await traceBackgroundOperation(
             'jumble.library.refresh',
@@ -105,6 +105,7 @@ export class JumbleLibrary {
             () => this.refresh(discordUserId, kind, canonical)
           ).catch(() => undefined)
         }
+        return undefined
       })
     )
   }

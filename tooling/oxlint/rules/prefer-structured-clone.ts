@@ -16,7 +16,8 @@ export default {
         const args = node.arguments
         if (!args || args.length !== 1) return
 
-        const inner = args[0]!
+        const inner = args[0]
+        if (inner === undefined) return
         if (isCallOf(inner, 'JSON', 'stringify') && inner.arguments?.length === 1) {
           context.report({
             message:

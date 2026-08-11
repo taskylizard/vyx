@@ -7,7 +7,6 @@ const THRESHOLD = 3
 
 function countBoolParams(node: Node): number {
   const params: Node[] = node.params
-  if (!params) return 0
   let count = 0
   for (const p of params) {
     // Check for TypeScript boolean type annotation: param: boolean

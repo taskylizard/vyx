@@ -99,14 +99,12 @@ export function telemetryErrorMessage(error: unknown): string {
     return String(error)
   }
   try {
-    return (
-      JSON.stringify(error, (key, value) => {
-        if (key.length > 0 && isSensitiveTelemetryField(key)) return '[redacted]'
-        if (typeof value === 'string') return redactTelemetryText(value)
-        if (typeof value === 'bigint') return value.toString()
-        return value
-      }) ?? '[unserializable error]'
-    )
+    return JSON.stringify(error, (key, value) => {
+      if (key.length > 0 && isSensitiveTelemetryField(key)) return '[redacted]'
+      if (typeof value === 'string') return redactTelemetryText(value)
+      if (typeof value === 'bigint') return value.toString()
+      return value
+    })
   } catch {
     return '[unserializable error]'
   }

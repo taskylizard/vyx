@@ -193,15 +193,15 @@ test('downloads private Twitter media and uploads it to Discord', async () => {
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
-  expect(options?.files).toEqual([
+  const options = createMessage.mock.calls[0][1]
+  expect(options.files).toEqual([
     { contents: Buffer.from([1, 2, 3]), name: 'twitter-avatar.png' },
     { contents: Buffer.from([4, 5, 6]), name: 'twitter-media-1.webp' }
   ])
-  expect(JSON.stringify(options?.components)).toContain('attachment://twitter-avatar.png')
-  expect(JSON.stringify(options?.components)).toContain('attachment://twitter-media-1.webp')
-  expect(JSON.stringify(options?.components)).not.toContain('private.example')
-  expect(JSON.stringify(options?.components)).not.toContain('media.example')
+  expect(JSON.stringify(options.components)).toContain('attachment://twitter-avatar.png')
+  expect(JSON.stringify(options.components)).toContain('attachment://twitter-media-1.webp')
+  expect(JSON.stringify(options.components)).not.toContain('private.example')
+  expect(JSON.stringify(options.components)).not.toContain('media.example')
 })
 
 test('builds a rich Instagram card', () => {
@@ -327,10 +327,10 @@ test('fetches rich Instagram data and gives remote carousel media to Discord', a
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
-  expect(options?.flags).toBe(MessageFlags.IS_COMPONENTS_V2)
-  expect(options?.files).toBeUndefined()
-  const rendered = JSON.stringify(options?.components)
+  const options = createMessage.mock.calls[0][1]
+  expect(options.flags).toBe(MessageFlags.IS_COMPONENTS_V2)
+  expect(options.files).toBeUndefined()
+  const rendered = JSON.stringify(options.components)
   expect(rendered).toContain('Carousel caption')
   expect(rendered).toContain('https://cdn.example/image.jpg')
   expect(rendered).toContain('https://cdn.example/video.mp4')
@@ -388,12 +388,12 @@ test('uses the vendored Instagram-native strategy after rich lookup rate limits'
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
-  expect(options?.files).toEqual([
+  const options = createMessage.mock.calls[0][1]
+  expect(options.files).toEqual([
     { contents: Buffer.from([1, 2, 3]), name: 'instagram-media-1.mp4' }
   ])
-  expect(JSON.stringify(options?.components)).toContain('attachment://instagram-media-1.mp4')
-  expect(JSON.stringify(options?.components)).not.toContain('cdn.example')
+  expect(JSON.stringify(options.components)).toContain('attachment://instagram-media-1.mp4')
+  expect(JSON.stringify(options.components)).not.toContain('cdn.example')
   expect(info).toHaveBeenCalledWith('instagram autoembed resolved via fallback', {
     strategy: 'native'
   })
@@ -447,12 +447,12 @@ test('downloads and uploads SnapSave media after native resolution fails', async
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
-  expect(options?.files).toEqual([
+  const options = createMessage.mock.calls[0][1]
+  expect(options.files).toEqual([
     { contents: Buffer.from([4, 5, 6]), name: 'instagram-media-1.mp4' }
   ])
-  expect(JSON.stringify(options?.components)).toContain('attachment://instagram-media-1.mp4')
-  expect(JSON.stringify(options?.components)).not.toContain('cdn.example')
+  expect(JSON.stringify(options.components)).toContain('attachment://instagram-media-1.mp4')
+  expect(JSON.stringify(options.components)).not.toContain('cdn.example')
   expect(
     fetchMock.mock.calls.some(([input]) => {
       const requestedURL =
@@ -633,7 +633,7 @@ test('replies with rewritten links and suppresses the original embed', async () 
 test('silently ignores missing permission errors while suppressing embeds', async () => {
   const createMessage = vi.fn(async () => ({}))
   const editMessage = vi.fn(async () => {
-    throw { code: 50_013, status: 403 }
+    throw Object.assign(new Error('Missing permissions'), { code: 50_013, status: 403 })
   })
   const warn = vi.fn()
   const context = {

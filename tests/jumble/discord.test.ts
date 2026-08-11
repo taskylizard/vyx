@@ -163,10 +163,10 @@ test('playing replay labels stay within Discord limits without splitting emoji',
     status: 'playing',
     userDisplayName: '😀'.repeat(100)
   })
-  const replay = components[0]?.components[0]
+  const replay = components[0].components[0]
 
-  expect(replay?.type).toBe(ComponentTypes.BUTTON)
-  if (replay === undefined || !('label' in replay) || replay.label === undefined) {
+  expect(replay.type).toBe(ComponentTypes.BUTTON)
+  if (!('label' in replay) || replay.label === undefined) {
     throw new Error('Expected a labeled replay button.')
   }
   expect(replay.label.length).toBeLessThanOrEqual(80)

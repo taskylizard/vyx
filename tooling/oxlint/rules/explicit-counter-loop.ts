@@ -7,7 +7,8 @@ import { getFunctionBody } from '../types.ts'
 
 function getZeroInitCounter(decl: Node): string | null {
   if (decl.type !== 'VariableDeclaration' || decl.declarations.length !== 1) return null
-  const d = decl.declarations[0]!
+  const d = decl.declarations[0]
+  if (d === undefined) return null
   if (d.id?.type !== 'Identifier' || d.init?.type !== 'Literal' || d.init.value !== 0) return null
   return d.id.name
 }

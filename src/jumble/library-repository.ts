@@ -114,7 +114,7 @@ export class JumbleLibraryRepository {
       )
       .limit(1)
     const state = rows[0]
-    return state === undefined || state.activeRefreshVersion === null || state.refreshAfter <= now
+    return rows.length === 0 || state.activeRefreshVersion === null || state.refreshAfter <= now
   }
 
   async trackedCounts(

@@ -11,7 +11,7 @@ export default {
         const enumName = node.id?.name
         if (!enumName) return
         const members: Node[] = node.members ?? node.body?.members
-        if (!members || members.length < 2) return
+        if (members.length < 2) return
 
         const names: string[] = members
           .map((m: Node) => (m.id?.type === 'Identifier' ? m.id.name : null))
