@@ -2,6 +2,14 @@ import { toolActivityLabel } from './tools/tool-labels.ts'
 
 export const THINKING_RESPONSE = '*Thinking...*'
 
+// tasky: the footer is kanikou UI chrome; strip echoed or previously-appended copies
+// (including consecutive ones) before formatting, so the rendered footer never repeats
+const TOOLS_FOOTER_PATTERN = /(?:^|\r?\n)(?:-# Tools: [^\r\n]*\r?\n?)+$/u
+
+export function stripToolsFooter(content: string): string {
+  return content.replace(TOOLS_FOOTER_PATTERN, '')
+}
+
 export function formatThinkingProgress(toolNames: readonly string[]): string {
   return formatCompletedResponse(THINKING_RESPONSE, toolNames)
 }
@@ -11,7 +19,7 @@ export function formatCompletedResponse(content: string, toolNames: readonly str
     return content
   }
 
-  return `${content}\n-# Tools: ${compactToolNames(toolNames).join(', ')}`
+  return `${stripToolsFooter(content)}\n-# Tools: ${compactToolNames(toolNames).join(', ')}`
 }
 
 function compactToolNames(toolNames: readonly string[]): string[] {

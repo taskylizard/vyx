@@ -75,3 +75,33 @@ test('does not add an empty memory message', async () => {
     { content: 'tasky (ID: user-1): Hello', role: 'user' }
   ])
 })
+
+test('strips the tools footer from prior bot messages in reply chains', async () => {
+  const context = {
+    botUserID: 'bot-1',
+    memory: { promptContext: vi.fn(async () => ({ personal: undefined, server: undefined })) }
+  } as unknown as BotContext
+  const previousBotMessage = {
+    attachments: { toArray: () => [] },
+    author: { id: 'bot-1' },
+    content: 'Here is the earlier answer.\n-# Tools: Search (x2)',
+    embeds: []
+  } as unknown as Message
+  const source = {
+    attachments: { toArray: () => [] },
+    author: { globalName: 'Tasky', id: 'user-1', username: 'tasky' },
+    content: 'Can you expand on that?',
+    embeds: [],
+    guildID: 'server-1',
+    member: { displayName: 'Tasky' },
+    referencedMessage: previousBotMessage
+  } as unknown as Message
+
+  const messages = await buildMessagePrompt(context, source)
+
+  expect(messages.at(-1)).toMatchObject({ role: 'user' })
+  expect(messages.at(-2)).toEqual({
+    content: 'Here is the earlier answer.',
+    role: 'assistant'
+  })
+})

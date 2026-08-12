@@ -2,6 +2,7 @@ import type { AssistantModelMessage, ModelMessage, UserContent, UserModelMessage
 import type { CommandInteraction, Message } from 'oceanic.js'
 import type { BotContext } from '../bot/context.ts'
 import { fetchReferencedMessageCached } from '../discord/cached.ts'
+import { stripToolsFooter } from './tool-progress.ts'
 
 const MAX_REPLY_CHAIN_MESSAGES = 12
 
@@ -62,7 +63,7 @@ function discordMessageToChatMessage(
 ): AssistantModelMessage | UserModelMessage {
   if (message.author.id === context.botUserID) {
     return {
-      content: message.content,
+      content: stripToolsFooter(message.content),
       role: 'assistant'
     }
   }
