@@ -19,7 +19,7 @@ function isReturnNullish(stmt: Node): boolean {
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length; i++) {
-    const stmt = body[i]!
+    const stmt = body[i]
     if (stmt.type !== 'ForOfStatement') continue
 
     const loopVar = getForOfVar(stmt)
@@ -31,7 +31,7 @@ function checkBody(body: Node[], context: Context) {
     if (inner.type === 'IfStatement' && !inner.alternate) {
       const consequent = unwrapBlock(inner.consequent)
       if (consequent && isReturnOfVar(consequent, loopVar)) {
-        const next: Node | undefined = body[i + 1]
+        const next = body.at(i + 1)
         if (next && isReturnNullish(next)) {
           context.report({
             message: 'Manual find: this loop can be replaced with `.find()`. (clippy::manual_find)',

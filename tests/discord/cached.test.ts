@@ -13,7 +13,7 @@ test('returns a cached message without making a Discord request', async () => {
         messages: { get: vi.fn(() => message) }
       })),
       rest: { channels: { getMessage: restGetMessage } }
-    } as never,
+    },
     'channel-1',
     'message-1'
   )
@@ -35,7 +35,7 @@ test('uses the cached channel method before REST', async () => {
         messages: { get: vi.fn(() => undefined) }
       })),
       rest: { channels: { getMessage: restGetMessage } }
-    } as never,
+    },
     'channel-1',
     'message-1'
   )
@@ -56,7 +56,7 @@ test('falls back to REST after a cached channel read fails', async () => {
         messages: { get: vi.fn(() => undefined) }
       })),
       rest: { channels: { getMessage: restGetMessage } }
-    } as never,
+    },
     'channel-1',
     'message-1'
   )
@@ -70,8 +70,8 @@ test('returns the payload referenced message without making a Discord request', 
   const restGetMessage = vi.fn(async () => ({ id: 'rest-message' }))
 
   const result = await fetchReferencedMessageCached(
-    { rest: { channels: { getMessage: restGetMessage } } } as never,
-    { channelID: 'channel-1', referencedMessage: referenced } as never
+    { rest: { channels: { getMessage: restGetMessage } } },
+    { channelID: 'channel-1', referencedMessage: referenced }
   )
 
   expect(result).toBe(referenced)
@@ -82,8 +82,8 @@ test('returns undefined when the message has no reference', async () => {
   const restGetMessage = vi.fn(async () => ({ id: 'rest-message' }))
 
   const result = await fetchReferencedMessageCached(
-    { rest: { channels: { getMessage: restGetMessage } } } as never,
-    { channelID: 'channel-1', referencedMessage: null } as never
+    { rest: { channels: { getMessage: restGetMessage } } },
+    { channelID: 'channel-1', referencedMessage: null }
   )
 
   expect(result).toBeUndefined()
@@ -95,12 +95,12 @@ test('fetches the referenced message through the cache when the payload omits it
   const restGetMessage = vi.fn(async () => referenced)
 
   const result = await fetchReferencedMessageCached(
-    { rest: { channels: { getMessage: restGetMessage } } } as never,
+    { rest: { channels: { getMessage: restGetMessage } } },
     {
       channelID: 'channel-1',
       messageReference: { channelID: 'channel-2', messageID: 'referenced-message' },
       referencedMessage: null
-    } as never
+    }
   )
 
   expect(result).toBe(referenced)

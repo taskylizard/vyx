@@ -15,6 +15,7 @@ import { rosepack } from '../../src/bot/rosepack.ts'
 import memoryCommand from '../../src/commands/memory.ts'
 import { guildOnlyGuard } from '../../src/discord/guards.ts'
 import { MarkdownMemoryStore } from '../../src/memory/markdown-memory.ts'
+import { partialFixture } from '../fixtures/partial.ts'
 
 const temporaryDirectories: string[] = []
 const memoryCommands = rosepack.createRegistry({ slashCommands: [memoryCommand] })
@@ -168,10 +169,12 @@ test('allows everyone to inspect server memory but only managers to change it', 
 
 test('rejects server memory operations outside a server', async () => {
   expect(memoryCommand.subcommands.server.subcommands.show.guards).toContain(guildOnlyGuard)
-  const decision = await guildOnlyGuard({
-    app: {},
-    interaction: { guildID: null, member: null, memberPermissions: null }
-  } as never)
+  const decision = await guildOnlyGuard(
+    partialFixture({
+      app: {},
+      interaction: { guildID: null, member: null, memberPermissions: null }
+    })
+  )
 
   expect(decision.allowed).toBe(false)
   if (decision.allowed) throw new Error('Expected the guild guard to deny access.')
@@ -273,11 +276,11 @@ test('reports ambiguous and missing memory identifiers consistently', async () =
 })
 
 function createBot(memory: MarkdownMemoryStore): BotContext {
-  return {
+  return partialFixture<BotContext>({
     logger: { error: vi.fn() },
     memory,
     moduleStore: { read: vi.fn(async () => ['ai']) }
-  } as unknown as BotContext
+  })
 }
 
 async function runMemorySubcommand<TOptions extends SlashCommandValueOptionRecord>({
@@ -336,7 +339,7 @@ function createInteraction({
     createMessage,
     defer,
     editOriginal,
-    interaction: {
+    interaction: partialFixture<CommandInteraction>({
       get acknowledged() {
         return acknowledged
       },
@@ -350,7 +353,7 @@ function createInteraction({
       member: guildID === null ? null : { roles: [] },
       memberPermissions: guildID === null ? null : { has: vi.fn(() => canManageServer) },
       user: { id: userID }
-    } as unknown as CommandInteraction
+    })
   }
 }
 

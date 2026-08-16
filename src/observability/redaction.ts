@@ -99,17 +99,19 @@ export function telemetryErrorMessage(error: unknown): string {
     return String(error)
   }
   try {
-    return (
-      JSON.stringify(error, (key, value) => {
-        if (key.length > 0 && isSensitiveTelemetryField(key)) return '[redacted]'
-        if (typeof value === 'string') return redactTelemetryText(value)
-        if (typeof value === 'bigint') return value.toString()
-        return value
-      }) ?? '[unserializable error]'
-    )
+    return serializeTelemetryError(error) ?? '[unserializable error]'
   } catch {
     return '[unserializable error]'
   }
+}
+
+function serializeTelemetryError(error: object): string | undefined {
+  return JSON.stringify(error, (key, value) => {
+    if (key.length > 0 && isSensitiveTelemetryField(key)) return '[redacted]'
+    if (typeof value === 'string') return redactTelemetryText(value)
+    if (typeof value === 'bigint') return value.toString()
+    return value
+  })
 }
 
 export function telemetryException(error: unknown): Error | string {

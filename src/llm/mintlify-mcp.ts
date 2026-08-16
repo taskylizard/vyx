@@ -137,7 +137,7 @@ async function namespaceTools(tools: ToolSet): Promise<ToolSet> {
 
   const namespaced: ToolSet = {}
   for (const { toolName, mcpTool, inputSchema, resolvedSchema } of resolved) {
-    if (namespaced[toolName] !== undefined) {
+    if (Object.hasOwn(namespaced, toolName)) {
       throw new Error(`Mintlify MCP tool name collision for ${toolName}.`)
     }
     namespaced[toolName] = {

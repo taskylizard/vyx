@@ -9,6 +9,8 @@ import {
   PARALLEL_SEARCH_TOOL_NAME
 } from '../../src/llm/tools/index.ts'
 
+const RequestBodySchema = z.record(z.string(), z.unknown())
+
 test('runs the Parallel package tool through the OpenRouter model loop', async () => {
   const calledTools: string[] = []
   const completedTools: string[] = []
@@ -70,7 +72,7 @@ test('runs the Parallel package tool through the OpenRouter model loop', async (
       'Vite+ uses the vp command.[[1]](<https://viteplus.dev>) Read <https://viteplus.dev/guide/>.'
     )
     expect(modelFetch).toHaveBeenCalledTimes(2)
-    const firstRequest = modelFetch.mock.calls[0]
+    const firstRequest = modelFetch.mock.calls.at(0)
     expect(requestUrl(firstRequest?.[0])).toBe('https://openrouter.ai/api/v1/chat/completions')
     expect(new Headers(firstRequest?.[1]?.headers).get('authorization')).toBe(
       'Bearer openrouter-key'
@@ -192,7 +194,11 @@ function chatText(text: string): Response {
 
 function requestBody(call: Parameters<typeof fetch> | undefined): Record<string, unknown> {
   const body = call?.[1]?.body
-  return typeof body === 'string' ? (JSON.parse(body) as Record<string, unknown>) : {}
+  if (typeof body !== 'string') return {}
+
+  const payload: unknown = JSON.parse(body)
+  const parsed = RequestBodySchema.safeParse(payload)
+  return parsed.success ? parsed.data : {}
 }
 
 function requestUrl(input: Parameters<typeof fetch>[0] | undefined): string {

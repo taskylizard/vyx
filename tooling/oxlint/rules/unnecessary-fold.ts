@@ -13,25 +13,23 @@ export default {
         const args = node.arguments
         if (!args || args.length !== 2) return
 
-        const callback = args[0]!
-        const initial = args[1]!
+        const callback = args[0]
+        const initial = args[1]
 
         // Callback must be (acc, x) => acc OP expr
         if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
           return
         if (callback.params.length !== 2) return
-        const accParam = callback.params[0]!
+        const accParam = callback.params[0]
         if (accParam.type !== 'Identifier') return
         const accName = accParam.name
 
         // Get the body expression
         let bodyExpr: Node | null = null
         if (callback.body.type === 'BlockStatement') {
-          if (
-            callback.body.body.length === 1 &&
-            callback.body.body[0]!.type === 'ReturnStatement'
-          ) {
-            bodyExpr = callback.body.body[0]!.argument
+          if (callback.body.body.length === 1) {
+            const statement = callback.body.body[0]
+            if (statement.type === 'ReturnStatement') bodyExpr = statement.argument
           }
         } else {
           bodyExpr = callback.body

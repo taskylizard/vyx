@@ -14,7 +14,7 @@ test('creates messages through cached channels first', async () => {
     {
       getChannel: vi.fn(() => ({ createMessage: cachedCreateMessage })),
       rest: { channels: { createMessage: restCreateMessage } }
-    } as never,
+    },
     'channel-1',
     { content: 'hello' }
   )
@@ -30,7 +30,7 @@ test('falls back to REST when a channel is missing or stale', async () => {
     {
       getChannel: vi.fn(() => undefined),
       rest: { channels: { createMessage: restCreateMessage } }
-    } as never,
+    },
     'channel-1',
     { content: 'missing' }
   )
@@ -40,7 +40,7 @@ test('falls back to REST when a channel is missing or stale', async () => {
     {
       getChannel: vi.fn(() => ({ createMessage: cachedCreateMessage })),
       rest: { channels: { createMessage: restCreateMessage } }
-    } as never,
+    },
     'channel-1',
     { content: 'stale' }
   )
@@ -58,7 +58,7 @@ test('falls back to REST after a cached edit fails', async () => {
     {
       getChannel: vi.fn(() => ({ editMessage: cachedEditMessage })),
       rest: { channels: { editMessage: restEditMessage } }
-    } as never,
+    },
     'channel-1',
     'message-1',
     { content: 'finished' }
@@ -79,9 +79,9 @@ test('keeps optional reactions from breaking message handling', async () => {
     id: 'message-1'
   }
 
-  await expect(safeCreateReaction(message as never, '✅')).resolves.toBe(true)
+  await expect(safeCreateReaction(message, '✅')).resolves.toBe(true)
   expect(restCreateReaction).toHaveBeenCalledWith('channel-1', 'message-1', '✅')
 
   restCreateReaction.mockRejectedValueOnce(new Error('missing permission'))
-  await expect(safeCreateReaction(message as never, '✅')).resolves.toBe(false)
+  await expect(safeCreateReaction(message, '✅')).resolves.toBe(false)
 })

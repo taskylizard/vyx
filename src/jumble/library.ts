@@ -97,7 +97,7 @@ export class JumbleLibrary {
     this.backgroundTail = runDetached(() =>
       this.backgroundTail.then(async () => {
         for (const kind of JUMBLE_KINDS) {
-          if (this.stopped) return
+          if (this.stopped) return undefined
           // eslint-disable-next-line no-await-in-loop -- tasky: one background refresh at a time avoids slamming Last.fm after profile changes
           await traceBackgroundOperation(
             'jumble.library.refresh',
@@ -105,6 +105,7 @@ export class JumbleLibrary {
             () => this.refresh(discordUserId, kind, canonical)
           ).catch(() => undefined)
         }
+        return undefined
       })
     )
   }
@@ -236,9 +237,10 @@ export class JumbleLibrary {
     const deadline = performance.now() + (this.options.contentionWaitMs ?? CONTENTION_WAIT_MS)
     const pollMs = this.options.contentionPollMs ?? CONTENTION_POLL_MS
     while (performance.now() < deadline) {
-      if (this.stopped) return []
       // eslint-disable-next-line no-await-in-loop -- tasky: another process owns the refresh, poll the durable generation instead of duplicating provider work
       await sleep(pollMs)
+      // oxlint-disable-next-line typescript/no-unnecessary-condition -- tasky: stop can flip while the polling sleep is awaiting
+      if (this.stopped) return []
       // eslint-disable-next-line no-await-in-loop -- tasky: each poll checks whether the lease owner atomically published its generation
       const snapshot = await this.persistence.read(discordUserId, kind, username)
       if (snapshot.candidates.length > 0) return snapshot.candidates

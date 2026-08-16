@@ -7,7 +7,12 @@ const THRESHOLD = 100
 
 function countLines(node: Node, sourceText: string): number {
   if (node.loc) return node.loc.end.line - node.loc.start.line + 1
-  if (node.start != null && node.end != null) {
+  if (
+    node.start !== null &&
+    node.start !== undefined &&
+    node.end !== null &&
+    node.end !== undefined
+  ) {
     return sourceText.substring(node.start, node.end).split('\n').length
   }
   return 0

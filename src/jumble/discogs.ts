@@ -56,7 +56,8 @@ export class DiscogsClient {
   private pending = 0
 
   constructor(options: DiscogsClientOptions = {}) {
-    this.token = options.token?.trim() || undefined
+    const token = options.token?.trim()
+    this.token = token === '' ? undefined : token
     this.cache = options.cache
     this.fetchImpl = options.fetchImpl ?? fetch
     this.baseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/u, '')
@@ -347,7 +348,7 @@ function chooseReleaseResult(
       score: releaseScore(result, expected, answer, album, candidate.artistName)
     }))
     .filter((entry) => entry.score > 0)
-    .sort((first, second) => second.score - first.score)[0]?.result
+    .toSorted((first, second) => second.score - first.score)[0]?.result
 }
 
 function releaseScore(

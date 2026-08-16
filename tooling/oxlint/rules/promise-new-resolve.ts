@@ -13,17 +13,17 @@ export default {
         if (!isIdentifier(node.callee, 'Promise')) return
         if (!node.arguments || node.arguments.length !== 1) return
 
-        const callback = node.arguments[0]!
+        const callback = node.arguments[0]
         if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
           return
         if (callback.params.length < 1) return
 
-        const resolveParam = callback.params[0]!
+        const resolveParam = callback.params[0]
         const rejectParam = callback.params[1]
 
         let bodyExpr: Node | null = null
         if (callback.body.type === 'BlockStatement' && callback.body.body.length === 1) {
-          const stmt = callback.body.body[0]!
+          const stmt = callback.body.body[0]
           if (stmt.type === 'ExpressionStatement') bodyExpr = stmt.expression
         } else if (callback.body.type !== 'BlockStatement') {
           bodyExpr = callback.body

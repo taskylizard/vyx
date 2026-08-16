@@ -22,19 +22,19 @@ export default {
         if (!isCallOf(receiver, 'Object', 'keys')) return
         if (!receiver.arguments || receiver.arguments.length !== 1) return
 
-        const objArg = receiver.arguments[0]!
+        const objArg = receiver.arguments[0]
         if (objArg.type !== 'Identifier') return
         const objName = objArg.name
 
         // Check callback: k => expr using obj[k]
         const args = node.arguments
         if (!args || args.length !== 1) return
-        const callback = args[0]!
+        const callback = args[0]
 
         if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
           return
         if (callback.params.length !== 1) return
-        const param = callback.params[0]!
+        const param = callback.params[0]
         if (param.type !== 'Identifier') return
         const keyName = param.name
 

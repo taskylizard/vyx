@@ -1,13 +1,6 @@
 import { Buffer } from 'node:buffer'
-import {
-  ButtonStyles,
-  ComponentTypes,
-  MessageFlags,
-  type CreateMessageOptions,
-  type Message
-} from 'oceanic.js'
+import { ButtonStyles, ComponentTypes, MessageFlags, type CreateMessageOptions } from 'oceanic.js'
 import { afterEach, expect, test, vi } from 'vite-plus/test'
-import type { BotContext } from '../../src/bot/context.ts'
 import {
   findAutoembedLinks,
   handleAutoembeds,
@@ -181,19 +174,19 @@ test('downloads private Twitter media and uploads it to Discord', async () => {
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: { FAUNA_URL: 'https://private.example' },
-    logger: { warn: vi.fn() }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn: vi.fn() }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://x.com/alyxia/status/123',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
+  const options = createMessage.mock.calls.at(0)?.[1]
   expect(options?.files).toEqual([
     { contents: Buffer.from([1, 2, 3]), name: 'twitter-avatar.png' },
     { contents: Buffer.from([4, 5, 6]), name: 'twitter-media-1.webp' }
@@ -315,19 +308,19 @@ test('fetches rich Instagram data and gives remote carousel media to Discord', a
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
-    logger: { warn: vi.fn() }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn: vi.fn() }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://www.instagram.com/p/AbC_123/?igsh=share-token',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
+  const options = createMessage.mock.calls.at(0)?.[1]
   expect(options?.flags).toBe(MessageFlags.IS_COMPONENTS_V2)
   expect(options?.files).toBeUndefined()
   const rendered = JSON.stringify(options?.components)
@@ -377,18 +370,18 @@ test('uses the vendored Instagram-native strategy after rich lookup rate limits'
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
     logger: { info, warn: vi.fn() }
-  } as unknown as BotContext
+  }
   const message = {
     channelID: 'channel',
     content: 'https://instagram.com/reel/native-fallback/',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
+  const options = createMessage.mock.calls.at(0)?.[1]
   expect(options?.files).toEqual([
     { contents: Buffer.from([1, 2, 3]), name: 'instagram-media-1.mp4' }
   ])
@@ -436,18 +429,18 @@ test('downloads and uploads SnapSave media after native resolution fails', async
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
     logger: { info, warn: vi.fn() }
-  } as unknown as BotContext
+  }
   const message = {
     channelID: 'channel',
     content: 'https://instagram.com/reel/snapsave-fallback/',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
-  const options = createMessage.mock.calls[0]?.[1]
+  const options = createMessage.mock.calls.at(0)?.[1]
   expect(options?.files).toEqual([
     { contents: Buffer.from([4, 5, 6]), name: 'instagram-media-1.mp4' }
   ])
@@ -502,15 +495,15 @@ test('uses the rewritten link when resolved Instagram media cannot be downloaded
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
-    logger: { warn }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://instagram.com/reel/unavailable/',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
@@ -540,15 +533,15 @@ test('falls back to a rewritten Instagram link when public lookup fails', async 
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
-    logger: { warn: vi.fn() }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn: vi.fn() }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://www.instagram.com/reel/example/',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
@@ -570,15 +563,15 @@ test('falls back to a rewritten Twitter link when component lookup fails', async
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: { FAUNA_URL: 'https://private.example' },
-    logger: { warn }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://x.com/alyxia/status/123',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
@@ -598,15 +591,15 @@ test('replies with rewritten links and suppresses the original embed', async () 
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
-    logger: { warn: vi.fn() }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn: vi.fn() }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://www.reddit.com/r/typescript/comments/example/',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
@@ -633,21 +626,21 @@ test('replies with rewritten links and suppresses the original embed', async () 
 test('silently ignores missing permission errors while suppressing embeds', async () => {
   const createMessage = vi.fn(async () => ({}))
   const editMessage = vi.fn(async () => {
-    throw { code: 50_013, status: 403 }
+    throw Object.assign(new Error('missing permissions'), { code: 50_013, status: 403 })
   })
   const warn = vi.fn()
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
-    logger: { warn }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn }
+  }
   const message = {
     channelID: 'channel',
     content: 'https://reddit.com/r/typescript/comments/example/',
     flags: 0,
     guildID: 'guild',
     id: 'message'
-  } as Message
+  }
 
   await handleAutoembeds(context, message)
 
@@ -662,11 +655,15 @@ test('honors -ignore without sending or suppressing anything', async () => {
   const context = {
     client: { rest: { channels: { createMessage, editMessage } } },
     env: {},
-    logger: { warn: vi.fn() }
-  } as unknown as BotContext
+    logger: { info: vi.fn(), warn: vi.fn() }
+  }
   const message = {
-    content: 'https://reddit.com/r/typescript -IGNORE'
-  } as Message
+    channelID: 'channel',
+    content: 'https://reddit.com/r/typescript -IGNORE',
+    flags: 0,
+    guildID: 'guild',
+    id: 'message'
+  }
 
   await handleAutoembeds(context, message)
 

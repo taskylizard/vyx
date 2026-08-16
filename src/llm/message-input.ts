@@ -1,14 +1,18 @@
 import type { AssistantModelMessage, ModelMessage, UserContent, UserModelMessage } from 'ai'
-import type { CommandInteraction, Message } from 'oceanic.js'
-import type { BotContext } from '../bot/context.ts'
 import { fetchReferencedMessageCached } from '../discord/cached.ts'
+import type {
+  MessagePromptContext,
+  PromptMessage,
+  SlashPromptContext,
+  SlashPromptInteraction
+} from './message-input-types.ts'
 import { stripToolsFooter } from './tool-progress.ts'
 
 const MAX_REPLY_CHAIN_MESSAGES = 12
 
 export async function buildMessagePrompt(
-  context: BotContext,
-  source: Message
+  context: MessagePromptContext,
+  source: PromptMessage
 ): Promise<ModelMessage[]> {
   const chain = await replyChain(context, source)
   const messages: ModelMessage[] = await memoryMessages(context, source.author.id, source.guildID)
@@ -21,8 +25,8 @@ export async function buildMessagePrompt(
 }
 
 export async function buildSlashPrompt(
-  context: BotContext,
-  interaction: CommandInteraction,
+  context: SlashPromptContext,
+  interaction: SlashPromptInteraction,
   prompt: string
 ): Promise<ModelMessage[]> {
   const displayName =
@@ -35,7 +39,7 @@ export async function buildSlashPrompt(
 }
 
 async function memoryMessages(
-  context: BotContext,
+  context: SlashPromptContext,
   userID: string,
   serverID: string | null
 ): Promise<UserModelMessage[]> {
@@ -58,8 +62,8 @@ async function memoryMessages(
 }
 
 function discordMessageToChatMessage(
-  context: BotContext,
-  message: Message
+  context: Pick<MessagePromptContext, 'botUserID'>,
+  message: PromptMessage
 ): AssistantModelMessage | UserModelMessage {
   if (message.author.id === context.botUserID) {
     return {
@@ -84,7 +88,7 @@ function userPromptMessage(userID: string, displayName: string, prompt: string):
   }
 }
 
-function messageContentParts(message: Message, displayName: string): UserContent {
+function messageContentParts(message: PromptMessage, displayName: string): UserContent {
   const parts: Exclude<UserContent, string> = [
     {
       text: `${displayName} (ID: ${message.author.id}): ${message.content}`,
@@ -125,7 +129,10 @@ function messageContentParts(message: Message, displayName: string): UserContent
   return parts
 }
 
-async function replyChain(context: BotContext, source: Message): Promise<Message[]> {
+async function replyChain(
+  context: Pick<MessagePromptContext, 'client'>,
+  source: PromptMessage
+): Promise<PromptMessage[]> {
   const chain = [source]
   let current = source
 
@@ -139,5 +146,5 @@ async function replyChain(context: BotContext, source: Message): Promise<Message
     current = referenced
   }
 
-  return chain.reverse()
+  return chain.toReversed()
 }

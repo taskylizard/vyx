@@ -17,7 +17,7 @@ test('polls typing immediately without overlapping requests and stops cleanly', 
     {
       getChannel: vi.fn(() => ({ sendTyping: cachedSendTyping })),
       rest: { channels: { sendTyping: restSendTyping } }
-    } as never,
+    },
     'channel-1',
     1_000
   )
@@ -45,7 +45,7 @@ test('falls back to REST when cached typing fails', async () => {
     {
       getChannel: vi.fn(() => ({ sendTyping: cachedSendTyping })),
       rest: { channels: { sendTyping: restSendTyping } }
-    } as never,
+    },
     'channel-1',
     1_000
   )
@@ -63,7 +63,7 @@ test('uses REST when the channel is not cached', async () => {
     {
       getChannel: vi.fn(() => undefined),
       rest: { channels: { sendTyping: restSendTyping } }
-    } as never,
+    },
     'channel-1',
     1_000
   )
@@ -81,7 +81,7 @@ test('stops polling after cached and REST typing both fail', async () => {
     {
       getChannel: vi.fn(() => ({ sendTyping: cachedSendTyping })),
       rest: { channels: { sendTyping: restSendTyping } }
-    } as never,
+    },
     'channel-1',
     1_000
   )

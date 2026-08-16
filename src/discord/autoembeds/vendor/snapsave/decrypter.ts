@@ -57,7 +57,7 @@ function decodeNumber(value: string, sourceBase: number, targetBase: number): nu
   const targetCharacters = characters.slice(0, targetBase)
   let number = value
     .split('')
-    .reverse()
+    .toReversed()
     .reduce((total, character, index) => {
       const characterIndex = sourceCharacters.indexOf(character)
       return characterIndex === -1 ? total : total + characterIndex * sourceBase ** index

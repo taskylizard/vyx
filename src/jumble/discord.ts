@@ -56,10 +56,10 @@ export async function renderJumble(
       image =
         state.session.endedAt === null
           ? imageUrls.length === 1
-            ? await renderer.render(imageUrls[0]!, state.session.blurStage)
+            ? await renderer.render(imageUrls[0], state.session.blurStage)
             : await renderer.renderWithFallback(imageUrls, state.session.blurStage)
           : imageUrls.length === 1
-            ? await renderer.reveal(imageUrls[0]!)
+            ? await renderer.reveal(imageUrls[0])
             : await renderer.revealWithFallback(imageUrls)
     } catch (error) {
       imageError = error instanceof Error ? error : new Error(String(error))

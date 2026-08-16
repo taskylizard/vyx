@@ -8,8 +8,6 @@ export default {
     return {
       SwitchStatement(node: Node) {
         const cases: Node[] = node.cases
-        if (!cases) return
-
         const nonDefaultCases = cases.filter((c: Node) => c.test !== null)
         const defaultCase = cases.find((c: Node) => c.test === null)
 

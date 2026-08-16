@@ -7,14 +7,14 @@ import { isMethodCall } from '../types.ts'
 function isIdentityClosure(node: Node): boolean {
   // (x) => x
   if (node.type === 'ArrowFunctionExpression' && node.params.length === 1) {
-    const param = node.params[0]!
+    const param = node.params[0]
     const body = node.body
     if (param.type === 'Identifier' && body.type === 'Identifier' && body.name === param.name) {
       return true
     }
     // (x) => { return x; }
     if (body.type === 'BlockStatement' && body.body.length === 1) {
-      const stmt = body.body[0]!
+      const stmt = body.body[0]
       if (
         stmt.type === 'ReturnStatement' &&
         stmt.argument?.type === 'Identifier' &&
@@ -26,13 +26,13 @@ function isIdentityClosure(node: Node): boolean {
   }
   // function(x) { return x; }
   if (node.type === 'FunctionExpression' && node.params.length === 1) {
-    const param = node.params[0]!
+    const param = node.params[0]
     if (
       param.type === 'Identifier' &&
       node.body.type === 'BlockStatement' &&
       node.body.body.length === 1
     ) {
-      const stmt = node.body.body[0]!
+      const stmt = node.body.body[0]
       if (
         stmt.type === 'ReturnStatement' &&
         stmt.argument?.type === 'Identifier' &&
@@ -54,7 +54,7 @@ export default {
         const args = node.arguments
         if (!args || args.length !== 1) return
 
-        if (isIdentityClosure(args[0]!)) {
+        if (isIdentityClosure(args[0])) {
           context.report({
             message:
               'Map identity: `.map(x => x)` is a no-op. Remove it, or use `.slice()` / `[...arr]` to copy. (clippy::map_identity)',

@@ -143,7 +143,11 @@ function abortableDelay(milliseconds: number, signal?: AbortSignal | null): Prom
       'abort',
       () => {
         clearTimeout(timeout)
-        reject(signal.reason)
+        reject(
+          signal.reason instanceof Error
+            ? signal.reason
+            : new DOMException('The delay was aborted.', 'AbortError')
+        )
       },
       { once: true }
     )

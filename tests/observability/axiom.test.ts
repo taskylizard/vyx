@@ -72,14 +72,21 @@ test('exports correlated logs, errors, and AI traces to separate Axiom datasets'
 
     expectTelemetryExports(requests, result.text)
   } finally {
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error === undefined ? resolve() : reject(error)))
-    )
+    await new Promise<void>((resolve, reject) => {
+      server.close((error) => {
+        if (error !== undefined) {
+          reject(error)
+          return
+        }
+
+        resolve()
+      })
+    })
   }
 })
 
 function traceIds(payload: string): string[] {
-  return [...payload.matchAll(/"traceId":"([a-f\d]{32})"/gu)].map((match) => match[1]!)
+  return [...payload.matchAll(/"traceId":"([a-f\d]{32})"/gu)].map((match) => match[1])
 }
 
 function expectTelemetryExports(requests: readonly ExportRequest[], resultText: string): void {

@@ -42,7 +42,7 @@ export default {
     let reported = false
 
     function walk(node: Node, depth: number) {
-      if (!node || typeof node !== 'object' || !node.type || reported) return
+      if (reported) return
       if (depth > 0 && FUNCTION_TYPES.has(node.type)) return
 
       const isNesting = NESTING_NODES.has(node.type)

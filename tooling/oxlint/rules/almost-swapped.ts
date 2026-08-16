@@ -21,8 +21,8 @@ function assignSource(node: Node): string | null {
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length - 1; i++) {
-    const s1 = body[i]!
-    const s2 = body[i + 1]!
+    const s1 = body[i]
+    const s2 = body[i + 1]
 
     const firstTarget = assignTarget(s1)
     const firstSource = assignSource(s1)

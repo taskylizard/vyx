@@ -41,18 +41,12 @@ export interface KanikouApp {
   stop(): Promise<void>
 }
 
-interface JumbleInfrastructure {
-  jumble: JumbleService
-  jumbleRenderer: JumbleImageRenderer
-  jumbleMetadataCache: JumbleMetadataCache
-}
-
 function createJumbleInfrastructure(
   config: KanikouEnv,
   database: KanikouDatabase,
   client: Client,
   logger: KanikouLogger
-): JumbleInfrastructure {
+) {
   const jumbleMetadataCache = new JumbleMetadataCache(database.db, {
     onError: (error) => logger.warn('jumble metadata cache error', { error })
   })
@@ -362,7 +356,7 @@ function interactionTraceAttributes(
   interaction: AnyInteractionGateway
 ): Readonly<Record<string, unknown>> {
   const common = {
-    'discord.channel.id': interaction.channelID ?? 'unknown',
+    'discord.channel.id': interaction.channelID,
     'discord.guild.id': interaction.guildID ?? 'direct-message',
     'discord.interaction.id': interaction.id,
     'discord.interaction.type': interaction.type

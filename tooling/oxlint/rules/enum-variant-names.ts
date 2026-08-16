@@ -10,8 +10,8 @@ export default {
       TSEnumDeclaration(node: Node) {
         const enumName = node.id?.name
         if (!enumName) return
-        const members: Node[] = node.members ?? node.body?.members
-        if (!members || members.length < 2) return
+        const members = node.members ?? node.body?.members
+        if (!Array.isArray(members) || members.length < 2) return
 
         const names: string[] = members
           .map((m: Node) => (m.id?.type === 'Identifier' ? m.id.name : null))

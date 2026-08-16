@@ -148,7 +148,7 @@ export class GuildSettingsStore {
         and(eq(guildSettings.applicationId, applicationID), eq(guildSettings.guildId, guildID))
       )
       .limit(1)
-    return rows[0]
+    return rows.at(0)
   }
 }
 

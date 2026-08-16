@@ -13,7 +13,7 @@ minimumReleaseAgeExclude:
   - '@ai-sdk/provider-utils@5.0.7'
   - '@ai-sdk/provider@4.0.3'
   - ai@7.0.19
-  - rosepack@0.1.0 || 0.2.0 || 0.3.0
+  - rosepack@0.1.0 || 0.2.0 || 0.3.0 || 0.4.0
 overrides:
   vite: 'catalog:'
 peerDependencyRules:

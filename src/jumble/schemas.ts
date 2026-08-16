@@ -8,19 +8,17 @@ import {
   type JumbleSessionMetadata
 } from './types.ts'
 
-export const JumbleArtistMetadataSchema: z.ZodType<JumbleArtistMetadata> = z
-  .object({
-    mbid: z.string().optional(),
-    type: z.string().optional(),
-    countryCode: z.string().optional(),
-    startDate: z.string().optional(),
-    endDate: z.string().optional(),
-    disambiguation: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    summary: z.string().optional(),
-    aliases: z.array(z.string()).max(8).optional()
-  })
-  .passthrough()
+export const JumbleArtistMetadataSchema: z.ZodType<JumbleArtistMetadata> = z.looseObject({
+  mbid: z.string().optional(),
+  type: z.string().optional(),
+  countryCode: z.string().optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  disambiguation: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+  summary: z.string().optional(),
+  aliases: z.array(z.string()).max(8).optional()
+})
 
 export const JumbleAnswerVariantSchema: z.ZodType<JumbleAnswerVariant> = z.object({
   value: z.string(),
@@ -68,21 +66,19 @@ export const JumbleCandidateSchema: z.ZodType<JumbleCandidate> = z.discriminated
   })
 ])
 
-export const JumbleSessionMetadataSchema: z.ZodType<JumbleSessionMetadata> = z
-  .object({
-    candidate: JumbleCandidateSchema,
-    shuffledAnswer: z.string().optional(),
-    answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
-    continuousSession: z
-      .object({
-        id: z.string().uuid()
-      })
-      .optional(),
-    hints: z.array(
-      z.object({
-        kind: z.string(),
-        content: z.string()
-      })
-    )
-  })
-  .passthrough()
+export const JumbleSessionMetadataSchema: z.ZodType<JumbleSessionMetadata> = z.looseObject({
+  candidate: JumbleCandidateSchema,
+  shuffledAnswer: z.string().optional(),
+  answerVariants: z.array(JumbleAnswerVariantSchema).max(16).optional(),
+  continuousSession: z
+    .object({
+      id: z.uuid()
+    })
+    .optional(),
+  hints: z.array(
+    z.object({
+      kind: z.string(),
+      content: z.string()
+    })
+  )
+})

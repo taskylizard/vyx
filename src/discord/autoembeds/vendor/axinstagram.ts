@@ -147,7 +147,7 @@ export function extractFromGQL(data: unknown): AxMediaResult | undefined {
     return undefined
   }
   const media = parsed.data.gql_data?.shortcode_media ?? parsed.data.gql_data?.xdt_shortcode_media
-  if (media == null) return undefined
+  if (media === null || media === undefined) return undefined
 
   const sidecar = media.edge_sidecar_to_children
   if (sidecar?.edges.length) {
@@ -295,11 +295,11 @@ async function tryGraphQL(postID: string, signal?: AbortSignal): Promise<unknown
     __hs: String(site?.haste_session ?? '20126.HYP:instagram_web_pkg.2.1...0'),
     __hsi: String(site?.hsi ?? '7436540909012459023'),
     __req: 'b',
-    __rev: String(pushInfo.success ? (pushInfo.data.rollout_hash ?? '1019933358') : '1019933358'),
+    __rev: pushInfo.success ? (pushInfo.data.rollout_hash ?? '1019933358') : '1019933358',
     __s: `::${randomBase64url(6)}`,
-    __spin_b: String(site?.__spin_b ?? 'trunk'),
-    __spin_r: String(site?.__spin_r ?? '1019933358'),
-    __spin_t: String(site?.__spin_t ?? Math.floor(Date.now() / 1_000)),
+    __spin_b: String(site?.['__spin_b'] ?? 'trunk'),
+    __spin_r: String(site?.['__spin_r'] ?? '1019933358'),
+    __spin_t: String(site?.['__spin_t'] ?? Math.floor(Date.now() / 1_000)),
     __user: '0',
     av: '0',
     doc_id: '8845758582119845',

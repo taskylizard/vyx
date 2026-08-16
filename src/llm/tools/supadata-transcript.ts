@@ -103,7 +103,7 @@ async function waitForTranscript(
   }
 
   const deadline = now() + timeoutMs
-  while (true) {
+  for (;;) {
     // eslint-disable-next-line no-await-in-loop -- tasky: sequential polling, each poll depends on elapsed time and prior job status
     const job = await client.transcript.getJobStatus(jobId)
     const transcript = match(job)

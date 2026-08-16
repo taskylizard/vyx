@@ -1,4 +1,5 @@
 import type { Client, EmbedOptions, Message } from 'oceanic.js'
+import type { EditMessageClient } from './client-types.ts'
 import { replyMessageReference, suppressAllMentions } from './message-options.ts'
 import { safeCreateMessage, safeEditMessage } from './safe-actions.ts'
 
@@ -25,7 +26,7 @@ export async function sendReply(
 }
 
 export async function editSentMessage(
-  client: Client,
+  client: EditMessageClient<unknown>,
   target: SentDiscordMessage,
   content: string
 ): Promise<void> {
@@ -36,7 +37,7 @@ export async function editSentMessage(
 }
 
 export async function editSentMessageWithEmbed(
-  client: Client,
+  client: EditMessageClient<unknown>,
   target: SentDiscordMessage,
   description: string
 ): Promise<void> {

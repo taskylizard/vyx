@@ -46,4 +46,4 @@ function filterKnownModules(values: readonly string[]): readonly string[] {
   return Object.freeze(unique(values.filter((value) => knownModuleIDs.has(value))))
 }
 
-export const { button, component, guard, modal, slash, slashSub } = rosepack
+export const { button, component, guard, modal, slash } = rosepack

@@ -72,13 +72,13 @@ export function buildJumbleReplayComponents(
     .returnType<TextButton | undefined>()
     .with(
       { startSessionCustomID: P.string, state: { status: 'ready' } },
-      ({ startSessionCustomID }) =>
-        button('Start session', startSessionCustomID, ButtonStyles.PRIMARY)
+      ({ startSessionCustomID: sessionCustomID }) =>
+        button('Start session', sessionCustomID, ButtonStyles.PRIMARY)
     )
     .with(
       { startSessionCustomID: P.string, state: { status: 'playing' } },
-      ({ startSessionCustomID }) => ({
-        ...button('Start session', startSessionCustomID, ButtonStyles.PRIMARY),
+      ({ startSessionCustomID: sessionCustomID }) => ({
+        ...button('Start session', sessionCustomID, ButtonStyles.PRIMARY),
         disabled: true
       })
     )

@@ -1,8 +1,8 @@
-import { slashSub } from '../bot/rosepack.ts'
+import { slash } from '../bot/rosepack.ts'
 import { guildOnlyGuard } from '../discord/guards.ts'
 import { buildJumbleProfileMessage } from '../jumble/profile-presentation.ts'
 
-export default slashSub({
+export default slash({
   description: 'View or set your Last.fm profile and Jumble stats',
   guards: [guildOnlyGuard],
   options: {

@@ -11,6 +11,7 @@ import { componentIds, jumbleComponents } from '../../src/jumble/components.ts'
 import { jumbleChannelPermissionsGuard, jumbleEnabledGuard } from '../../src/jumble/guards.ts'
 import { jumblePermissionError } from '../../src/jumble/permissions.ts'
 import { modules } from '../../src/modules.ts'
+import { partialFixture } from '../fixtures/partial.ts'
 
 test('keeps Jumble out of global registration until its guild module is enabled', () => {
   const registry = rosepack.createRegistry({ components: jumbleComponents, slashCommands })
@@ -55,19 +56,23 @@ test('reports every channel permission needed before starting a game', async () 
   expect(error).toContain('Attach Files')
   expect(jumblePermissionError({ appPermissions: denied, guildID: null })).toBeNull()
 
-  const decision = await jumbleChannelPermissionsGuard({
-    app: {},
-    interaction: { appPermissions: denied, guildID: 'guild-1' }
-  } as never)
+  const decision = await jumbleChannelPermissionsGuard(
+    partialFixture({
+      app: {},
+      interaction: { appPermissions: denied, guildID: 'guild-1' }
+    })
+  )
   expect(decision.allowed).toBe(false)
 })
 
 test('component guards stop Jumble when its module is disabled', async () => {
   const isEnabled = vi.fn(async () => false)
-  const decision = await jumbleEnabledGuard({
-    app: { moduleStore: { isEnabled } },
-    interaction: { applicationID: 'app-1', guildID: 'guild-1' }
-  } as never)
+  const decision = await jumbleEnabledGuard(
+    partialFixture({
+      app: { moduleStore: { isEnabled } },
+      interaction: { applicationID: 'app-1', guildID: 'guild-1' }
+    })
+  )
 
   expect(isEnabled).toHaveBeenCalledWith({
     applicationID: 'app-1',
@@ -83,16 +88,18 @@ test('slash play does not show a typing indicator', async () => {
   const sendTyping = vi.fn(async () => undefined)
   const editResponse = vi.fn(async () => undefined)
 
-  await jumbleCommand.subcommands.play.execute({
-    client: {
-      getChannel: vi.fn(() => ({ sendTyping })),
-      rest: { channels: { sendTyping } }
-    },
-    defer: vi.fn(async () => undefined),
-    editResponse,
-    interaction: { channelID: 'channel-1' },
-    options: { kind: 'unsupported' }
-  } as never)
+  await jumbleCommand.subcommands.play.execute(
+    partialFixture({
+      client: {
+        getChannel: vi.fn(() => ({ sendTyping })),
+        rest: { channels: { sendTyping } }
+      },
+      defer: vi.fn(async () => undefined),
+      editResponse,
+      interaction: { channelID: 'channel-1' },
+      options: { kind: 'unsupported' }
+    })
+  )
 
   expect(editResponse).toHaveBeenCalledWith('That Jumble type is not available.')
   expect(sendTyping).not.toHaveBeenCalled()
@@ -130,21 +137,23 @@ test('slash play treats an explicit username as a one-game override', async () =
     }
   }))
 
-  await jumbleCommand.subcommands.play.execute({
-    app: {
-      jumble: { setProfile, start, attachMessage: vi.fn(async () => undefined) },
-      jumbleRenderer: {}
-    },
-    defer: vi.fn(async () => undefined),
-    editResponse,
-    interaction: {
-      channelID: 'channel-1',
-      guildID: 'guild-1',
-      user: { id: 'user-1' },
-      getOriginal: vi.fn(async () => ({ id: 'message-1' }))
-    },
-    options: { kind: 'album', username: 'lastfm' }
-  } as never)
+  await jumbleCommand.subcommands.play.execute(
+    partialFixture({
+      app: {
+        jumble: { setProfile, start, attachMessage: vi.fn(async () => undefined) },
+        jumbleRenderer: {}
+      },
+      defer: vi.fn(async () => undefined),
+      editResponse,
+      interaction: {
+        channelID: 'channel-1',
+        guildID: 'guild-1',
+        user: { id: 'user-1' },
+        getOriginal: vi.fn(async () => ({ id: 'message-1' }))
+      },
+      options: { kind: 'album', username: 'lastfm' }
+    })
+  )
 
   expect(setProfile).not.toHaveBeenCalled()
   expect(start).toHaveBeenCalledWith(
@@ -206,13 +215,15 @@ test('jumble profile without a username renders the saved profile and all stats'
     }
   }))
 
-  await jumbleProfileSubcommand.execute({
-    app: { jumble: { profileSummary } },
-    defer: vi.fn(async () => undefined),
-    editResponse,
-    interaction: { user: { id: 'user-1' } },
-    options: {}
-  } as never)
+  await jumbleProfileSubcommand.execute(
+    partialFixture({
+      app: { jumble: { profileSummary } },
+      defer: vi.fn(async () => undefined),
+      editResponse,
+      interaction: { user: { id: 'user-1' } },
+      options: {}
+    })
+  )
 
   expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('Last.fm: `taskyliz`'))
   expect(editResponse).toHaveBeenCalledWith(expect.stringContaining('All: **6**'))
@@ -247,9 +258,9 @@ test('enabling the Jumble module reconciles its guild command', async () => {
   }
   const registry = rosepack.createRegistry({ slashCommands })
   const result = await registry.modules.enable({
-    app: { moduleStore } as never,
+    app: partialFixture({ moduleStore }),
     applicationID: 'app-1',
-    client: client as never,
+    client: partialFixture(client),
     guildID: 'guild-1',
     module: modules.jumble
   })
@@ -291,9 +302,9 @@ test('enabling the AI module reconciles its guild memory command', async () => {
   const registry = rosepack.createRegistry({ slashCommands })
 
   await registry.modules.enable({
-    app: { moduleStore } as never,
+    app: partialFixture({ moduleStore }),
     applicationID: 'app-1',
-    client: client as never,
+    client: partialFixture(client),
     guildID: 'guild-1',
     module: modules.ai
   })

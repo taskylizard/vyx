@@ -8,8 +8,8 @@ import { getFunctionBody } from '../types.ts'
 function checkBody(body: Node[], context: Context) {
   if (body.length < 2) return
 
-  const last = body[body.length - 1]!
-  const secondLast = body[body.length - 2]!
+  const last = body[body.length - 1]
+  const secondLast = body[body.length - 2]
 
   // Last must be: return x;
   if (last.type !== 'ReturnStatement' || !last.argument || last.argument.type !== 'Identifier')
@@ -18,7 +18,7 @@ function checkBody(body: Node[], context: Context) {
 
   // Second-to-last must be: const/let x = expr;
   if (secondLast.type !== 'VariableDeclaration' || secondLast.declarations.length !== 1) return
-  const decl = secondLast.declarations[0]!
+  const decl = secondLast.declarations[0]
   if (decl.id?.type !== 'Identifier' || decl.id.name !== returnedName || !decl.init) return
 
   context.report({

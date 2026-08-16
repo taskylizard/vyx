@@ -4,15 +4,13 @@
 import type { Context, Node } from '../types.ts'
 
 function alwaysExits(node: Node): boolean {
-  if (!node) return false
-
   switch (node.type) {
     case 'ReturnStatement':
     case 'ThrowStatement':
     case 'BreakStatement':
       return true
     case 'BlockStatement':
-      return node.body.length > 0 && alwaysExits(node.body[node.body.length - 1]!)
+      return node.body.length > 0 && alwaysExits(node.body[node.body.length - 1])
     case 'IfStatement':
       return !!node.alternate && alwaysExits(node.consequent) && alwaysExits(node.alternate)
     case 'ExpressionStatement':

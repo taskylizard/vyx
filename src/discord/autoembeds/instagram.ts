@@ -4,11 +4,9 @@ import {
   MessageFlags,
   type ContainerComponent,
   type MediaGalleryItem,
-  type Message,
   type MessageComponent
 } from 'oceanic.js'
 import { match } from 'ts-pattern'
-import type { BotContext } from '../../bot/context.ts'
 import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
 import { safeCreateMessage } from '../safe-actions.ts'
 import { escapeMarkdown, textDisplay, trimComponentText, unfurledMedia } from './components.ts'
@@ -28,6 +26,7 @@ import { InstagramPostResponseSchema, InstagramSharerResponseSchema } from './in
 import { resolveAxInstagramMedia } from './vendor/axinstagram.ts'
 import { resolveSnapSaveInstagramMedia } from './vendor/snapsave/instagram.ts'
 import type { ResolvedInstagramMedia } from './vendor/types.ts'
+import type { AutoembedContext, AutoembedMessage } from './types.ts'
 
 export type { InstagramComponentAssets } from './instagram-types.ts'
 
@@ -46,8 +45,8 @@ const instagramInFlight = new Map<string, Promise<InstagramResolution | undefine
 let richLookupBlockedUntil = 0
 
 export async function sendInstagramAutoembed(
-  context: BotContext,
-  message: Message,
+  context: AutoembedContext,
+  message: AutoembedMessage,
   sourceURL: string
 ): Promise<void> {
   const resolution = await resolveInstagram(sourceURL)
@@ -123,7 +122,7 @@ export function instagramComponents(
   sharer?: string
 ): Array<MessageComponent> {
   const username = post.user.username
-  const displayName = post.user.full_name || username
+  const displayName = post.user.full_name ?? username
   const verified = post.user.is_verified ? ' ✓' : ''
   const coauthors = (post.coauthor_producers ?? [])
     .flatMap((coauthor) => (coauthor.username ? [coauthor.username] : []))
@@ -203,7 +202,7 @@ function prepareInstagramAssets(post: InstagramPost): InstagramComponentAssets {
 }
 
 async function prepareInstagramMediaAssets(
-  context: BotContext,
+  context: AutoembedContext,
   media: ResolvedInstagramMedia
 ): Promise<PreparedInstagramMediaAssets> {
   const assets = await Promise.all(
@@ -354,7 +353,7 @@ function isInstagramRateLimitError(error: unknown): boolean {
 }
 
 async function fetchInstagramSharerSafely(
-  context: BotContext,
+  context: AutoembedContext,
   sourceURL: string
 ): Promise<string | undefined> {
   try {

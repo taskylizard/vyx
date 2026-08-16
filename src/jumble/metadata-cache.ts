@@ -60,7 +60,7 @@ export class JumbleMetadataCache {
         .from(jumbleMetadataCache)
         .where(eq(jumbleMetadataCache.cacheKey, cacheKey))
         .limit(1)
-      const row = rows[0]
+      const row = rows.at(0)
       if (row === undefined) return null
       if (Buffer.byteLength(row.payload, 'utf8') > this.maxPayloadBytes) {
         await this.delete(cacheKey)
@@ -93,17 +93,21 @@ export class JumbleMetadataCache {
     }
   }
 
-  async set<T>(cacheKey: string, value: T, ttlMs: number): Promise<boolean> {
+  async set(cacheKey: string, value: unknown, ttlMs: number): Promise<boolean> {
     if (cacheKey.trim().length === 0 || cacheKey.length > 512) return false
-    let payload: string
+    let serialized: unknown
     try {
-      payload = JSON.stringify(value)
+      serialized = JSON.stringify(value)
     } catch (error) {
       this.report(error)
       return false
     }
-    if (payload === undefined || Buffer.byteLength(payload, 'utf8') > this.maxPayloadBytes)
+    if (
+      typeof serialized !== 'string' ||
+      Buffer.byteLength(serialized, 'utf8') > this.maxPayloadBytes
+    )
       return false
+    const payload = serialized
 
     const fetchedAt = this.now()
     const expiresAt = fetchedAt + Math.max(1, Math.trunc(ttlMs))
@@ -142,7 +146,7 @@ export class JumbleMetadataCache {
       await this.db.delete(jumbleMetadataCache).where(lt(jumbleMetadataCache.expiresAt, now))
 
       const rows = await this.db.select({ total: count() }).from(jumbleMetadataCache)
-      let remaining = Math.max(0, Number(rows[0]?.total ?? 0) - this.maxEntries)
+      let remaining = Math.max(0, (rows.at(0)?.total ?? 0) - this.maxEntries)
       for (let pass = 0; pass < 8 && remaining > 0; pass += 1) {
         const batchSize = Math.min(remaining, 512)
         // eslint-disable-next-line no-await-in-loop -- tasky: sequential batch pruning, each pass evicts the next oldest batch after the prior deletion

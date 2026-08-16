@@ -13,6 +13,7 @@ import { JumbleRepository } from '../../src/jumble/repository.ts'
 import type { JumbleImageRenderer } from '../../src/jumble/renderer.ts'
 import { JumbleError, JumbleService } from '../../src/jumble/service.ts'
 import type { JumbleTimingEvent } from '../../src/jumble/timing.ts'
+import { partialFixture } from '../fixtures/partial.ts'
 import type { JumbleCandidate, JumbleHint, JumbleKind } from '../../src/jumble/types.ts'
 
 let database: ReturnType<typeof createKanikouDatabase>
@@ -93,7 +94,7 @@ test('persists a text-and-art artist session, hints, guesses, and a solved outco
       .content
   ).toContain('Unscramble:')
   let renderedImage: { stage: number | undefined; url: string } | undefined
-  const renderer = {
+  const renderer = partialFixture<JumbleImageRenderer>({
     async render(url: string, stage?: number) {
       renderedImage = { stage, url }
       return Buffer.from('artist-art')
@@ -101,7 +102,7 @@ test('persists a text-and-art artist session, hints, guesses, and a solved outco
     async reveal() {
       throw new Error('Active Artist Jumble should keep its artwork pixelated.')
     }
-  } as unknown as JumbleImageRenderer
+  })
   const rendered = await renderJumble(
     started.state,
     renderer,
@@ -415,6 +416,7 @@ test('returns a playable foreground candidate before deferred enrichment finishe
   let drained = false
   const drain = service.drain().then(() => {
     drained = true
+    return undefined
   })
   await Promise.resolve()
   expect(drained).toBe(false)

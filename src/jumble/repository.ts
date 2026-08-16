@@ -98,7 +98,8 @@ export class JumbleRepository {
       .where(and(eq(jumbleSessions.channelId, channelId), isNull(jumbleSessions.endedAt)))
       .orderBy(desc(jumbleSessions.startedAt))
       .limit(1)
-    return rows[0] === undefined ? null : toSession(rows[0])
+    const row = rows.at(0)
+    return row === undefined ? null : toSession(row)
   }
 
   async listActive(): Promise<readonly JumbleSession[]> {
@@ -130,7 +131,8 @@ export class JumbleRepository {
       .from(jumbleSessions)
       .where(eq(jumbleSessions.id, id))
       .limit(1)
-    return rows[0] === undefined ? null : toSession(rows[0])
+    const row = rows.at(0)
+    return row === undefined ? null : toSession(row)
   }
 
   async createSession(input: CreateJumbleSessionInput): Promise<JumbleSession> {
@@ -233,7 +235,7 @@ export class JumbleRepository {
       .where(and(eq(jumbleHints.sessionId, sessionId), eq(jumbleHints.shown, false)))
       .orderBy(asc(jumbleHints.hintOrder), asc(jumbleHints.id))
       .limit(1)
-    const row = rows[0]
+    const row = rows.at(0)
     if (row === undefined) return null
     await this.db.update(jumbleHints).set({ shown: true }).where(eq(jumbleHints.id, row.id))
     return { kind: row.kind, content: row.content }
@@ -311,7 +313,7 @@ export class JumbleRepository {
     const sessionMap = new Map(
       [...startedSessions, ...answeredSessions].map((session) => [session.id, session])
     )
-    const sessions = [...sessionMap.values()].sort(
+    const sessions = [...sessionMap.values()].toSorted(
       (first, second) => first.startedAt - second.startedAt
     )
     const answers = allAnswers.filter((answer) => sessionMap.has(answer.sessionId))

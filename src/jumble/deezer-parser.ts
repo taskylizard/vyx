@@ -53,7 +53,7 @@ const trackSearch = z.object({
         title: text,
         title_short: text.nullish(),
         link: url.nullish(),
-        duration: z.number().finite().nonnegative().max(86_400).nullish(),
+        duration: z.number().nonnegative().max(86_400).nullish(),
         artist,
         album: z.object({
           id: identifier,
@@ -99,10 +99,11 @@ export function parseDeezerSearch(payload: unknown, candidate: JumbleCandidate):
             exactName(entry.title, expected.answer) &&
             (expected.artistName === undefined || exactName(entry.artist.name, expected.artistName))
         )
-        .sort(
+        .toSorted(
           (first, second) =>
             titleScore(second.title, expected.answer) - titleScore(first.title, expected.answer)
-        )[0]
+        )
+        .at(0)
       if (result === undefined) return { status: 'not-found' }
 
       return {
@@ -132,10 +133,11 @@ export function parseDeezerSearch(payload: unknown, candidate: JumbleCandidate):
                 exactName(entry.title_short, expected.answer))) &&
             (expected.artistName === undefined || exactName(entry.artist.name, expected.artistName))
         )
-        .sort(
+        .toSorted(
           (first, second) =>
             titleScore(second.title, expected.answer) - titleScore(first.title, expected.answer)
-        )[0]
+        )
+        .at(0)
       if (result === undefined) return { status: 'not-found' }
 
       return {
@@ -171,7 +173,7 @@ function exactName(actual: string, expected: string): boolean {
 function titleScore(actual: string, expected: string): number {
   if (actual.trim().localeCompare(expected.trim(), undefined, { sensitivity: 'base' }) === 0)
     return 2
-  return /\blive\b/iu.test(actual) && !/\blive\b/iu.test(expected) ? 0 : 1
+  return Number(!(/\blive\b/iu.test(actual) && !/\blive\b/iu.test(expected)))
 }
 
 function deezerImageUrls(values: readonly (string | null | undefined)[]): string[] | undefined {

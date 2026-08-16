@@ -129,7 +129,7 @@ test('removes non-string enums from nested MCP schemas for provider compatibilit
   const resolved = await provider.resolve(toolScope())
   const readTool = resolved.tools.docs_read
   expect(readTool).toBeDefined()
-  const schema = await asSchema(readTool!.inputSchema).jsonSchema
+  const schema = await asSchema(readTool.inputSchema).jsonSchema
 
   expect(schema).toMatchObject({
     properties: {
@@ -147,5 +147,5 @@ test('removes non-string enums from nested MCP schemas for provider compatibilit
   })
   expect(JSON.stringify(schema)).not.toContain('"enum":[false]')
   expect(JSON.stringify(schema)).not.toContain('"const":false')
-  expect(readTool!.execute).toBe(execute)
+  expect(readTool.execute).toBe(execute)
 })

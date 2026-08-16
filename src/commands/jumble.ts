@@ -1,4 +1,4 @@
-import { slash, slashSub } from '../bot/rosepack.ts'
+import { slash } from '../bot/rosepack.ts'
 import { match } from 'ts-pattern'
 import { renderJumble } from '../jumble/discord.ts'
 import { jumbleErrorMessage } from '../jumble/errors.ts'
@@ -18,7 +18,7 @@ export default slash({
     await context.editResponse(jumbleErrorMessage(error, 'Could not start Jumble. Try again.'))
   },
   subcommands: {
-    play: slashSub({
+    play: slash({
       description: 'Guess a scrambled artist, album, or track from its name and artwork',
       guards: jumblePlayGuards,
       options: {

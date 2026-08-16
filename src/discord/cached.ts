@@ -1,14 +1,21 @@
-import type { Client, Message } from 'oceanic.js'
+import type { MessageFetchClient } from './client-types.ts'
 
-type CacheClient = Partial<Pick<Client, 'getChannel'>>
+export interface ReferencedMessage<TMessage> {
+  channelID: string
+  messageReference?: {
+    channelID?: string
+    messageID?: string
+  } | null
+  referencedMessage?: TMessage | null
+}
 
-export async function fetchMessageCached(
-  client: Pick<Client, 'rest'> & CacheClient,
+export async function fetchMessageCached<TMessage>(
+  client: MessageFetchClient<TMessage>,
   channelID: string,
   messageID: string
-): Promise<Message> {
+): Promise<TMessage> {
   const channel = client.getChannel?.(channelID)
-  if (channel !== undefined && 'getMessage' in channel && 'messages' in channel) {
+  if (channel?.getMessage !== undefined && channel.messages !== undefined) {
     const cached = channel.messages.get(messageID)
     if (cached !== undefined) return cached
 
@@ -22,10 +29,10 @@ export async function fetchMessageCached(
   return client.rest.channels.getMessage(channelID, messageID)
 }
 
-export async function fetchReferencedMessageCached(
-  client: Pick<Client, 'rest'> & CacheClient,
-  message: Message
-): Promise<Message | undefined> {
+export async function fetchReferencedMessageCached<TMessage>(
+  client: MessageFetchClient<TMessage>,
+  message: ReferencedMessage<TMessage>
+): Promise<TMessage | undefined> {
   if (message.referencedMessage !== undefined && message.referencedMessage !== null) {
     return message.referencedMessage
   }

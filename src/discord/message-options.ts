@@ -7,7 +7,7 @@ export const suppressAllMentions = {
   users: false
 } satisfies AllowedMentions
 
-export function replyMessageReference(message: Message) {
+export function replyMessageReference(message: Pick<Message, 'channelID' | 'guildID' | 'id'>) {
   return {
     channelID: message.channelID,
     failIfNotExists: false,

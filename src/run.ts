@@ -1,3 +1,4 @@
+// oxlint-disable-next-line import/no-unassigned-import -- tasky: importing this installs the shared undici dispatcher before any clients load
 import './shared/http.ts'
 import { loadKanikouEnv } from './config/env.ts'
 import { startKanikouObservability } from './observability/axiom.ts'

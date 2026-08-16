@@ -5,10 +5,8 @@ import {
   MessageFlags,
   type ContainerComponent,
   type MediaGalleryItem,
-  type Message,
   type MessageComponent
 } from 'oceanic.js'
-import type { BotContext } from '../../bot/context.ts'
 import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
 import { safeCreateMessage } from '../safe-actions.ts'
 import {
@@ -29,6 +27,7 @@ import {
   type TwitterComponentAssets,
   type TwitterStatus
 } from './twitter-types.ts'
+import type { AutoembedContext, AutoembedMessage } from './types.ts'
 
 const TWITTER_COMPONENT_COLOR = 0x1da1f2
 const DEFAULT_PRIVATE_API_HOST_BASE64 = 'ZmF1bmEuYWx5eGlhLmRldg=='
@@ -36,8 +35,8 @@ const DEFAULT_PRIVATE_API_HOST_BASE64 = 'ZmF1bmEuYWx5eGlhLmRldg=='
 export type { TwitterComponentAssets } from './twitter-types.ts'
 
 export async function sendTwitterAutoembed(
-  context: BotContext,
-  message: Message,
+  context: AutoembedContext,
+  message: AutoembedMessage,
   realURL: string,
   statusID: string
 ): Promise<void> {
@@ -59,8 +58,8 @@ export function twitterComponents(
 ): Array<MessageComponent> {
   const timestamp = discordTimestamp(status.created_at) ?? 'unknown time'
   const account = status.account
-  const displayName = account?.display_name || account?.username || 'Twitter'
-  const username = account?.username || account?.acct?.split('@')[0]
+  const displayName = account?.display_name ?? account?.username ?? 'Twitter'
+  const username = account?.username ?? account?.acct?.split('@')[0]
   const handle = username ? `@${username}` : '@unknown'
   const authorURL = username ? `https://x.com/${username}` : realURL
   const content = cleanedStatusContent(status.content ?? '')
@@ -116,10 +115,10 @@ export function twitterComponents(
 }
 
 async function prepareTwitterAssets(
-  context: BotContext,
+  context: AutoembedContext,
   status: TwitterStatus
 ): Promise<PreparedTwitterAssets> {
-  const avatarURL = status.account?.avatar || undefined
+  const avatarURL = status.account?.avatar
   const mediaLimit = avatarURL ? MAX_DISCORD_ATTACHMENTS - 1 : MAX_DISCORD_ATTACHMENTS
   const mediaAttachments = (status.media_attachments ?? [])
     .flatMap((attachment) => {
@@ -180,7 +179,9 @@ async function fetchTwitterStatus(statusID: string, faunaURL?: string): Promise<
 
 function normalizePrivateAPIURL(privateAPIURL?: string): string {
   const defaultHost = Buffer.from(DEFAULT_PRIVATE_API_HOST_BASE64, 'base64').toString('utf8')
-  const value = privateAPIURL?.trim() || defaultHost
+  const configuredHost = privateAPIURL?.trim()
+  const value =
+    configuredHost === undefined || configuredHost.length === 0 ? defaultHost : configuredHost
   const withoutTrailingSlash = value.replace(/\/+$/gu, '')
   return /^https?:\/\//iu.test(withoutTrailingSlash)
     ? withoutTrailingSlash

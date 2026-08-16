@@ -116,7 +116,7 @@ export class MarkdownMemoryStore implements MemoryStore {
         return { outcome: 'ambiguous' }
       }
 
-      const entry = matches[0]!
+      const entry = matches[0]
       entries.splice(entries.indexOf(entry), 1)
       return { entry, outcome: 'forgotten' }
     })
@@ -233,12 +233,12 @@ function serializeMemoryFile(scope: MemoryScope, entries: readonly MemoryEntry[]
 
 function parseMemoryEntries(markdown: string): MemoryEntry[] {
   const entries: MemoryEntry[] = []
-  for (const match of markdown.matchAll(MEMORY_ENTRY_PATTERN)) {
+  for (const entryMatch of markdown.matchAll(MEMORY_ENTRY_PATTERN)) {
     entries.push({
-      content: match[4]!.trim(),
-      createdAt: match[2]!,
-      id: match[1]!,
-      sourceInteractionID: match[3]!
+      content: entryMatch[4].trim(),
+      createdAt: entryMatch[2],
+      id: entryMatch[1],
+      sourceInteractionID: entryMatch[3]
     })
   }
   return entries
@@ -260,7 +260,7 @@ function renderPromptMemory(entries: readonly MemoryEntry[]): string | undefined
     length += item.length + 1
   }
 
-  return selected.length === 0 ? undefined : selected.reverse().join('\n')
+  return selected.length === 0 ? undefined : selected.toReversed().join('\n')
 }
 
 async function readMemoryFile(path: string): Promise<string> {

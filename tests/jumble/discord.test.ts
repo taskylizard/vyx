@@ -11,6 +11,7 @@ import { buildJumblePayload, buildJumbleReplayComponents } from '../../src/jumbl
 import type { JumbleImageRenderer } from '../../src/jumble/renderer.ts'
 import type { JumbleService } from '../../src/jumble/service.ts'
 import type { JumbleCandidate, JumbleKind, JumbleState } from '../../src/jumble/types.ts'
+import { partialFixture } from '../fixtures/partial.ts'
 
 test('play again disables the completed button and uses the cached channel for the new game', async () => {
   const state = jumbleState('track', false)
@@ -51,7 +52,7 @@ test('play again disables the completed button and uses the cached channel for t
     update
   }
 
-  await jumbleReplayButton.execute(context as never)
+  await jumbleReplayButton.execute(partialFixture(context))
 
   expect(update).toHaveBeenCalledWith({
     components: [
@@ -134,7 +135,7 @@ test('start session disables the completed controls and sends the first continuo
     update
   }
 
-  await jumbleStartSessionButton.execute(context as never)
+  await jumbleStartSessionButton.execute(partialFixture(context))
 
   expect(startContinuousSession).toHaveBeenCalledWith('session-track')
   expect(update).toHaveBeenCalledWith({
@@ -162,10 +163,10 @@ test('playing replay labels stay within Discord limits without splitting emoji',
     status: 'playing',
     userDisplayName: '😀'.repeat(100)
   })
-  const replay = components[0]?.components[0]
+  const replay = components[0].components[0]
 
-  expect(replay?.type).toBe(ComponentTypes.BUTTON)
-  if (replay === undefined || !('label' in replay) || replay.label === undefined) {
+  expect(replay.type).toBe(ComponentTypes.BUTTON)
+  if (!('label' in replay) || replay.label === undefined) {
     throw new Error('Expected a labeled replay button.')
   }
   expect(replay.label.length).toBeLessThanOrEqual(80)
@@ -220,7 +221,7 @@ test('a failed replay restores the button and expires the hidden game', async ()
     update
   }
 
-  await expect(jumbleReplayButton.execute(context as never)).rejects.toBe(createFailure)
+  await expect(jumbleReplayButton.execute(partialFixture(context))).rejects.toBe(createFailure)
 
   expect(expire).toHaveBeenCalledWith('session-album')
   expect(update).toHaveBeenCalledTimes(2)
@@ -249,28 +250,28 @@ test.each([
     const restCreateMessage = vi.fn(async () => ({}))
     const restEditMessage = vi.fn(async () => ({}))
     const createReaction = vi.fn(async () => undefined)
-    const client = {
+    const client = partialFixture<Client>({
       getChannel: vi.fn(() => ({ createMessage, editMessage })),
       rest: {
         channels: { createMessage: restCreateMessage, editMessage: restEditMessage }
       }
-    } as unknown as Client
-    const message = {
+    })
+    const message = partialFixture<Message>({
       author: { bot: false, id: 'winner' },
       channelID: 'channel-1',
       content: answer,
       createReaction,
       guildID: 'guild-1',
       id: 'guess-message'
-    } as unknown as Message
-    const service = {
+    })
+    const service = partialFixture<JumbleService>({
       activeForChannel: vi.fn(async () => state),
       submitGuess: vi.fn(async () => ({ action: 'won', state }))
-    } as unknown as JumbleService
+    })
 
     const handled = await handleJumbleMessage(client, message, {
       service,
-      renderer: {} as JumbleImageRenderer,
+      renderer: partialFixture<JumbleImageRenderer>({}),
       idsFor: () => ({
         giveUp: '',
         hint: '',
@@ -326,7 +327,7 @@ test('winning a continuous game automatically sends the next game', async () => 
   const createReaction = vi.fn(async () => undefined)
   const attachMessage = vi.fn(async () => next)
   const continueContinuousSession = vi.fn(async () => ({ action: 'started' as const, state: next }))
-  const client = {
+  const client = partialFixture<Client>({
     getChannel: vi.fn(() => ({ createMessage, editMessage, sendTyping })),
     rest: {
       channels: {
@@ -335,25 +336,25 @@ test('winning a continuous game automatically sends the next game', async () => 
         sendTyping: vi.fn(async () => undefined)
       }
     }
-  } as unknown as Client
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'winner' },
     channelID: 'channel-1',
     content: 'Jóga',
     createReaction,
     guildID: 'guild-1',
     id: 'guess-message'
-  } as unknown as Message
-  const service = {
+  })
+  const service = partialFixture<JumbleService>({
     activeForChannel: vi.fn(async () => active),
     attachMessage,
     continueContinuousSession,
     submitGuess: vi.fn(async () => ({ action: 'won' as const, state: completed }))
-  } as unknown as JumbleService
+  })
 
   await handleJumbleMessage(client, message, {
     service,
-    renderer: {} as JumbleImageRenderer,
+    renderer: partialFixture<JumbleImageRenderer>({}),
     idsFor: (state) => componentIds(state.session.id)
   })
 
@@ -381,7 +382,7 @@ test('saying cancel stops a continuous game without recording a guess', async ()
     action: 'cancelled' as const,
     state: cancelled
   }))
-  const client = {
+  const client = partialFixture<Client>({
     getChannel: vi.fn(() => ({ editMessage })),
     rest: {
       channels: {
@@ -389,24 +390,24 @@ test('saying cancel stops a continuous game without recording a guess', async ()
         editMessage: vi.fn(async () => ({}))
       }
     }
-  } as unknown as Client
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user-2' },
     channelID: 'channel-1',
     content: '  CANCEL  ',
     createReaction,
     guildID: 'guild-1',
     id: 'cancel-message'
-  } as unknown as Message
-  const service = {
+  })
+  const service = partialFixture<JumbleService>({
     activeForChannel: vi.fn(async () => active),
     cancelContinuousSession,
     submitGuess
-  } as unknown as JumbleService
+  })
 
   await handleJumbleMessage(client, message, {
     service,
-    renderer: {} as JumbleImageRenderer,
+    renderer: partialFixture<JumbleImageRenderer>({}),
     idsFor: (state) => componentIds(state.session.id)
   })
 
@@ -436,26 +437,26 @@ test('does not reply or react to an incorrect guess', async () => {
   const state = jumbleState('track', false)
   const createMessage = vi.fn(async () => ({}))
   const createReaction = vi.fn(async () => undefined)
-  const client = {
+  const client = partialFixture<Client>({
     getChannel: vi.fn(() => undefined),
     rest: { channels: { createMessage, editMessage: vi.fn(async () => ({})) } }
-  } as unknown as Client
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user-2' },
     channelID: 'channel-1',
     content: 'wrong',
     createReaction,
     guildID: 'guild-1',
     id: 'guess-message'
-  } as unknown as Message
-  const service = {
+  })
+  const service = partialFixture<JumbleService>({
     activeForChannel: vi.fn(async () => state),
     submitGuess: vi.fn(async () => ({ action: 'incorrect', state }))
-  } as unknown as JumbleService
+  })
 
   await handleJumbleMessage(client, message, {
     service,
-    renderer: {} as JumbleImageRenderer,
+    renderer: partialFixture<JumbleImageRenderer>({}),
     idsFor: () => ({
       giveUp: '',
       hint: '',

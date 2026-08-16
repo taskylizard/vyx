@@ -4,12 +4,13 @@ import type { BotContext } from '../../src/bot/context.ts'
 import { handleMessageCreate } from '../../src/bot/messages.ts'
 import { TASKYLAND_GUILD_ID } from '../../src/discord/ids.ts'
 import { modules } from '../../src/modules.ts'
+import { partialFixture } from '../fixtures/partial.ts'
 
 test('does not send autoembed messages to the AI responder', async () => {
   const replyToMessage = vi.fn(async () => undefined)
   const createMessage = vi.fn(async () => ({}))
   const editMessage = vi.fn(async () => ({}))
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: { rest: { channels: { createMessage, editMessage } } },
@@ -19,8 +20,8 @@ test('does not send autoembed messages to the AI responder', async () => {
       isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.autoembeds.id)
     },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: '<@bot> https://reddit.com/r/typescript/comments/example/',
@@ -28,7 +29,7 @@ test('does not send autoembed messages to the AI responder', async () => {
     guildID: TASKYLAND_GUILD_ID,
     id: 'message',
     mentions: { users: [{ id: 'bot' }] }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 
@@ -41,7 +42,7 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
   const replyToMessage = vi.fn(async () => undefined)
   const createMessage = vi.fn(async () => ({}))
   const editMessage = vi.fn(async () => ({}))
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: { rest: { channels: { createMessage, editMessage } } },
@@ -49,8 +50,8 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
     logger: { warn: vi.fn() },
     moduleStore: { isEnabled: vi.fn(async () => true) },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: '<@bot> https://reddit.com/r/typescript -ignore',
@@ -58,7 +59,7 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
     guildID: TASKYLAND_GUILD_ID,
     id: 'message',
     mentions: { users: [{ id: 'bot' }] }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 
@@ -70,7 +71,7 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
 test('guild mentions reach the AI responder only when the AI module is enabled', async () => {
   const replyToMessage = vi.fn(async () => undefined)
   const moduleEnabled = vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: {},
@@ -78,14 +79,14 @@ test('guild mentions reach the AI responder only when the AI module is enabled',
     logger: { warn: vi.fn() },
     moduleStore: { isEnabled: moduleEnabled },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: '<@bot> hello',
     guildID: 'guild',
     mentions: { users: [{ id: 'bot' }] }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
   expect(replyToMessage).toHaveBeenCalledWith(context, message)
@@ -104,7 +105,7 @@ test('guild mentions reach the AI responder only when the AI module is enabled',
 test('does not respond to mentions when the AI module is disabled in Taskyland', async () => {
   const replyToMessage = vi.fn(async () => undefined)
   const moduleEnabled = vi.fn(async () => false)
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: {},
@@ -112,14 +113,14 @@ test('does not respond to mentions when the AI module is disabled in Taskyland',
     logger: { warn: vi.fn() },
     moduleStore: { isEnabled: moduleEnabled },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: '<@bot> hello',
     guildID: TASKYLAND_GUILD_ID,
     mentions: { users: [{ id: 'bot' }] }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 
@@ -134,7 +135,7 @@ test('does not respond to mentions when the AI module is disabled in Taskyland',
 test('only checks for active Jumble guesses when the guild module is enabled', async () => {
   const activeForChannel = vi.fn(async (): Promise<unknown> => null)
   const moduleEnabled = vi.fn(async () => true)
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: {},
@@ -142,14 +143,14 @@ test('only checks for active Jumble guesses when the guild module is enabled', a
     logger: { warn: vi.fn() },
     moduleStore: { isEnabled: moduleEnabled },
     responder: { replyToMessage: vi.fn() }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: 'guess',
     guildID: 'guild',
     mentions: { users: [] }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
   expect(activeForChannel).toHaveBeenCalledWith('channel')
@@ -173,7 +174,7 @@ test('ignores reply pings to autoembed responses', async () => {
     author: { id: 'user' },
     content: 'check this out https://instagram.com/reel/example/'
   }))
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: { rest: { channels: { getMessage } } },
@@ -183,8 +184,8 @@ test('ignores reply pings to autoembed responses', async () => {
       isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
     },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: 'lol this is insane',
@@ -197,7 +198,7 @@ test('ignores reply pings to autoembed responses', async () => {
       content: '',
       messageReference: { channelID: 'channel', messageID: 'parent-message' }
     }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 
@@ -208,7 +209,7 @@ test('ignores reply pings to autoembed responses', async () => {
 test('responds to explicit mentions in replies to autoembed responses', async () => {
   const replyToMessage = vi.fn(async () => undefined)
   const getMessage = vi.fn(async () => ({}))
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: { rest: { channels: { getMessage } } },
@@ -218,8 +219,8 @@ test('responds to explicit mentions in replies to autoembed responses', async ()
       isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
     },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: '<@bot> what song is in this reel?',
@@ -232,7 +233,7 @@ test('responds to explicit mentions in replies to autoembed responses', async ()
       content: '',
       messageReference: { channelID: 'channel', messageID: 'parent-message' }
     }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 
@@ -246,7 +247,7 @@ test('responds to reply pings on regular bot responses', async () => {
     author: { id: 'user' },
     content: '<@bot> hello there'
   }))
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: { rest: { channels: { getMessage } } },
@@ -256,8 +257,8 @@ test('responds to reply pings on regular bot responses', async () => {
       isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
     },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: 'tell me more',
@@ -270,7 +271,7 @@ test('responds to reply pings on regular bot responses', async () => {
       content: 'hi! how can I help?',
       messageReference: { channelID: 'channel', messageID: 'parent-message' }
     }
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 
@@ -282,7 +283,7 @@ test('responds when a replied-to bot message cannot be resolved', async () => {
   const getMessage = vi.fn(async () => {
     throw new Error('unknown message')
   })
-  const context = {
+  const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
     client: { rest: { channels: { getMessage } } },
@@ -292,8 +293,8 @@ test('responds when a replied-to bot message cannot be resolved', async () => {
       isEnabled: vi.fn(async ({ module }: { module: string }) => module === modules.ai.id)
     },
     responder: { replyToMessage }
-  } as unknown as BotContext
-  const message = {
+  })
+  const message = partialFixture<Message>({
     author: { bot: false, id: 'user' },
     channelID: 'channel',
     content: 'any thoughts?',
@@ -302,7 +303,7 @@ test('responds when a replied-to bot message cannot be resolved', async () => {
     mentions: { users: [{ id: 'bot' }] },
     messageReference: { channelID: 'channel', messageID: 'deleted-message' },
     referencedMessage: null
-  } as unknown as Message
+  })
 
   await handleMessageCreate(context, message)
 

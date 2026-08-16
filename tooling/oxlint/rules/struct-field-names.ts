@@ -18,14 +18,14 @@ function getFieldNames(node: Node): string[] {
 
 function commonPrefix(names: string[]): string {
   if (names.length < 2) return ''
-  let prefix = names[0]!
+  let prefix = names[0]
   for (let i = 1; i < names.length; i++) {
-    const current = names[i]!
+    const current = names[i]
     let j = 0
     while (
       j < prefix.length &&
       j < current.length &&
-      prefix[j]!.toLowerCase() === current[j]!.toLowerCase()
+      prefix[j].toLowerCase() === current[j].toLowerCase()
     )
       j++
     prefix = prefix.slice(0, j)
@@ -38,7 +38,7 @@ function commonPrefix(names: string[]): string {
   // Check camelCase boundary: char at prefix.length in first name that's longer should be uppercase
   for (const field of names) {
     if (field.length > prefix.length) {
-      const nextChar = field[prefix.length]!
+      const nextChar = field[prefix.length]
       if (nextChar >= 'A' && nextChar <= 'Z') return prefix
       return ''
     }
@@ -49,9 +49,9 @@ function commonPrefix(names: string[]): string {
 function commonSuffix(names: string[]): string {
   if (names.length < 2) return ''
   // Find raw common suffix
-  let suffix = names[0]!
+  let suffix = names[0]
   for (let i = 1; i < names.length; i++) {
-    const current = names[i]!
+    const current = names[i]
     let j = 0
     while (
       j < suffix.length &&
@@ -63,7 +63,7 @@ function commonSuffix(names: string[]): string {
   }
   if (!suffix) return ''
   // Check word boundary: suffix should start with uppercase (camelCase) or _
-  if (suffix[0]! >= 'A' && suffix[0]! <= 'Z') return suffix
+  if (suffix[0] >= 'A' && suffix[0] <= 'Z') return suffix
   if (suffix.startsWith('_')) return suffix
   return ''
 }

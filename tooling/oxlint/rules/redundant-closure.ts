@@ -25,12 +25,12 @@ const SAFE_SINGLE_ARG = new Set([
 
 function extractSingleParamBody(callback: Node): { paramName: string; bodyExpr: Node } | null {
   if (callback.params.length !== 1) return null
-  const param = callback.params[0]!
+  const param = callback.params[0]
   if (param.type !== 'Identifier') return null
 
   let bodyExpr: Node | null = null
   if (callback.body.type === 'BlockStatement' && callback.body.body.length === 1) {
-    const stmt = callback.body.body[0]!
+    const stmt = callback.body.body[0]
     if (stmt.type === 'ReturnStatement') bodyExpr = stmt.argument
   } else if (callback.body.type !== 'BlockStatement') {
     bodyExpr = callback.body
@@ -47,7 +47,7 @@ export default {
         const args = node.arguments
         if (!args || args.length !== 1) return
 
-        const callback = args[0]!
+        const callback = args[0]
         if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
           return
 
@@ -56,7 +56,7 @@ export default {
         const { paramName, bodyExpr } = extracted
 
         if (bodyExpr.type !== 'CallExpression' || bodyExpr.arguments.length !== 1) return
-        if (!isIdentifier(bodyExpr.arguments[0]!, paramName)) return
+        if (!isIdentifier(bodyExpr.arguments[0], paramName)) return
 
         const fnCallee = bodyExpr.callee
         if (isIdentifier(fnCallee) && SAFE_SINGLE_ARG.has(fnCallee.name)) {

@@ -118,13 +118,13 @@ export class JumbleImageRenderer {
 
   async render(url: string, stage = 0): Promise<Buffer> {
     const normalizedStage = clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)
-    const level = PIXELATION_LEVELS[normalizedStage]!
+    const level = PIXELATION_LEVELS[normalizedStage]
     return this.measureRender('pixelated', 1, normalizedStage, () => this.renderImage(url, level))
   }
 
   async renderWithFallback(urls: readonly string[], stage = 0): Promise<Buffer> {
     const normalizedStage = clamp(Math.trunc(stage), 0, PIXELATION_LEVELS.length - 1)
-    const level = PIXELATION_LEVELS[normalizedStage]!
+    const level = PIXELATION_LEVELS[normalizedStage]
     const candidates = boundedArtworkUrls(urls)
     return this.measureRender('pixelated', candidates.length, normalizedStage, () =>
       this.renderFirstAvailable(candidates, level)
@@ -250,7 +250,7 @@ export class JumbleImageRenderer {
 
     const startNext = (): void => {
       const index = nextIndex
-      const url = candidates[index]
+      const url = candidates.at(index)
       if (url === undefined) return
       nextIndex += 1
 
@@ -520,10 +520,10 @@ export function pixelate(
       for (let y = top; y < bottom; y += 1) {
         for (let x = left; x < right; x += 1) {
           const offset = (y * width + x) * 4
-          red += data[offset]!
-          green += data[offset + 1]!
-          blue += data[offset + 2]!
-          alpha += data[offset + 3]!
+          red += data[offset]
+          green += data[offset + 1]
+          blue += data[offset + 2]
+          alpha += data[offset + 3]
           count += 1
         }
       }

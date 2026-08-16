@@ -453,10 +453,10 @@ test('fuzzes hostile artwork lists without exceeding fallback resource bounds', 
   ]
 
   await Promise.all(
-    Array.from({ length: 64 }, async (_, caseIndex) => {
+    Array.from({ length: 64 }, async (_unusedCase, caseIndex) => {
       const urls = Array.from(
         { length: (caseIndex * 17) % 24 },
-        (_, urlIndex) => corpus[(caseIndex * 7 + urlIndex * 11) % corpus.length]!
+        (_unusedURL, urlIndex) => corpus[(caseIndex * 7 + urlIndex * 11) % corpus.length]
       )
       let active = 0
       let maxActive = 0

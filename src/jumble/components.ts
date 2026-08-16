@@ -82,10 +82,7 @@ export const jumbleReplayButton = button({
     }
 
     const replayCustomID = jumbleReplayButton.buildID({ params: { kind } })
-    const userDisplayName =
-      context.interaction.member.displayName ??
-      context.interaction.user.globalName ??
-      context.interaction.user.username
+    const userDisplayName = context.interaction.member.displayName
     await startJumbleFromCompletedMessage(context, {
       pendingComponents: buildJumbleReplayComponents(replayCustomID, undefined, {
         status: 'playing',
@@ -112,10 +109,7 @@ export const jumbleStartSessionButton = button({
     const customID = jumbleStartSessionButton.buildID({
       params: { sessionId: context.params.sessionId }
     })
-    const userDisplayName =
-      context.interaction.member.displayName ??
-      context.interaction.user.globalName ??
-      context.interaction.user.username
+    const userDisplayName = context.interaction.member.displayName
     await startJumbleFromCompletedMessage(context, {
       pendingComponents: buildJumbleSessionStartingComponents(customID, userDisplayName),
       start: () => context.app.jumble.startContinuousSession(context.params.sessionId)

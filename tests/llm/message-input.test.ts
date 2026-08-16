@@ -1,6 +1,4 @@
-import type { CommandInteraction, Message } from 'oceanic.js'
 import { expect, test, vi } from 'vite-plus/test'
-import type { BotContext } from '../../src/bot/context.ts'
 import { buildMessagePrompt, buildSlashPrompt } from '../../src/llm/message-input.ts'
 
 test('adds personal and server memory to message prompts as guarded user context', async () => {
@@ -8,15 +6,20 @@ test('adds personal and server memory to message prompts as guarded user context
     personal: '- Prefers concise answers',
     server: '- This server uses TypeScript'
   }))
-  const context = { memory: { promptContext } } as unknown as BotContext
+  const context = {
+    botUserID: 'bot-1',
+    client: unusedMessageClient(),
+    memory: { promptContext }
+  }
   const source = {
     attachments: { toArray: () => [] },
     author: { globalName: 'Tasky', id: 'user-1', username: 'tasky' },
+    channelID: 'channel-1',
     content: 'What should I use?',
     embeds: [],
     guildID: 'server-1',
     member: { displayName: 'Tasky' }
-  } as unknown as Message
+  }
 
   const messages = await buildMessagePrompt(context, source)
 
@@ -43,12 +46,12 @@ test('adds personal memory to slash prompts without inventing server context in 
     personal: '- Uses Fedora',
     server: undefined
   }))
-  const context = { memory: { promptContext } } as unknown as BotContext
+  const context = { memory: { promptContext } }
   const interaction = {
     guildID: null,
     member: null,
     user: { globalName: 'Tasky', id: 'user-1', username: 'tasky' }
-  } as unknown as CommandInteraction
+  }
 
   const messages = await buildSlashPrompt(context, interaction, 'Which command?')
 
@@ -64,12 +67,12 @@ test('adds personal memory to slash prompts without inventing server context in 
 test('does not add an empty memory message', async () => {
   const context = {
     memory: { promptContext: vi.fn(async () => ({ personal: undefined, server: undefined })) }
-  } as unknown as BotContext
+  }
   const interaction = {
     guildID: null,
     member: null,
     user: { globalName: null, id: 'user-1', username: 'tasky' }
-  } as unknown as CommandInteraction
+  }
 
   await expect(buildSlashPrompt(context, interaction, 'Hello')).resolves.toEqual([
     { content: 'tasky (ID: user-1): Hello', role: 'user' }
@@ -79,23 +82,28 @@ test('does not add an empty memory message', async () => {
 test('strips the tools footer from prior bot messages in reply chains', async () => {
   const context = {
     botUserID: 'bot-1',
+    client: unusedMessageClient(),
     memory: { promptContext: vi.fn(async () => ({ personal: undefined, server: undefined })) }
-  } as unknown as BotContext
+  }
   const previousBotMessage = {
     attachments: { toArray: () => [] },
-    author: { id: 'bot-1' },
+    author: { globalName: null, id: 'bot-1', username: 'kanikou' },
+    channelID: 'channel-1',
     content: 'Here is the earlier answer.\n-# Tools: Search (x2)',
-    embeds: []
-  } as unknown as Message
+    embeds: [],
+    guildID: 'server-1',
+    member: null
+  }
   const source = {
     attachments: { toArray: () => [] },
     author: { globalName: 'Tasky', id: 'user-1', username: 'tasky' },
+    channelID: 'channel-1',
     content: 'Can you expand on that?',
     embeds: [],
     guildID: 'server-1',
     member: { displayName: 'Tasky' },
     referencedMessage: previousBotMessage
-  } as unknown as Message
+  }
 
   const messages = await buildMessagePrompt(context, source)
 
@@ -105,3 +113,15 @@ test('strips the tools footer from prior bot messages in reply chains', async ()
     role: 'assistant'
   })
 })
+
+function unusedMessageClient() {
+  return {
+    rest: {
+      channels: {
+        getMessage: vi.fn(async () => {
+          throw new Error('This test does not fetch uncached messages.')
+        })
+      }
+    }
+  }
+}

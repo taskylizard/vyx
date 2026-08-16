@@ -234,7 +234,7 @@ function firstImages(value: unknown): string[] {
   if (!Array.isArray(value)) return []
   const ranked = value
     .filter(isLastFmEnvelope)
-    .sort((first, second) => imageRank(String(second.size)) - imageRank(String(first.size)))
+    .toSorted((first, second) => imageRank(String(second.size)) - imageRank(String(first.size)))
   const urls: string[] = []
   for (const entry of ranked) {
     const url = parseLastFmString(entry['#text'])

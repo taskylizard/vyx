@@ -1,15 +1,8 @@
-import type { Client } from 'oceanic.js'
+import type { SendTypingClient } from '../discord/client-types.ts'
 import { safeSendTyping } from '../discord/safe-actions.ts'
 
-type TypingClient = {
-  getChannel: Pick<Client, 'getChannel'>['getChannel']
-  rest: {
-    channels: Pick<Client['rest']['channels'], 'sendTyping'>
-  }
-}
-
 export function startJumbleTyping(
-  client: TypingClient,
+  client: SendTypingClient,
   channelId: string,
   intervalMs = 8_000
 ): () => void {

@@ -1,11 +1,11 @@
-import { MessageFlags, type Message } from 'oceanic.js'
-import type { BotContext } from '../../bot/context.ts'
+import { MessageFlags } from 'oceanic.js'
 import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
 import { safeCreateMessage, safeEditMessage } from '../safe-actions.ts'
+import type { AutoembedContext, AutoembedMessage } from './types.ts'
 
 export async function sendTextReply(
-  context: BotContext,
-  message: Message,
+  context: AutoembedContext,
+  message: AutoembedMessage,
   content: string
 ): Promise<void> {
   await safeCreateMessage(context.client, message.channelID, {
@@ -15,7 +15,10 @@ export async function sendTextReply(
   })
 }
 
-export async function suppressOriginalEmbed(context: BotContext, message: Message): Promise<void> {
+export async function suppressOriginalEmbed(
+  context: AutoembedContext,
+  message: AutoembedMessage
+): Promise<void> {
   if ((message.flags & MessageFlags.SUPPRESS_EMBEDS) !== 0) {
     return
   }

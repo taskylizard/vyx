@@ -13,7 +13,7 @@ export default {
         if (node.arguments.length !== 0) return
 
         // Unwrap parenthesized expression — the callee may be in parens
-        let fn = callee
+        const fn = callee
         // In ESTree, parens don't produce a wrapper node, so callee is the function directly
 
         if (fn.type === 'ArrowFunctionExpression' && fn.params.length === 0) {
@@ -28,7 +28,7 @@ export default {
           }
           // (() => { return expr; })()
           if (fn.body.body.length === 1) {
-            const stmt = fn.body.body[0]!
+            const stmt = fn.body.body[0]
             if (stmt.type === 'ReturnStatement' && stmt.argument) {
               context.report({
                 message:
@@ -46,7 +46,7 @@ export default {
           fn.body.type === 'BlockStatement' &&
           fn.body.body.length === 1
         ) {
-          const stmt = fn.body.body[0]!
+          const stmt = fn.body.body[0]
           if (stmt.type === 'ReturnStatement' && stmt.argument) {
             context.report({
               message:

@@ -19,7 +19,8 @@ export default defineConfig({
       suspicious: 'warn'
     },
     jsPlugins: ['./tooling/oxlint/plugin.ts'],
-    extends: [lintConfig],    options: {
+    extends: [lintConfig],
+    options: {
       reportUnusedDisableDirectives: 'warn',
       typeAware: true,
       typeCheck: true

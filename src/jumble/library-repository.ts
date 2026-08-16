@@ -38,9 +38,10 @@ export class JumbleLibraryRepository {
         )
       )
       .limit(1)
-    const activeRefreshVersion = state[0]?.activeRefreshVersion
+    const stateRow = state.at(0)
+    const activeRefreshVersion = stateRow?.activeRefreshVersion
     if (activeRefreshVersion === null || activeRefreshVersion === undefined)
-      return { candidates: [], refreshAfter: state[0]?.refreshAfter ?? null }
+      return { candidates: [], refreshAfter: stateRow?.refreshAfter ?? null }
     const rows = await this.db
       .select()
       .from(jumbleLibraryItems)
@@ -90,7 +91,7 @@ export class JumbleLibraryRepository {
         )
       return { candidates: [], refreshAfter: 0 }
     }
-    return { candidates, refreshAfter: state[0]?.refreshAfter ?? null }
+    return { candidates, refreshAfter: stateRow?.refreshAfter ?? null }
   }
 
   async needsRefresh(
@@ -113,7 +114,7 @@ export class JumbleLibraryRepository {
         )
       )
       .limit(1)
-    const state = rows[0]
+    const state = rows.at(0)
     return state === undefined || state.activeRefreshVersion === null || state.refreshAfter <= now
   }
 
@@ -146,7 +147,7 @@ export class JumbleLibraryRepository {
     const counts: JumbleKindTrackedCounts = { artist: 0, album: 0, track: 0 }
     for (const row of rows) {
       if (row.kind === 'artist' || row.kind === 'album' || row.kind === 'track') {
-        counts[row.kind] = Number(row.count)
+        counts[row.kind] = row.count
       }
     }
     return counts
@@ -195,6 +196,7 @@ export class JumbleLibraryRepository {
     return claimed.length > 0
   }
 
+  // oxlint-disable-next-line clippy/too-many-lines -- tasky: generation publish and cleanup share one lease invariant, splitting this makes it harder to audit
   async replace(input: {
     discordUserId: string
     kind: JumbleKind
@@ -217,7 +219,13 @@ export class JumbleLibraryRepository {
         and(eq(jumbleLibrarySync.discordUserId, discordUserId), eq(jumbleLibrarySync.kind, kind))
       )
       .limit(1)
-    if (state[0]?.owner !== owner || state[0].canonicalUsername !== username) return false
+    const stateRow = state.at(0)
+    if (
+      stateRow === undefined ||
+      stateRow.owner !== owner ||
+      stateRow.canonicalUsername !== username
+    )
+      return false
     const values = candidates.map((candidate, rank) => {
       const identityKey = jumbleCandidateIdentityKey(candidate)
       return {
@@ -265,7 +273,7 @@ export class JumbleLibraryRepository {
         )
       )
       .returning({ version: jumbleLibrarySync.activeRefreshVersion })
-    if (published.length === 0 || published[0]?.version !== version) {
+    if (published.at(0)?.version !== version) {
       await this.db
         .delete(jumbleLibraryItems)
         .where(
@@ -277,8 +285,8 @@ export class JumbleLibraryRepository {
         )
       return false
     }
-    const retainedVersions = [version, state[0]?.activeRefreshVersion].filter(
-      (value): value is string => value !== null && value !== undefined
+    const retainedVersions = [version, stateRow.activeRefreshVersion].filter(
+      (value): value is string => typeof value === 'string'
     )
     const stillOwnsPublishedGeneration = this.db
       .select({ one: sql`1` })

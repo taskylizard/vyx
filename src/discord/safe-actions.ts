@@ -1,18 +1,18 @@
-import type { Client, CreateMessageOptions, EditMessageOptions, Message } from 'oceanic.js'
+import type { CreateMessageOptions, EditMessageOptions } from 'oceanic.js'
+import type {
+  CreateMessageClient,
+  EditMessageClient,
+  ReactionMessage,
+  SendTypingClient
+} from './client-types.ts'
 
-type CachedClient = Partial<Pick<Client, 'getChannel'>>
-
-type ActionClient<TAction extends keyof Client['rest']['channels']> = CachedClient & {
-  rest: { channels: Pick<Client['rest']['channels'], TAction> }
-}
-
-export async function safeCreateMessage(
-  client: ActionClient<'createMessage'>,
+export async function safeCreateMessage<TMessage>(
+  client: CreateMessageClient<TMessage>,
   channelID: string,
   options: CreateMessageOptions
-): Promise<Message> {
+): Promise<TMessage> {
   const channel = client.getChannel?.(channelID)
-  if (channel !== undefined && 'createMessage' in channel) {
+  if (channel?.createMessage !== undefined) {
     try {
       return await channel.createMessage(options)
     } catch {
@@ -23,14 +23,14 @@ export async function safeCreateMessage(
   return client.rest.channels.createMessage(channelID, options)
 }
 
-export async function safeEditMessage(
-  client: ActionClient<'editMessage'>,
+export async function safeEditMessage<TMessage>(
+  client: EditMessageClient<TMessage>,
   channelID: string,
   messageID: string,
   options: EditMessageOptions
-): Promise<Message> {
+): Promise<TMessage> {
   const channel = client.getChannel?.(channelID)
-  if (channel !== undefined && 'editMessage' in channel) {
+  if (channel?.editMessage !== undefined) {
     try {
       return await channel.editMessage(messageID, options)
     } catch {
@@ -41,12 +41,9 @@ export async function safeEditMessage(
   return client.rest.channels.editMessage(channelID, messageID, options)
 }
 
-export async function safeSendTyping(
-  client: ActionClient<'sendTyping'>,
-  channelID: string
-): Promise<void> {
+export async function safeSendTyping(client: SendTypingClient, channelID: string): Promise<void> {
   const channel = client.getChannel?.(channelID)
-  if (channel !== undefined && 'sendTyping' in channel) {
+  if (channel?.sendTyping !== undefined) {
     try {
       await channel.sendTyping()
       return
@@ -59,7 +56,10 @@ export async function safeSendTyping(
   await client.rest.channels.sendTyping(channelID)
 }
 
-export async function safeCreateReaction(message: Message, emoji: string): Promise<boolean> {
+export async function safeCreateReaction(
+  message: ReactionMessage,
+  emoji: string
+): Promise<boolean> {
   try {
     await message.createReaction(emoji)
     return true

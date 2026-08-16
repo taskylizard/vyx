@@ -199,12 +199,12 @@ function parseDiscogsTags(payload: DiscogsEnvelope): string[] | undefined {
 }
 
 function parseDiscogsLabel(value: unknown): string | undefined {
-  const first = DiscogsEnvelopeArraySchema.parse(value)[0]
+  const first = DiscogsEnvelopeArraySchema.parse(value).at(0)
   return first === undefined ? undefined : OptionalDiscogsTextSchema.parse(first.name)
 }
 
 function parseDiscogsReleaseType(value: unknown): string | undefined {
-  const first = DiscogsEnvelopeArraySchema.parse(value)[0]
+  const first = DiscogsEnvelopeArraySchema.parse(value).at(0)
   if (first === undefined) return undefined
   const name = OptionalDiscogsTextSchema.parse(first.name)
   const descriptions = UnknownArraySchema.parse(first.descriptions)

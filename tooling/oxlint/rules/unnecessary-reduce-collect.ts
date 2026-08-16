@@ -35,7 +35,7 @@ function getReduceBody(callback: Node): { stmts: Node[]; accName: string } | nul
   if (callback.type !== 'ArrowFunctionExpression' && callback.type !== 'FunctionExpression')
     return null
   if (callback.params.length !== 2) return null
-  const accParam = callback.params[0]!
+  const accParam = callback.params[0]
   if (accParam.type !== 'Identifier') return null
   if (callback.body.type !== 'BlockStatement') return null
   return { stmts: callback.body.body, accName: accParam.name }
@@ -48,12 +48,12 @@ export default {
         if (!isMethodCall(node, 'reduce')) return
         const args = node.arguments
         if (!args || args.length !== 2) return
-        if (!isEmptyArray(args[1]!)) return
+        if (!isEmptyArray(args[1])) return
 
-        const body = getReduceBody(args[0]!)
+        const body = getReduceBody(args[0])
         if (!body || body.stmts.length !== 2) return
 
-        const [firstStmt, returnStmt] = body.stmts as [Node, Node]
+        const [firstStmt, returnStmt] = body.stmts
         if (!returnsAcc(returnStmt, body.accName)) return
 
         // Pattern: { acc.push(expr); return acc; } → .map()
@@ -71,7 +71,7 @@ export default {
           const consequent = firstStmt.consequent
           let pushExpr: Node | null = null
           if (consequent.type === 'BlockStatement' && consequent.body.length === 1) {
-            pushExpr = consequent.body[0]!
+            pushExpr = consequent.body[0]
           } else if (consequent.type === 'ExpressionStatement') {
             pushExpr = consequent
           }

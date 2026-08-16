@@ -198,11 +198,10 @@ function memoryID(index: number): string {
 }
 
 function memoryTool(tools: ToolSet, name: string): Tool {
-  const found = tools[name]
-  if (found === undefined) {
+  if (!Object.hasOwn(tools, name)) {
     throw new Error(`Tool ${name} is not defined.`)
   }
-  return found
+  return tools[name]
 }
 
 async function executeTool(tools: ToolSet, name: string, input: unknown): Promise<unknown> {

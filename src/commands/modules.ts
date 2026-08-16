@@ -1,6 +1,6 @@
 import { moduleChoices } from 'rosepack'
 import { match } from 'ts-pattern'
-import { slash, slashSub } from '../bot/rosepack.ts'
+import { slash } from '../bot/rosepack.ts'
 import { botOwnerGuard, guildOnlyGuard } from '../discord/guards.ts'
 import { modules } from '../modules.ts'
 
@@ -26,7 +26,7 @@ export default slash({
     await context.editResponse('Could not change that module. Try again.')
   },
   subcommands: {
-    list: slashSub({
+    list: slash({
       description: 'List the features enabled in this server',
       guards: moduleGuards,
       async execute(context) {
@@ -41,7 +41,7 @@ export default slash({
         await context.editResponse(['**Server modules**', ...lines].join('\n'))
       }
     }),
-    enable: slashSub({
+    enable: slash({
       description: 'Enable a feature in this server',
       guards: moduleGuards,
       options: { module: moduleOption },
@@ -57,7 +57,7 @@ export default slash({
           })
       }
     }),
-    disable: slashSub({
+    disable: slash({
       description: 'Disable a feature in this server',
       guards: moduleGuards,
       options: { module: moduleOption },

@@ -89,7 +89,7 @@ test('hydrates a top track before requiring its nested album artwork', async () 
   const candidates = await client.getCandidates('track', 'tasky')
   expect(candidates[0]?.imageUrl).toBeUndefined()
 
-  await expect(client.hydrate(candidates[0]!)).resolves.toMatchObject({
+  await expect(client.hydrate(candidates[0])).resolves.toMatchObject({
     albumName: '(((((ultraSOUND)))))',
     imageUrl: 'https://example.test/large.png',
     imageUrls: ['https://example.test/large.png', 'https://example.test/medium.png']

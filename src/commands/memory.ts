@@ -1,5 +1,5 @@
 import { match } from 'ts-pattern'
-import { slash, slashSub } from '../bot/rosepack.ts'
+import { slash } from '../bot/rosepack.ts'
 import { guildOnlyGuard, manageGuildGuard } from '../discord/guards.ts'
 import {
   MEMORY_ENTRY_LIMIT,
@@ -35,7 +35,7 @@ export default slash({
     await context.editResponse('Could not update memory. Try again.')
   },
   subcommands: {
-    export: slashSub({
+    export: slash({
       description: 'Download your personal memory as Markdown',
       guards: guildMemoryGuards,
       async execute(context) {
@@ -54,7 +54,7 @@ export default slash({
         })
       }
     }),
-    clear: slashSub({
+    clear: slash({
       description: 'Delete all of your personal memory',
       guards: guildMemoryGuards,
       options: {
@@ -82,10 +82,10 @@ export default slash({
         )
       }
     }),
-    server: {
+    server: slash({
       description: "View or manage this server's shared memory",
       subcommands: {
-        export: slashSub({
+        export: slash({
           description: "Download this server's memory as Markdown",
           guards: guildMemoryGuards,
           async execute(context) {
@@ -104,7 +104,7 @@ export default slash({
             })
           }
         }),
-        clear: slashSub({
+        clear: slash({
           description: 'Delete all shared memory for this server',
           guards: managedMemoryGuards,
           options: {
@@ -132,7 +132,7 @@ export default slash({
             )
           }
         }),
-        forget: slashSub({
+        forget: slash({
           description: 'Remove one shared server memory by ID',
           guards: managedMemoryGuards,
           options: {
@@ -152,7 +152,7 @@ export default slash({
             await context.editResponse(formatForgetMemoryResult(result, context.options.id))
           }
         }),
-        show: slashSub({
+        show: slash({
           description: "Show this server's shared memory",
           guards: guildMemoryGuards,
           async execute(context) {
@@ -163,7 +163,7 @@ export default slash({
             await context.editResponse(formatMemoryList("This server's memory", entries))
           }
         }),
-        remember: slashSub({
+        remember: slash({
           description: 'Save shared server memory',
           guards: managedMemoryGuards,
           options: {
@@ -186,8 +186,8 @@ export default slash({
           }
         })
       }
-    },
-    forget: slashSub({
+    }),
+    forget: slash({
       description: 'Remove one personal memory by ID',
       guards: guildMemoryGuards,
       options: {
@@ -207,7 +207,7 @@ export default slash({
         await context.editResponse(formatForgetMemoryResult(result, context.options.id))
       }
     }),
-    show: slashSub({
+    show: slash({
       description: 'Show your saved personal memory',
       guards: guildMemoryGuards,
       async execute(context) {
@@ -218,7 +218,7 @@ export default slash({
         await context.editResponse(formatMemoryList('Your personal memory', entries))
       }
     }),
-    remember: slashSub({
+    remember: slash({
       description: 'Save a personal memory',
       guards: guildMemoryGuards,
       options: {
@@ -265,7 +265,7 @@ function formatMemoryList(title: string, entries: readonly MemoryEntry[]): strin
   }
 
   const lines = [`**${title} (${entries.length}/${MEMORY_ENTRY_LIMIT})**`]
-  let responseLength = lines[0]!.length
+  let responseLength = lines[0].length
   for (const entry of entries) {
     const line = `\`${entry.id.slice(0, 8)}\` — ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
     if (responseLength + line.length + 1 > RESPONSE_MAX_LENGTH) {

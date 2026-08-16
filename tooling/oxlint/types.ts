@@ -3,6 +3,7 @@
 export interface Node {
   type: string
   loc?: { start: { line: number; column: number }; end: { line: number; column: number } }
+  // oxlint-disable-next-line typescript/no-explicit-any -- tasky: oxlint exposes parser-specific ast fields here, fake unknown types just spread casts everywhere
   [key: string]: any
 }
 
@@ -18,13 +19,13 @@ export interface Rule {
 
 // --- Helpers ---
 
-export function isLiteral(node: Node | null | undefined, value?: unknown): boolean {
+export function isLiteral(node: Node | null | undefined, value?: unknown): node is Node {
   if (!node || node.type !== 'Literal') return false
   return value === undefined ? true : node.value === value
 }
 
 export function isBoolLiteral(node: Node | null | undefined): node is Node {
-  return isLiteral(node) && typeof node!.value === 'boolean'
+  return isLiteral(node) && typeof node.value === 'boolean'
 }
 
 export function isIdentifier(node: Node | null | undefined, name?: string): boolean {

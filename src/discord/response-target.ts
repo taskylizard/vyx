@@ -1,22 +1,50 @@
 import type { CommandInteraction, EmbedOptions } from 'oceanic.js'
 import { match } from 'ts-pattern'
-import type { BotContext } from '../bot/context.ts'
+import type { EditMessageClient } from './client-types.ts'
 import { editSentMessage, editSentMessageWithEmbed, type SentDiscordMessage } from './replies.ts'
 
 const DISCORD_CONTENT_LIMIT = 2000
 
-export type ResponseTarget =
-  | {
-      interaction: CommandInteraction
-      kind: 'interaction'
-    }
-  | {
-      kind: 'message'
-      placeholder: SentDiscordMessage
-    }
+interface InteractionResponseContext {
+  client?: never
+}
+
+interface MessageResponseContext {
+  client: EditMessageClient<unknown>
+}
+
+export interface InteractionResponseTarget {
+  interaction: {
+    editOriginal(options: Parameters<CommandInteraction['editOriginal']>[0]): Promise<unknown>
+  }
+  kind: 'interaction'
+}
+
+export interface MessageResponseTarget {
+  kind: 'message'
+  placeholder: SentDiscordMessage
+}
+
+export type ResponseTarget = InteractionResponseTarget | MessageResponseTarget
+
+export function sendResponse(
+  context: InteractionResponseContext,
+  target: InteractionResponseTarget,
+  content: string
+): Promise<void>
+export function sendResponse(
+  context: MessageResponseContext,
+  target: MessageResponseTarget,
+  content: string
+): Promise<void>
+export function sendResponse(
+  context: MessageResponseContext,
+  target: ResponseTarget,
+  content: string
+): Promise<void>
 
 export async function sendResponse(
-  context: BotContext,
+  context: InteractionResponseContext | MessageResponseContext,
   target: ResponseTarget,
   content: string
 ): Promise<void> {
@@ -43,6 +71,10 @@ export async function sendResponse(
       })
     })
     .with({ kind: 'message' }, async ({ placeholder }) => {
+      if (context.client === undefined) {
+        throw new Error('A Discord client is required for message response targets.')
+      }
+
       if (exceedsContentLimit) {
         await editSentMessageWithEmbed(context.client, placeholder, content)
         return

@@ -40,7 +40,7 @@ export {
   type SlashSubcommandRecord,
   type ValidateSlashCommandDefinition
 } from 'rosepack'
-export { rosepack, button, component, guard, modal, slash, slashSub } from './bot/rosepack.ts'
+export { rosepack, button, component, guard, modal, slash } from './bot/rosepack.ts'
 export {
   OPERATIONS_CHANNEL_ID,
   OPERATIONS_GUILD_ID,

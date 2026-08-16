@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer'
 import type { File as DiscordFile } from 'oceanic.js'
-import type { BotContext } from '../../bot/context.ts'
+import type { AutoembedContext } from './types.ts'
 
 export const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
@@ -25,7 +25,7 @@ export interface DownloadedAutoembedAsset {
 }
 
 export async function downloadAutoembedAssetSafely(
-  context: BotContext,
+  context: Pick<AutoembedContext, 'logger'>,
   url: string,
   filenameBase: string
 ): Promise<DownloadedAutoembedAsset | undefined> {

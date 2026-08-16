@@ -1,12 +1,14 @@
-import type { Message } from 'oceanic.js'
 import { match } from 'ts-pattern'
-import type { BotContext } from '../../bot/context.ts'
 import { sendTextReply, suppressOriginalEmbed } from './discord.ts'
 import { sendInstagramAutoembed } from './instagram.ts'
 import { findAutoembedLinks } from './links.ts'
 import { sendTwitterAutoembed } from './twitter.ts'
+import type { AutoembedContext, AutoembedMessage } from './types.ts'
 
-export async function handleAutoembeds(context: BotContext, message: Message): Promise<void> {
+export async function handleAutoembeds(
+  context: AutoembedContext,
+  message: AutoembedMessage
+): Promise<void> {
   if (message.content.toLowerCase().includes('-ignore')) {
     return
   }
@@ -52,3 +54,4 @@ export { twitterComponents } from './twitter.ts'
 export type { InstagramComponentAssets } from './instagram.ts'
 export type { AutoembedLink, AutoembedService } from './links.ts'
 export type { TwitterComponentAssets } from './twitter.ts'
+export type { AutoembedContext, AutoembedMessage } from './types.ts'

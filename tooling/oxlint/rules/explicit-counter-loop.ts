@@ -7,7 +7,7 @@ import { getFunctionBody } from '../types.ts'
 
 function getZeroInitCounter(decl: Node): string | null {
   if (decl.type !== 'VariableDeclaration' || decl.declarations.length !== 1) return null
-  const d = decl.declarations[0]!
+  const d = decl.declarations[0]
   if (d.id?.type !== 'Identifier' || d.init?.type !== 'Literal' || d.init.value !== 0) return null
   return d.id.name
 }
@@ -36,15 +36,15 @@ function isCounterIncrement(stmt: Node, counterName: string): boolean {
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length - 1; i++) {
-    const counterName = getZeroInitCounter(body[i]!)
+    const counterName = getZeroInitCounter(body[i])
     if (!counterName) continue
 
-    const loop = body[i + 1]!
+    const loop = body[i + 1]
     if (loop.type !== 'ForOfStatement') continue
     if (loop.body?.type !== 'BlockStatement' || loop.body.body.length === 0) continue
 
     const stmts: Node[] = loop.body.body
-    if (isCounterIncrement(stmts[stmts.length - 1]!, counterName)) {
+    if (isCounterIncrement(stmts[stmts.length - 1], counterName)) {
       context.report({
         message: `Explicit counter loop: manual counter \`${counterName}\` can be replaced with \`for (const [${counterName}, item] of arr.entries())\`. (clippy::explicit_counter_loop)`,
         node: loop

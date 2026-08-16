@@ -45,7 +45,7 @@ test('uses the Parallel AI SDK package search tool', async () => {
     })
     expect(fetcher).toHaveBeenCalledOnce()
 
-    const request = fetcher.mock.calls[0]
+    const request = fetcher.mock.calls.at(0)
     const requestInput = request?.[0]
     const requestUrl =
       requestInput instanceof Request

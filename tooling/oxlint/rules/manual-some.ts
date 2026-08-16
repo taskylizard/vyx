@@ -6,7 +6,7 @@ import { getFunctionBody, isLiteral, unwrapBlock } from '../types.ts'
 
 function checkBody(body: Node[], context: Context) {
   for (let i = 0; i < body.length; i++) {
-    const stmt = body[i]!
+    const stmt = body[i]
     if (stmt.type !== 'ForOfStatement') continue
 
     const inner = unwrapBlock(stmt.body)
@@ -20,7 +20,7 @@ function checkBody(body: Node[], context: Context) {
     )
       continue
 
-    const next: Node | undefined = body[i + 1]
+    const next = body.at(i + 1)
     if (next && next.type === 'ReturnStatement' && isLiteral(next.argument, false)) {
       context.report({
         message: 'Manual some: this loop can be replaced with `.some()`. (clippy::manual_find)',
