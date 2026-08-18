@@ -1,7 +1,7 @@
 import type { MessageFetchClient } from '../discord/client-types.ts'
 import type { MemoryStore } from '../memory/markdown-memory.ts'
 
-interface PromptAttachment {
+export interface PromptAttachment {
   contentType?: string | null
   url: string
 }

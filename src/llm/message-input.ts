@@ -1,5 +1,6 @@
 import type { AssistantModelMessage, ModelMessage, UserContent, UserModelMessage } from 'ai'
 import { fetchReferencedMessageCached } from '../discord/cached.ts'
+import { attachmentContentPart } from './attachment-content.ts'
 import type {
   MessagePromptContext,
   PromptMessage,
@@ -17,9 +18,10 @@ export async function buildMessagePrompt(
   const chain = await replyChain(context, source)
   const messages: ModelMessage[] = await memoryMessages(context, source.author.id, source.guildID)
 
-  for (const message of chain) {
-    messages.push(discordMessageToChatMessage(context, message))
-  }
+  const replyMessages = await Promise.all(
+    chain.map((message) => discordMessageToChatMessage(context, message))
+  )
+  messages.push(...replyMessages)
 
   return messages
 }
@@ -61,10 +63,10 @@ async function memoryMessages(
   ]
 }
 
-function discordMessageToChatMessage(
+async function discordMessageToChatMessage(
   context: Pick<MessagePromptContext, 'botUserID'>,
   message: PromptMessage
-): AssistantModelMessage | UserModelMessage {
+): Promise<AssistantModelMessage | UserModelMessage> {
   if (message.author.id === context.botUserID) {
     return {
       content: stripToolsFooter(message.content),
@@ -76,7 +78,7 @@ function discordMessageToChatMessage(
     message.member?.displayName ?? message.author.globalName ?? message.author.username
 
   return {
-    content: messageContentParts(message, displayName),
+    content: await messageContentParts(message, displayName),
     role: 'user'
   }
 }
@@ -88,7 +90,10 @@ function userPromptMessage(userID: string, displayName: string, prompt: string):
   }
 }
 
-function messageContentParts(message: PromptMessage, displayName: string): UserContent {
+async function messageContentParts(
+  message: PromptMessage,
+  displayName: string
+): Promise<UserContent> {
   const parts: Exclude<UserContent, string> = [
     {
       text: `${displayName} (ID: ${message.author.id}): ${message.content}`,
@@ -96,24 +101,10 @@ function messageContentParts(message: PromptMessage, displayName: string): UserC
     }
   ]
 
-  for (const attachment of message.attachments.toArray()) {
-    const contentType = attachment.contentType ?? ''
-    if (contentType.includes('image')) {
-      parts.push({
-        data: new URL(attachment.url),
-        mediaType: contentType,
-        type: 'file'
-      })
-      continue
-    }
-
-    if (contentType.includes('video')) {
-      parts.push({
-        text: `[video attachment: ${attachment.url}]`,
-        type: 'text'
-      })
-    }
-  }
+  const attachmentParts = await Promise.all(
+    message.attachments.toArray().map((attachment) => attachmentContentPart(attachment))
+  )
+  parts.push(...attachmentParts)
 
   for (const embed of message.embeds) {
     const thumbnailUrl = embed.thumbnail?.url
