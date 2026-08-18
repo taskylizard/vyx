@@ -53,7 +53,7 @@ export {
   kanikouSystemPrompt,
   utcDateStamp
 } from './config/system-prompt.ts'
-export { KANIKOU_MODEL, KANIKOU_MODEL_SETTINGS } from './config/model.ts'
+export { getKanikouModel, KANIKOU_MODEL_SETTINGS } from './config/model.ts'
 export { loadKanikouEnv, type KanikouEnv } from './config/env.ts'
 export { default as askCommand } from './commands/ask.ts'
 export { default as memoryCommand } from './commands/memory.ts'

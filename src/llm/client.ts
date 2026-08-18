@@ -1,6 +1,6 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider'
 import type { LanguageModel } from 'ai'
-import { KANIKOU_MODEL_SETTINGS } from '../config/model.ts'
+import { getKanikouModel } from '../config/model.ts'
 import type { KanikouEnv } from '../config/env.ts'
 
 export function createKanikouModel(config: KanikouEnv): LanguageModel {
@@ -10,5 +10,5 @@ export function createKanikouModel(config: KanikouEnv): LanguageModel {
     compatibility: 'strict'
   })
 
-  return openrouter.chat(KANIKOU_MODEL_SETTINGS.model)
+  return openrouter.chat(getKanikouModel())
 }
