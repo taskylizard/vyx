@@ -65,6 +65,14 @@ export class KanikouResponder {
     })
   }
 
+  /**
+   * Generates a plain reply with every tool disabled and no response UI, for
+   * flows like chimes that produce a single casual message.
+   */
+  async generateWithoutTools(messages: ModelMessage[], instructions: string): Promise<string> {
+    return generateKanikouResponse(this.#model, messages, {}, { instructions })
+  }
+
   async #complete(
     context: BotContext,
     messages: ModelMessage[],

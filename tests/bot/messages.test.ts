@@ -13,6 +13,7 @@ test('does not send autoembed messages to the AI responder', async () => {
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: { rest: { channels: { createMessage, editMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -45,6 +46,7 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: { rest: { channels: { createMessage, editMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -74,6 +76,7 @@ test('guild mentions reach the AI responder only when the AI module is enabled',
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: {},
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -108,6 +111,7 @@ test('does not respond to mentions when the AI module is disabled in Taskyland',
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: {},
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -138,6 +142,7 @@ test('only checks for active Jumble guesses when the guild module is enabled', a
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: {},
     jumble: { activeForChannel },
     logger: { warn: vi.fn() },
@@ -177,6 +182,7 @@ test('ignores reply pings to autoembed responses', async () => {
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -212,6 +218,7 @@ test('responds to explicit mentions in replies to autoembed responses', async ()
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -250,6 +257,7 @@ test('responds to reply pings on regular bot responses', async () => {
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -286,6 +294,7 @@ test('responds when a replied-to bot message cannot be resolved', async () => {
   const context = partialFixture<BotContext>({
     applicationID: 'app',
     botUserID: 'bot',
+    chime: { observe: vi.fn() },
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },

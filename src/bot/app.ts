@@ -16,6 +16,7 @@ import {
 import { startKanikouObservability } from '../observability/axiom.ts'
 import { addActiveSpanEvent, traceOperation } from '../observability/tracing.ts'
 import type { KanikouLogger, KanikouObservability } from '../observability/types.ts'
+import { ChimeWatcher } from '../chime/watcher.ts'
 import { componentIds, jumbleComponents } from '../jumble/components.ts'
 import { renderJumble } from '../jumble/discord.ts'
 import { safeEditMessage } from '../discord/safe-actions.ts'
@@ -127,6 +128,7 @@ function createJumbleInfrastructure(
 }
 
 interface ReadySetupDeps {
+  chimeWatcher: ChimeWatcher
   database: KanikouDatabase
   jumbleMetadataCache: JumbleMetadataCache
   jumble: JumbleService
@@ -156,6 +158,7 @@ async function performReadySetup(
   const context: BotContext = {
     applicationID: client.application.id,
     botUserID: client.user.id,
+    chime: deps.chimeWatcher,
     client,
     env: deps.config,
     logger,
@@ -227,8 +230,17 @@ function createBotDependencies(config: KanikouEnv, client: Client, logger: Kanik
   })
   const moduleStore = new GuildSettingsStore(database.db)
   const jumbleInfrastructure = createJumbleInfrastructure(config, database, client, logger)
+  const chimeWatcher = new ChimeWatcher({ client, logger, responder })
 
-  return { database, memory, mintlifyMcp, moduleStore, responder, ...jumbleInfrastructure }
+  return {
+    chimeWatcher,
+    database,
+    memory,
+    mintlifyMcp,
+    moduleStore,
+    responder,
+    ...jumbleInfrastructure
+  }
 }
 
 export function createKanikouApp(
@@ -245,6 +257,7 @@ export function createKanikouApp(
     }
   })
   const {
+    chimeWatcher,
     database,
     jumble,
     jumbleMetadataCache,
@@ -260,6 +273,7 @@ export function createKanikouApp(
   client.once('ready', () => {
     runTask(observability, 'bot.ready_setup', {}, async () => {
       context = await performReadySetup(client, registry, logger, {
+        chimeWatcher,
         database,
         jumbleMetadataCache,
         jumble,

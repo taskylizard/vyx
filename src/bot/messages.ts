@@ -15,6 +15,10 @@ export async function handleMessageCreate(context: BotContext, message: Message)
     return
   }
 
+  // The chime watcher tracks all human chatter in its scope, including
+  // messages that other routes below go on to handle.
+  context.chime.observe(context.botUserID, message)
+
   const guildID = message.guildID
 
   try {
