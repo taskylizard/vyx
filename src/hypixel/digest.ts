@@ -1,4 +1,5 @@
 import { formatCompact } from '../shared/numbers.ts'
+import { parseTalismanBag } from './accessories.ts'
 import type { HypixelPlayer, SkillDefinition, SkyblockMember, SkyblockProfile } from './schemas.ts'
 
 export interface OverviewDigestInput {
@@ -53,7 +54,7 @@ export function skillProgress(
 }
 
 /** Builds a compact Markdown snapshot of the configured player's Skyblock state. */
-export function buildOverviewDigest(input: OverviewDigestInput): string {
+export async function buildOverviewDigest(input: OverviewDigestInput): Promise<string> {
   const { member, player, playerUUID, profile, skillDefinitions } = input
   const lines: string[] = []
 
@@ -86,8 +87,7 @@ export function buildOverviewDigest(input: OverviewDigestInput): string {
   const fairySouls = member.fairy_souls?.total_collected
   if (fairySouls !== undefined) lines.push(`Fairy souls: ${fairySouls}`)
 
-  const magicalPower = member.player_data?.accessory_bag?.highest_magical_power
-  if (magicalPower !== undefined) lines.push(`Magical power: ${magicalPower}`)
+  lines.push(...(await buildAccessoryLines(member)))
 
   const skillLine = buildSkillLine(member.player_data?.experience, skillDefinitions)
   if (skillLine !== undefined) lines.push(`Skills: ${skillLine}`)
@@ -134,6 +134,49 @@ function buildSkillLine(
   }
 
   return parts.length === 0 ? undefined : parts.join(', ')
+}
+
+async function buildAccessoryLines(member: SkyblockMember): Promise<string[]> {
+  const storage = member.accessory_bag_storage
+  const legacyMp = member.player_data?.accessory_bag?.highest_magical_power
+  const mp = storage?.highest_magical_power ?? legacyMp
+  const selectedPower = storage?.selected_power
+  const tuning = storage?.tuning?.slot_0
+  const unlockedPowers = storage?.unlocked_powers
+  const bagData = member.inventory?.bag_contents?.talisman_bag?.data
+
+  const lines: string[] = []
+  if (selectedPower !== undefined && mp !== undefined) {
+    lines.push(`Power: ${titleCase(selectedPower)} · ${mp} MP`)
+  } else if (selectedPower !== undefined) {
+    lines.push(`Power: ${titleCase(selectedPower)}`)
+  } else if (mp !== undefined) {
+    lines.push(`Magical power: ${mp}`)
+  }
+
+  if (tuning !== undefined) {
+    const allocations = Object.entries(tuning)
+      .filter((entry) => entry[1] !== 0)
+      .map(([stat, value]) => `${value} ${titleCase(stat)}`)
+    if (allocations.length > 0) lines.push(`Tuning: ${allocations.join(', ')}`)
+  }
+
+  if (unlockedPowers !== undefined && unlockedPowers.length > 0) {
+    lines.push(`Unlocked powers: ${unlockedPowers.map(titleCase).join(', ')}`)
+  }
+
+  const bagSummary = await parseTalismanBag(bagData)
+  if (bagSummary !== undefined) {
+    const rarityBreakdown = Object.entries(bagSummary.byRarity)
+      .toSorted((a, b) => b[1] - a[1])
+      .map(([rarity, count]) => `${count} ${rarity}`)
+      .join(', ')
+    lines.push(
+      `Accessories: ${bagSummary.accessories.length} in bag${rarityBreakdown.length > 0 ? ` (${rarityBreakdown})` : ''}`
+    )
+  }
+
+  return lines
 }
 
 type SlayerBosses = NonNullable<NonNullable<SkyblockMember['slayer']>['slayer_bosses']>

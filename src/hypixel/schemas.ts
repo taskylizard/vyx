@@ -20,6 +20,21 @@ export const HypixelPlayerSchema = z.looseObject({
 export type HypixelPlayer = z.infer<typeof HypixelPlayerSchema>
 
 export const SkyblockMemberSchema = z.looseObject({
+  accessory_bag_storage: z
+    .looseObject({
+      highest_magical_power: z.number().optional(),
+      selected_power: z.string().optional(),
+      tuning: z
+        .looseObject({
+          highest_unlocked_slot: z.number().optional(),
+          slot_0: z.record(z.string(), z.number()).optional()
+          // Additional slots (slot_1, etc.) are sparse purchase markers.
+        })
+        .loose()
+        .optional(),
+      unlocked_powers: z.array(z.string()).max(100).optional()
+    })
+    .optional(),
   crafted_generators: z.array(z.string()).max(600).optional(),
   dungeons: z
     .looseObject({
@@ -42,6 +57,20 @@ export const SkyblockMemberSchema = z.looseObject({
   fairy_souls: z
     .looseObject({
       total_collected: z.number().optional()
+    })
+    .optional(),
+  inventory: z
+    .looseObject({
+      bag_contents: z
+        .looseObject({
+          talisman_bag: z
+            .looseObject({
+              data: z.string().optional(),
+              type: z.number().optional()
+            })
+            .optional()
+        })
+        .optional()
     })
     .optional(),
   last_save: z.number().optional(),

@@ -88,7 +88,7 @@ function digestFor(
   profile: SkyblockProfile,
   player: HypixelPlayer = playerFixture(),
   skillDefinitions: Record<string, never> | typeof SKILL_DEFINITIONS = SKILL_DEFINITIONS
-): string {
+): Promise<string> {
   return buildOverviewDigest({
     member: Object.hasOwn(profile.members, MEMBER_UUID) ? profile.members[MEMBER_UUID] : undefined,
     player,
@@ -108,8 +108,8 @@ test('computes skill levels from cumulative resource thresholds', () => {
   expect(skillProgress(200, combat)).toMatchObject({ cap: 2, level: 2, xpForNextLevel: 0 })
 })
 
-test('renders a full snapshot with computed skills and compact numbers', () => {
-  const digest = digestFor(profileFixture())
+test('renders a full snapshot with computed skills and compact numbers', async () => {
+  const digest = await digestFor(profileFixture())
 
   expect(digest).toContain(
     '**tasky** · profile **Zucchini** · selected · ironman · saved 2026-01-15'
@@ -130,15 +130,15 @@ test('renders a full snapshot with computed skills and compact numbers', () => {
   expect(digest).toContain('Kuudra completions: 15')
 })
 
-test('falls back to raw skill xp when thresholds are unavailable', () => {
-  const digest = digestFor(profileFixture(), playerFixture(), {})
+test('falls back to raw skill xp when thresholds are unavailable', async () => {
+  const digest = await digestFor(profileFixture(), playerFixture(), {})
 
   expect(digest).toContain('Skills: Combat 150 xp, Farming 60 xp, Social 5k xp')
 })
 
-test('reports missing member data instead of throwing', () => {
+test('reports missing member data instead of throwing', async () => {
   const profile = profileFixture()
   delete (profile.members as Record<string, unknown>)[MEMBER_UUID]
 
-  expect(digestFor(profile)).toContain('Member data is unavailable')
+  expect(await digestFor(profile)).toContain('Member data is unavailable')
 })
