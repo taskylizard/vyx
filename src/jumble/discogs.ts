@@ -25,7 +25,7 @@ import type {
   JumbleCandidate,
   JumbleTrackCandidate
 } from './types.ts'
-import { readBoundedJson } from './response.ts'
+import { readBoundedJson } from '../shared/http.ts'
 
 const DEFAULT_BASE_URL = 'https://api.discogs.com'
 const DEFAULT_USER_AGENT = 'Kanikou/0.0.0 (https://github.com/taskylizard/kanikou)'

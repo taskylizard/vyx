@@ -14,6 +14,7 @@ test('does not send autoembed messages to the AI responder', async () => {
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: { rest: { channels: { createMessage, editMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -47,6 +48,7 @@ test('allows -ignore autoembed messages to reach the AI responder', async () => 
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: { rest: { channels: { createMessage, editMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -77,6 +79,7 @@ test('guild mentions reach the AI responder only when the AI module is enabled',
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: {},
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -112,6 +115,7 @@ test('does not respond to mentions when the AI module is disabled in Taskyland',
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: {},
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -143,6 +147,7 @@ test('only checks for active Jumble guesses when the guild module is enabled', a
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: {},
     jumble: { activeForChannel },
     logger: { warn: vi.fn() },
@@ -183,6 +188,7 @@ test('ignores reply pings to autoembed responses', async () => {
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -219,6 +225,7 @@ test('responds to explicit mentions in replies to autoembed responses', async ()
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -258,6 +265,7 @@ test('responds to reply pings on regular bot responses', async () => {
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -295,6 +303,7 @@ test('responds when a replied-to bot message cannot be resolved', async () => {
     applicationID: 'app',
     botUserID: 'bot',
     chime: { observe: vi.fn() },
+    env: {},
     client: { rest: { channels: { getMessage } } },
     jumble: { activeForChannel: vi.fn(async () => null) },
     logger: { warn: vi.fn() },
@@ -317,4 +326,45 @@ test('responds when a replied-to bot message cannot be resolved', async () => {
   await handleMessageCreate(context, message)
 
   expect(replyToMessage).toHaveBeenCalledWith(context, message)
+})
+
+test('routes every skyblock-channel message from the configured user to the advisor', async () => {
+  const replyToMessage = vi.fn(async () => undefined)
+  const context = partialFixture<BotContext>({
+    applicationID: 'app',
+    botUserID: 'bot',
+    chime: { observe: vi.fn() },
+    client: {},
+    env: { SKYBLOCK_CHANNEL_ID: 'skyblock-channel', SKYBLOCK_DISCORD_USER_ID: 'owner' },
+    jumble: { activeForChannel: vi.fn(async () => null) },
+    logger: { warn: vi.fn() },
+    moduleStore: { isEnabled: vi.fn(async () => true) },
+    responder: { replyToMessage }
+  })
+  const message = partialFixture<Message>({
+    author: { bot: false, id: 'owner' },
+    channelID: 'skyblock-channel',
+    content: 'what should I grind next?',
+    flags: 0,
+    guildID: TASKYLAND_GUILD_ID,
+    mentions: { users: [] }
+  })
+
+  await handleMessageCreate(context, message)
+
+  expect(replyToMessage).toHaveBeenCalledWith(context, message)
+
+  replyToMessage.mockClear()
+  await handleMessageCreate(
+    context,
+    partialFixture<Message>({
+      author: { bot: false, id: 'someone-else' },
+      channelID: 'skyblock-channel',
+      content: 'what should I grind next?',
+      flags: 0,
+      guildID: TASKYLAND_GUILD_ID,
+      mentions: { users: [] }
+    })
+  )
+  expect(replyToMessage).not.toHaveBeenCalled()
 })

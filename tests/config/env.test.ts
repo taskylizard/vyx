@@ -75,3 +75,20 @@ test('requires a dedicated metrics dataset in production', () => {
     })
   ).toThrow('AXIOM_METRICS_DATASET is required')
 })
+
+test('passes through the optional hypixel skyblock settings untouched', () => {
+  const environment = loadKanikouEnv({
+    ...requiredEnvironment,
+    HYPIXEL_API_KEY: 'hypixel-key',
+    SKYBLOCK_CHANNEL_ID: 'channel-1',
+    SKYBLOCK_DISCORD_USER_ID: 'user-1',
+    SKYBLOCK_PLAYER_UUID: 'uuid',
+    SKYBLOCK_PROFILE_NAME: 'Zucchini'
+  })
+
+  expect(environment.HYPIXEL_API_KEY).toBe('hypixel-key')
+  expect(environment.SKYBLOCK_CHANNEL_ID).toBe('channel-1')
+  expect(environment.SKYBLOCK_DISCORD_USER_ID).toBe('user-1')
+  expect(environment.SKYBLOCK_PLAYER_UUID).toBe('uuid')
+  expect(environment.SKYBLOCK_PROFILE_NAME).toBe('Zucchini')
+})

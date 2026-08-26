@@ -24,7 +24,7 @@ import {
   parseLastFmString,
   parseLastFmTopItems
 } from './lastfm-parser.ts'
-import { readBoundedJson } from './response.ts'
+import { readBoundedJson } from '../shared/http.ts'
 import { JumbleCandidateSchema } from './schemas.ts'
 import { emitJumbleTiming, jumbleDurationMs, type JumbleTimingSink } from './timing.ts'
 import type {

@@ -10,7 +10,7 @@ import {
   type DeezerRequestResult
 } from './deezer-types.ts'
 import type { JumbleMetadataCache } from './metadata-cache.ts'
-import { readBoundedJson } from './response.ts'
+import { readBoundedJson } from '../shared/http.ts'
 import type { JumbleCandidate } from './types.ts'
 
 const DEFAULT_BASE_URL = 'https://api.deezer.com'

@@ -17,6 +17,8 @@ import { startKanikouObservability } from '../observability/axiom.ts'
 import { addActiveSpanEvent, traceOperation } from '../observability/tracing.ts'
 import type { KanikouLogger, KanikouObservability } from '../observability/types.ts'
 import { ChimeWatcher } from '../chime/watcher.ts'
+import { resolveSkyblockFeature } from '../hypixel/advisor.ts'
+import { SkyblockAdvisorToolProvider } from '../llm/tools/hypixel.ts'
 import { componentIds, jumbleComponents } from '../jumble/components.ts'
 import { renderJumble } from '../jumble/discord.ts'
 import { safeEditMessage } from '../discord/safe-actions.ts'
@@ -207,6 +209,7 @@ function createBotDependencies(config: KanikouEnv, client: Client, logger: Kanik
           oauthFile: config.MINTLIFY_MCP_OAUTH_FILE,
           onError: (error) => logger.error('Mintlify MCP error', { error })
         })
+  const skyblockFeature = resolveSkyblockFeature(config, logger)
   const responder = new KanikouResponder(
     createKanikouModel(config),
     createKanikouTools({
@@ -221,7 +224,15 @@ function createBotDependencies(config: KanikouEnv, client: Client, logger: Kanik
         instructions: PROJECT_SELENE_INSTRUCTIONS,
         provider: mintlifyMcp,
         tools: createProjectSeleneTools({ token: config.GITHUB_TOKEN })
-      })
+      }),
+      ...(skyblockFeature === undefined
+        ? []
+        : [
+            new SkyblockAdvisorToolProvider({
+              client: skyblockFeature.client,
+              ...skyblockFeature.advisor
+            })
+          ])
     ])
   )
   const database = createKanikouDatabase({

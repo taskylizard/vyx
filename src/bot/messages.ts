@@ -2,6 +2,7 @@ import type { Message } from 'oceanic.js'
 import { handleAutoembeds, isAutoembedMessage } from '../discord/autoembeds.ts'
 import { OWNER_USER_ID } from '../discord/ids.ts'
 import { isIntentionalBotMention } from '../discord/mention-intent.ts'
+import { isSkyblockAdvisorTarget } from '../hypixel/advisor.ts'
 import { isOperationsScope } from '../llm/mintlify-mcp.ts'
 import { handleJumbleMessage } from '../jumble/discord.ts'
 import { componentIds } from '../jumble/components.ts'
@@ -62,6 +63,12 @@ export async function handleMessageCreate(context: BotContext, message: Message)
       context.logger.warn('autoembed failed', { error })
     }
     setActiveSpanAttributes({ 'kanikou.message.route': 'autoembed' })
+    return
+  }
+
+  if (isSkyblockAdvisorTarget(context.env, message)) {
+    setActiveSpanAttributes({ 'kanikou.message.route': 'skyblock-advisor' })
+    await context.responder.replyToMessage(context, message)
     return
   }
 

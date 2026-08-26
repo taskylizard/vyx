@@ -30,7 +30,7 @@ import {
   type ReleaseMetadata,
   musicBrainzCachedValueSchema
 } from './musicbrainz-types.ts'
-import { readBoundedJson } from './response.ts'
+import { readBoundedJson } from '../shared/http.ts'
 import { JumbleArtistMetadataSchema } from './schemas.ts'
 
 const DEFAULT_BASE_URL = 'https://musicbrainz.org/ws/2'

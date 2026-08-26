@@ -1,5 +1,5 @@
 import { expect, test } from 'vite-plus/test'
-import { readBoundedBytes, readBoundedJson } from '../../src/jumble/response.ts'
+import { readBoundedBytes, readBoundedJson } from '../../src/shared/http.ts'
 
 test('rejects non-finite response limits before reading the body', async () => {
   await expect(readBoundedBytes(new Response('payload'), Number.NaN)).rejects.toThrow(

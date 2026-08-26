@@ -1,7 +1,7 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas'
 import { clamp, unique } from 'radashi'
 import { match, P } from 'ts-pattern'
-import { readBoundedBytes } from './response.ts'
+import { readBoundedBytes } from '../shared/http.ts'
 import {
   emitJumbleTiming,
   jumbleDurationMs,

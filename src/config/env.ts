@@ -76,6 +76,26 @@ const kanikouEnvDefinition = {
     type: 'string',
     optional: true
   },
+  HYPIXEL_API_KEY: {
+    type: 'string',
+    optional: true
+  },
+  SKYBLOCK_CHANNEL_ID: {
+    type: 'string',
+    optional: true
+  },
+  SKYBLOCK_DISCORD_USER_ID: {
+    type: 'string',
+    optional: true
+  },
+  SKYBLOCK_PLAYER_UUID: {
+    type: 'string',
+    optional: true
+  },
+  SKYBLOCK_PROFILE_NAME: {
+    type: 'string',
+    optional: true
+  },
   KANIKOU_DATABASE_URL: {
     type: 'string',
     default: 'file:./data/kanikou.db'
