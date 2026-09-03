@@ -59,7 +59,6 @@ export { default as askCommand } from './commands/ask.ts'
 export { default as memoryCommand } from './commands/memory.ts'
 export { default as jumbleCommand } from './commands/jumble.ts'
 export { default as modulesCommand } from './commands/modules.ts'
-export { default as jumbleProfileSubcommand } from './commands/jumble-profile.ts'
 export { slashCommands } from './commands/index.ts'
 export { GuildSettingsStore } from './database/guild-settings.ts'
 export {

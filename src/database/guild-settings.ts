@@ -168,9 +168,7 @@ function parseStringArray(value: string | null | undefined): readonly string[] {
 }
 
 function parseCommandKeys(value: string | null | undefined): readonly ApplicationCommandKey[] {
-  return Object.freeze(parseStringArray(value).filter(isApplicationCommandKey))
-}
-
-function isApplicationCommandKey(value: string): value is ApplicationCommandKey {
-  return /^\d+:.+$/u.test(value)
+  return Object.freeze(
+    parseStringArray(value).filter((key): key is ApplicationCommandKey => /^\d+:.+$/u.test(key))
+  )
 }

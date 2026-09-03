@@ -4,8 +4,9 @@ import { renderJumble } from '../jumble/discord.ts'
 import { jumbleErrorMessage } from '../jumble/errors.ts'
 import { componentIds } from '../jumble/components.ts'
 import { jumblePlayGuards } from '../jumble/guards.ts'
+import { buildJumbleProfileMessage } from '../jumble/profile-presentation.ts'
+import { guildOnlyGuard } from '../discord/guards.ts'
 import { modules } from '../modules.ts'
-import jumbleProfileSubcommand from './jumble-profile.ts'
 
 export default slash({
   name: 'jumble',
@@ -75,6 +76,29 @@ export default slash({
         }
       }
     }),
-    profile: jumbleProfileSubcommand
+    profile: slash({
+      description: 'View or set your Last.fm profile and Jumble stats',
+      guards: [guildOnlyGuard],
+      options: {
+        username: {
+          description: 'Set a Last.fm username (omit to view your profile)',
+          kind: 'string',
+          maxLength: 64,
+          minLength: 1
+        }
+      },
+      async execute(context) {
+        await context.defer({ ephemeral: true })
+        const savedUsername =
+          context.options.username === undefined
+            ? undefined
+            : await context.app.jumble.setProfile(
+                context.interaction.user.id,
+                context.options.username
+              )
+        const summary = await context.app.jumble.profileSummary(context.interaction.user.id)
+        await context.editResponse(buildJumbleProfileMessage(summary, savedUsername))
+      }
+    })
   }
 })

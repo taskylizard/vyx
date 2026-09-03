@@ -5,8 +5,8 @@ import { Agent, setGlobalDispatcher } from 'undici'
  *
  * Configures a single undici `Agent` with keep-alive, per-origin connection
  * limits, and backstop timeouts, then installs it as the global dispatcher so
- * every `globalThis.fetch` call — jumble enrichment, autoembed scraping,
- * Project Selene GitHub requests, media downloads — reuses the same pool.
+ * every `globalThis.fetch` call (jumble enrichment, autoembed scraping,
+ * Project Selene GitHub requests, media downloads) reuses the same pool.
  */
 const sharedAgent = new Agent({
   connections: 64,

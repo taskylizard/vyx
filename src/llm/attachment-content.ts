@@ -30,14 +30,13 @@ export async function downloadFile(
 }
 
 /**
- * Converts a single Discord attachment into the appropriate AI SDK content part
- * for the OpenRouter provider.
+ * Converts a Discord attachment into an AI SDK content part for OpenRouter.
  *
  * Images, videos, and documents (PDFs, etc.) are passed as URL-based file parts.
  * Audio must be base64-encoded for OpenRouter, so it is downloaded and passed
  * as raw bytes.
  *
- * `fetchFile` defaults to the global `fetch` and can be injected for testing.
+ * `fetchFile` defaults to the global `fetch` and is injectable for testing.
  */
 export async function attachmentContentPart(
   attachment: PromptAttachment,

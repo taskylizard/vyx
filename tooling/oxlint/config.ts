@@ -1,5 +1,10 @@
 export default {
   rules: {
+    'tasky/max-comment-length': 'warn',
+    'tasky/no-bullshit': 'warn',
+    'tasky/no-subcommand-variables': 'error',
+    'tasky/no-trivial-functions': 'warn',
+    'tasky/no-trivial-type-aliases': 'warn',
     'clippy/match-same-arms': 'warn',
     'clippy/used-underscore-binding': 'warn',
     'clippy/needless-continue': 'warn',

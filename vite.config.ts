@@ -18,8 +18,17 @@ export default defineConfig({
       perf: 'error',
       suspicious: 'warn'
     },
-    jsPlugins: ['./tooling/oxlint/plugin.ts'],
+    jsPlugins: ['./tooling/oxlint/plugin.ts', './tooling/oxlint/tasky/index.ts'],
     extends: [lintConfig],
+    overrides: [
+      {
+        files: ['tooling/oxlint/**'],
+        rules: {
+          'tasky/max-comment-length': 'off',
+          'tasky/no-bullshit': 'off'
+        }
+      }
+    ],
     options: {
       reportUnusedDisableDirectives: 'warn',
       typeAware: true,

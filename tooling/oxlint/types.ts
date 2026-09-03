@@ -9,7 +9,11 @@ export interface Node {
 
 export interface Context {
   report(descriptor: { message: string; node: Node }): void
-  sourceCode: { text: string }
+  sourceCode: {
+    text: string
+    getAllComments?: () => Node[]
+    getFirstToken?: (node: Node) => Node | null | undefined
+  }
   filename?: string
 }
 
