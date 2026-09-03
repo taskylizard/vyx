@@ -410,7 +410,7 @@ function getNumber(name: string, html: string): number | undefined {
 }
 
 function getJSONEntry(name: string, html: string): unknown {
-  const raw = html.match(new RegExp(`\\["${name}",.*?,({.*?}),\\d+\\]`, 'u'))?.[1]
+  const raw = html.match(new RegExp(`\\["${name}",.*?,(\\{.*?\\}),\\d+\\]`, 'u'))?.[1]
   try {
     if (raw === undefined) return undefined
     const parsed: unknown = JSON.parse(raw)

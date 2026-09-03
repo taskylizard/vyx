@@ -392,6 +392,81 @@ test('uses the vendored Instagram-native strategy after rich lookup rate limits'
   })
 })
 
+test('rehosts oversized Instagram media anonymously on Catbox', async () => {
+  const createMessage = vi.fn(async (_channelID: string, _options: CreateMessageOptions) => ({}))
+  const editMessage = vi.fn(async () => ({}))
+  const fetchMock = vi.fn(
+    async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = new URL(
+        typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      )
+      if (
+        url.hostname === 'www.instagram.com' &&
+        url.searchParams.get('doc_id') === '26130443479876713'
+      ) {
+        return new Response('rate limited', { status: 401 })
+      }
+      if (url.hostname === 'i.instagram.com' && url.pathname === '/api/v1/oembed/') {
+        return Response.json({ media_id: '123' })
+      }
+      if (url.hostname === 'i.instagram.com' && url.pathname === '/api/v1/media/123/info/') {
+        return Response.json({
+          items: [
+            {
+              video_versions: [
+                { height: 1_920, url: 'https://cdn.example/oversized.mp4', width: 1_080 }
+              ]
+            }
+          ]
+        })
+      }
+      if (url.href === 'https://cdn.example/oversized.mp4') {
+        return new Response(Buffer.alloc(10 * 1024 * 1024 + 1), {
+          headers: { 'content-type': 'video/mp4' }
+        })
+      }
+      if (url.href === 'https://catbox.moe/user/api.php') {
+        if (!(init?.body instanceof FormData)) {
+          throw new TypeError('expected Catbox multipart form')
+        }
+        expect(init.body.get('reqtype')).toBe('fileupload')
+        expect(init.body.has('userhash')).toBe(false)
+        const upload = init.body.get('fileToUpload')
+        if (!(upload instanceof Blob)) {
+          throw new TypeError('expected Catbox file upload')
+        }
+        expect(upload.size).toBe(10 * 1024 * 1024 + 1)
+        return new Response('https://files.catbox.moe/rehosted.mp4\n')
+      }
+      throw new Error(`unexpected fetch: ${url.href}`)
+    }
+  )
+  vi.stubGlobal('fetch', fetchMock)
+  const info = vi.fn()
+  const context = {
+    client: { rest: { channels: { createMessage, editMessage } } },
+    env: {},
+    logger: { info, warn: vi.fn() }
+  }
+  const message = {
+    channelID: 'channel',
+    content: 'https://instagram.com/reel/oversized/',
+    flags: 0,
+    guildID: 'guild',
+    id: 'message'
+  }
+
+  await handleAutoembeds(context, message)
+
+  const options = createMessage.mock.calls.at(0)?.[1]
+  expect(options?.files).toEqual([])
+  expect(JSON.stringify(options?.components)).toContain('https://files.catbox.moe/rehosted.mp4')
+  expect(JSON.stringify(options?.components)).not.toContain('attachment://')
+  expect(info).toHaveBeenCalledWith('instagram autoembed media rehosted', {
+    service: 'catbox'
+  })
+})
+
 test('downloads and uploads SnapSave media after native resolution fails', async () => {
   const createMessage = vi.fn(async (_channelID: string, _options: CreateMessageOptions) => ({}))
   const editMessage = vi.fn(async () => ({}))

@@ -24,6 +24,7 @@ import type {
 } from './instagram-types.ts'
 import { InstagramPostResponseSchema, InstagramSharerResponseSchema } from './instagram-types.ts'
 import { resolveAxInstagramMedia } from './vendor/axinstagram.ts'
+import { uploadAnonymousCatboxFile } from './vendor/catbox.ts'
 import { resolveSnapSaveInstagramMedia } from './vendor/snapsave/instagram.ts'
 import type { ResolvedInstagramMedia } from './vendor/types.ts'
 import type { AutoembedContext, AutoembedMessage } from './types.ts'
@@ -39,6 +40,7 @@ const compactNumberFormatter = new Intl.NumberFormat('en-US', {
 const INSTAGRAM_CACHE_TTL_MS = 5 * 60_000
 const INSTAGRAM_NEGATIVE_CACHE_TTL_MS = 30_000
 const INSTAGRAM_RICH_COOLDOWN_MS = 60_000
+const DISCORD_DEFAULT_UPLOAD_LIMIT_BYTES = 10 * 1024 * 1024
 
 const instagramCache = new Map<string, InstagramCacheEntry>()
 const instagramInFlight = new Map<string, Promise<InstagramResolution | undefined>>()
@@ -49,7 +51,7 @@ export async function sendInstagramAutoembed(
   message: AutoembedMessage,
   sourceURL: string
 ): Promise<void> {
-  const resolution = await resolveInstagram(sourceURL)
+  const resolution = await resolveInstagram(context, sourceURL)
   if (resolution === undefined) {
     throw new Error('Instagram media resolution failed')
   }
@@ -206,15 +208,37 @@ async function prepareInstagramMediaAssets(
   media: ResolvedInstagramMedia
 ): Promise<PreparedInstagramMediaAssets> {
   const assets = await Promise.all(
-    media.items
-      .slice(0, MAX_DISCORD_ATTACHMENTS)
-      .map((item, index) =>
-        downloadAutoembedAssetSafely(context, item.url, `instagram-media-${index + 1}`)
+    media.items.slice(0, MAX_DISCORD_ATTACHMENTS).map(async (item, index) => {
+      const asset = await downloadAutoembedAssetSafely(
+        context,
+        item.url,
+        `instagram-media-${index + 1}`
       )
+      if (asset === undefined) {
+        return undefined
+      }
+      if (asset.file.contents.byteLength <= DISCORD_DEFAULT_UPLOAD_LIMIT_BYTES) {
+        return asset
+      }
+
+      try {
+        const reference = await uploadAnonymousCatboxFile(asset.file.contents, asset.file.name)
+        context.logger.info('instagram autoembed media rehosted', {
+          service: 'catbox'
+        })
+        return { reference }
+      } catch (error) {
+        context.logger.warn('failed to rehost instagram autoembed asset', {
+          error,
+          service: 'catbox'
+        })
+        return undefined
+      }
+    })
   )
 
   return {
-    files: assets.flatMap((asset) => (asset === undefined ? [] : [asset.file])),
+    files: assets.flatMap((asset) => (asset !== undefined && 'file' in asset ? [asset.file] : [])),
     mediaItems: assets.flatMap(
       (asset): Array<MediaGalleryItem> =>
         asset === undefined ? [] : [{ media: unfurledMedia(asset.reference) }]
@@ -222,7 +246,10 @@ async function prepareInstagramMediaAssets(
   }
 }
 
-async function resolveInstagram(sourceURL: string): Promise<InstagramResolution | undefined> {
+async function resolveInstagram(
+  context: Pick<AutoembedContext, 'logger'>,
+  sourceURL: string
+): Promise<InstagramResolution | undefined> {
   const cacheKey = instagramShortcode(sourceURL) ?? canonicalInstagramURL(sourceURL)
   const cached = instagramCache.get(cacheKey)
   if (cached && cached.expiresAt > Date.now()) {
@@ -234,7 +261,7 @@ async function resolveInstagram(sourceURL: string): Promise<InstagramResolution 
     return active
   }
 
-  const promise = resolveInstagramUncached(sourceURL)
+  const promise = resolveInstagramUncached(context, sourceURL)
     .then((resolution) => {
       instagramCache.set(cacheKey, {
         expiresAt:
@@ -250,6 +277,7 @@ async function resolveInstagram(sourceURL: string): Promise<InstagramResolution 
 }
 
 async function resolveInstagramUncached(
+  context: Pick<AutoembedContext, 'logger'>,
   sourceURL: string
 ): Promise<InstagramResolution | undefined> {
   const canonicalURL = canonicalInstagramURL(sourceURL)
@@ -260,22 +288,37 @@ async function resolveInstagramUncached(
       )
       return { kind: 'rich', post }
     } catch (error) {
+      context.logger.warn('instagram autoembed strategy failed', { error, strategy: 'rich' })
       if (isInstagramRateLimitError(error)) {
         richLookupBlockedUntil = Date.now() + INSTAGRAM_RICH_COOLDOWN_MS
       }
     }
   }
 
-  const nativeMedia = await withStrategyTimeout(8_000, (signal) =>
-    resolveAxInstagramMedia(canonicalURL, signal)
-  ).catch(() => undefined)
+  let nativeMedia: ResolvedInstagramMedia | undefined
+  try {
+    nativeMedia = await withStrategyTimeout(8_000, (signal) =>
+      resolveAxInstagramMedia(canonicalURL, signal)
+    )
+  } catch (error) {
+    context.logger.warn('instagram autoembed strategy failed', { error, strategy: 'native' })
+  }
   if (nativeMedia?.items.length) {
     return { kind: 'media', media: nativeMedia, strategy: 'native' }
   }
+  context.logger.warn('instagram autoembed strategy returned no media', { strategy: 'native' })
 
-  const snapSaveMedia = await withStrategyTimeout(10_000, (signal) =>
-    resolveSnapSaveInstagramMedia(canonicalURL, signal)
-  ).catch(() => undefined)
+  let snapSaveMedia: ResolvedInstagramMedia | undefined
+  try {
+    snapSaveMedia = await withStrategyTimeout(10_000, (signal) =>
+      resolveSnapSaveInstagramMedia(canonicalURL, signal)
+    )
+  } catch (error) {
+    context.logger.warn('instagram autoembed strategy failed', { error, strategy: 'snapsave' })
+  }
+  if (!snapSaveMedia?.items.length) {
+    context.logger.warn('instagram autoembed strategy returned no media', { strategy: 'snapsave' })
+  }
   return snapSaveMedia?.items.length
     ? { kind: 'media', media: snapSaveMedia, strategy: 'snapsave' }
     : undefined

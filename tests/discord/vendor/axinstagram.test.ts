@@ -1,7 +1,8 @@
-import { expect, test } from 'vite-plus/test'
+import { expect, test, vi } from 'vite-plus/test'
 import {
   biggest,
   extractFromGQL,
+  resolveAxInstagramMedia,
   smallest
 } from '../../../src/discord/autoembeds/vendor/axinstagram.ts'
 
@@ -58,4 +59,36 @@ test('extracts mixed GraphQL carousel media', () => {
       }
     ]
   })
+})
+
+test('falls through to the web GraphQL strategy when embed metadata is unavailable', async () => {
+  const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(
+      typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    )
+    if (url.hostname === 'i.instagram.com') {
+      return new Response('unavailable', { status: 404 })
+    }
+    if (url.pathname.endsWith('/embed/captioned/') || url.pathname.endsWith('/embed/')) {
+      return new Response('unavailable', { status: 404 })
+    }
+    if (url.pathname === '/p/example/' && init?.method !== 'POST') {
+      return new Response('<html></html>')
+    }
+    if (url.pathname === '/graphql/query' && init?.method === 'POST') {
+      return Response.json({
+        data: { xdt_shortcode_media: { video_url: 'https://cdn.example/video.mp4' } }
+      })
+    }
+    throw new Error(`unexpected fetch: ${url.href}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
+
+  try {
+    await expect(resolveAxInstagramMedia('https://instagram.com/p/example/')).resolves.toEqual({
+      items: [{ thumbnail: undefined, type: 'video', url: 'https://cdn.example/video.mp4' }]
+    })
+  } finally {
+    vi.unstubAllGlobals()
+  }
 })
