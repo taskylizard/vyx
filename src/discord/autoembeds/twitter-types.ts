@@ -1,4 +1,4 @@
-import type { File as DiscordFile, MediaGalleryItem } from 'oceanic.js'
+import type { File as DiscordFile } from 'oceanic.js'
 import { z } from 'zod'
 
 const TwitterAccountFieldSchema = z.object({
@@ -29,9 +29,14 @@ export const TwitterStatusSchema = z.object({
 
 export type TwitterStatus = z.infer<typeof TwitterStatusSchema>
 
+export interface TwitterComponentMediaItem {
+  description?: string
+  url: string
+}
+
 export interface TwitterComponentAssets {
   avatarReference?: string
-  mediaItems: Array<MediaGalleryItem>
+  mediaItems: Array<TwitterComponentMediaItem>
 }
 
 export interface PreparedTwitterAssets extends TwitterComponentAssets {

@@ -1,5 +1,8 @@
+import { SeparatorSpacingSize } from 'oceanic.js'
+import type { EditInteractionContent } from 'oceanic.js'
 import { match } from 'ts-pattern'
 import { slash } from '../bot/rosepack.ts'
+import { ComponentMessage, Container, Separator, TextDisplay } from 'rosepack'
 import { guildOnlyGuard, manageGuildGuard } from '../discord/guards.ts'
 import {
   MEMORY_ENTRY_LIMIT,
@@ -259,22 +262,36 @@ function formatForgetMemoryResult(result: ForgetMemoryResult, identifier: string
     .exhaustive()
 }
 
-function formatMemoryList(title: string, entries: readonly MemoryEntry[]): string {
+function formatMemoryList(
+  title: string,
+  entries: readonly MemoryEntry[]
+): EditInteractionContent | string {
   if (entries.length === 0) {
     return `${title} is empty.`
   }
 
-  const lines = [`**${title} (${entries.length}/${MEMORY_ENTRY_LIMIT})**`]
-  let responseLength = lines[0].length
+  const header = `**${title} (${entries.length}/${MEMORY_ENTRY_LIMIT})**`
+  const lines: string[] = []
+  let responseLength = header.length
   for (const entry of entries) {
     const line = `\`${entry.id.slice(0, 8)}\` — ${previewMemory(entry.content, MEMORY_PREVIEW_MAX_LENGTH)}`
     if (responseLength + line.length + 1 > RESPONSE_MAX_LENGTH) {
-      const remaining = entries.length - (lines.length - 1)
-      lines.push(`…and ${remaining} more. Use the Export command to download everything.`)
+      lines.push(
+        `-# …and ${entries.length - lines.length} more. Use the Export command to download everything.`
+      )
       break
     }
     lines.push(line)
     responseLength += line.length + 1
   }
-  return lines.join('\n')
+
+  const tree = (
+    <Container>
+      <TextDisplay>{header}</TextDisplay>
+      <Separator spacing={SeparatorSpacingSize.SMALL} />
+      <TextDisplay>{lines.join('\n')}</TextDisplay>
+    </Container>
+  )
+
+  return ComponentMessage({ children: [tree] })
 }

@@ -1,8 +1,8 @@
 import { match } from 'ts-pattern'
 import { sendTextReply, suppressOriginalEmbed } from './discord.ts'
-import { sendInstagramAutoembed } from './instagram.ts'
+import { sendInstagramAutoembed } from './instagram.tsx'
 import { findAutoembedLinks } from './links.ts'
-import { sendTwitterAutoembed } from './twitter.ts'
+import { sendTwitterAutoembed } from './twitter.tsx'
 import type { AutoembedContext, AutoembedMessage } from './types.ts'
 
 export async function handleAutoembeds(
@@ -48,10 +48,10 @@ export function isAutoembedMessage(content: string): boolean {
   return !content.toLowerCase().includes('-ignore') && findAutoembedLinks(content).length > 0
 }
 
-export { instagramComponents } from './instagram.ts'
+export { instagramMessage, instagramMediaMessage } from './instagram.tsx'
 export { findAutoembedLinks } from './links.ts'
-export { twitterComponents } from './twitter.ts'
-export type { InstagramComponentAssets } from './instagram.ts'
+export { twitterMessage } from './twitter.tsx'
+export type { InstagramComponentAssets } from './instagram.tsx'
 export type { AutoembedLink, AutoembedService } from './links.ts'
-export type { TwitterComponentAssets } from './twitter.ts'
+export type { TwitterComponentAssets } from './twitter.tsx'
 export type { AutoembedContext, AutoembedMessage } from './types.ts'

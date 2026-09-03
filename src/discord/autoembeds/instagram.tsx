@@ -1,15 +1,18 @@
-import {
-  ButtonStyles,
-  ComponentTypes,
-  MessageFlags,
-  type ContainerComponent,
-  type MediaGalleryItem,
-  type MessageComponent
-} from 'oceanic.js'
+import { ButtonStyles, type CreateMessageOptions } from 'oceanic.js'
 import { match } from 'ts-pattern'
+import {
+  Button,
+  ComponentMessage,
+  Container,
+  MediaGallery,
+  MediaGalleryItem,
+  Section,
+  TextDisplay,
+  Thumbnail
+} from 'rosepack'
 import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
 import { safeCreateMessage } from '../safe-actions.ts'
-import { escapeMarkdown, textDisplay, trimComponentText, unfurledMedia } from './components.ts'
+import { escapeMarkdown, trimComponentText } from './components.ts'
 import {
   BROWSER_USER_AGENT,
   MAX_DISCORD_ATTACHMENTS,
@@ -67,10 +70,9 @@ export async function sendInstagramAutoembed(
 
       context.logger.info('instagram autoembed resolved via fallback', { strategy })
       await safeCreateMessage(context.client, message.channelID, {
+        ...instagramMediaMessage(realURL, assets),
         allowedMentions: suppressAllMentions,
-        components: instagramMediaComponents(realURL, assets),
         files: assets.files,
-        flags: MessageFlags.IS_COMPONENTS_V2,
         messageReference: replyMessageReference(message)
       })
     })
@@ -78,51 +80,49 @@ export async function sendInstagramAutoembed(
       const sharer = await fetchInstagramSharerSafely(context, sourceURL)
       const assets = prepareInstagramAssets(post)
       await safeCreateMessage(context.client, message.channelID, {
+        ...instagramMessage(realURL, post, assets, sharer),
         allowedMentions: suppressAllMentions,
-        components: instagramComponents(realURL, post, assets, sharer),
-        flags: MessageFlags.IS_COMPONENTS_V2,
         messageReference: replyMessageReference(message)
       })
     })
     .exhaustive()
 }
 
-export function instagramMediaComponents(
+export function instagramMediaMessage(
   realURL: string,
   assets: InstagramComponentAssets
-): Array<MessageComponent> {
-  const containerComponents: ContainerComponent['components'] = [
-    textDisplay('## Instagram\n-# Media preview')
-  ]
-  if (assets.mediaItems.length > 0) {
-    containerComponents.push({ items: assets.mediaItems, type: ComponentTypes.MEDIA_GALLERY })
-  }
-  containerComponents.push({
-    accessory: {
-      label: 'View Post',
-      style: ButtonStyles.LINK,
-      type: ComponentTypes.BUTTON,
-      url: realURL
-    },
-    components: [textDisplay('-# Instagram')],
-    type: ComponentTypes.SECTION
+): CreateMessageOptions {
+  return ComponentMessage({
+    children: [
+      <Container accentColor={INSTAGRAM_COMPONENT_COLOR}>
+        <TextDisplay>## Instagram\n-# Media preview</TextDisplay>
+        {assets.mediaItems.length > 0 ? (
+          <MediaGallery>
+            {assets.mediaItems.map((item) => (
+              <MediaGalleryItem url={item.url} />
+            ))}
+          </MediaGallery>
+        ) : null}
+        <Section
+          accessory={
+            <Button style={ButtonStyles.LINK} url={realURL}>
+              View Post
+            </Button>
+          }
+        >
+          <TextDisplay>-# Instagram</TextDisplay>
+        </Section>
+      </Container>
+    ]
   })
-
-  return [
-    {
-      accentColor: INSTAGRAM_COMPONENT_COLOR,
-      components: containerComponents,
-      type: ComponentTypes.CONTAINER
-    }
-  ]
 }
 
-export function instagramComponents(
+export function instagramMessage(
   realURL: string,
   post: InstagramPost,
   assets: InstagramComponentAssets,
   sharer?: string
-): Array<MessageComponent> {
+): CreateMessageOptions {
   const username = post.user.username
   const displayName = post.user.full_name ?? username
   const verified = post.user.is_verified ? ' ✓' : ''
@@ -147,27 +147,6 @@ export function instagramComponents(
     header += `\n${caption}`
   }
 
-  const containerComponents: ContainerComponent['components'] = []
-  if (post.user.profile_pic_url) {
-    containerComponents.push({
-      accessory: {
-        media: unfurledMedia(post.user.profile_pic_url),
-        type: ComponentTypes.THUMBNAIL
-      },
-      components: [textDisplay(trimComponentText(header, 3500))],
-      type: ComponentTypes.SECTION
-    })
-  } else {
-    containerComponents.push(textDisplay(trimComponentText(header, 3500)))
-  }
-
-  if (assets.mediaItems.length > 0) {
-    containerComponents.push({
-      items: assets.mediaItems,
-      type: ComponentTypes.MEDIA_GALLERY
-    })
-  }
-
   const stats = instagramStats(post)
   const timestamp = post.taken_at ? `<t:${post.taken_at}:F>` : 'unknown time'
   let footer = stats.length > 0 ? `### -# ${stats}\n` : ''
@@ -176,30 +155,43 @@ export function instagramComponents(
     footer += `\n-# Shared by [@${escapeMarkdown(sharer)}](https://instagram.com/${sharer})`
   }
 
-  containerComponents.push({
-    accessory: {
-      label: 'View Post',
-      style: ButtonStyles.LINK,
-      type: ComponentTypes.BUTTON,
-      url: realURL
-    },
-    components: [textDisplay(footer)],
-    type: ComponentTypes.SECTION
-  })
+  const headerText = trimComponentText(header, 3500)
 
-  return [
-    {
-      accentColor: INSTAGRAM_COMPONENT_COLOR,
-      components: containerComponents,
-      type: ComponentTypes.CONTAINER
-    }
-  ]
+  return ComponentMessage({
+    children: [
+      <Container accentColor={INSTAGRAM_COMPONENT_COLOR}>
+        {post.user.profile_pic_url ? (
+          <Section accessory={<Thumbnail url={post.user.profile_pic_url} />}>
+            <TextDisplay>{headerText}</TextDisplay>
+          </Section>
+        ) : (
+          <TextDisplay>{headerText}</TextDisplay>
+        )}
+        {assets.mediaItems.length > 0 ? (
+          <MediaGallery>
+            {assets.mediaItems.map((item) => (
+              <MediaGalleryItem url={item.url} />
+            ))}
+          </MediaGallery>
+        ) : null}
+        <Section
+          accessory={
+            <Button style={ButtonStyles.LINK} url={realURL}>
+              View Post
+            </Button>
+          }
+        >
+          <TextDisplay>{footer}</TextDisplay>
+        </Section>
+      </Container>
+    ]
+  })
 }
 
 function prepareInstagramAssets(post: InstagramPost): InstagramComponentAssets {
   const mediaURLs = instagramMediaURLs(post).slice(0, MAX_DISCORD_ATTACHMENTS)
   return {
-    mediaItems: mediaURLs.map((url) => ({ media: unfurledMedia(url) }))
+    mediaItems: mediaURLs.map((url) => ({ url }))
   }
 }
 
@@ -239,10 +231,7 @@ async function prepareInstagramMediaAssets(
 
   return {
     files: assets.flatMap((asset) => (asset !== undefined && 'file' in asset ? [asset.file] : [])),
-    mediaItems: assets.flatMap(
-      (asset): Array<MediaGalleryItem> =>
-        asset === undefined ? [] : [{ media: unfurledMedia(asset.reference) }]
-    )
+    mediaItems: assets.flatMap((asset) => (asset === undefined ? [] : [{ url: asset.reference }]))
   }
 }
 

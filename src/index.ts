@@ -56,7 +56,7 @@ export {
 export { getKanikouModel, KANIKOU_MODEL_SETTINGS } from './config/model.ts'
 export { loadKanikouEnv, type KanikouEnv } from './config/env.ts'
 export { default as askCommand } from './commands/ask.ts'
-export { default as memoryCommand } from './commands/memory.ts'
+export { default as memoryCommand } from './commands/memory.tsx'
 export { default as jumbleCommand } from './commands/jumble.ts'
 export { default as modulesCommand } from './commands/modules.ts'
 export { slashCommands } from './commands/index.ts'

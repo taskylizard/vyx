@@ -278,7 +278,7 @@ importers:
         version: 7.0.19(zod@4.4.3)
       axiom:
         specifier: 0.52.2
-        version: 0.52.2(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@types/node@26.1.1)(@vitest/browser-preview@4.1.10(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(vitest@4.1.10))(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(typescript@7.0.2)(zod@4.4.3)
+        version: 0.52.2(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(typescript@7.0.2)(zod@4.4.3)
       cheerio:
         specifier: 1.2.0
         version: 1.2.0
@@ -298,8 +298,8 @@ importers:
         specifier: 12.9.1
         version: 12.9.1
       rosepack:
-        specifier: 0.4.0
-        version: 0.4.0(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(oceanic.js@1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2))
+        specifier: 0.5.1
+        version: 0.5.1(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(oceanic.js@1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2))
       ts-pattern:
         specifier: 5.9.0
         version: 5.9.0
@@ -3614,8 +3614,8 @@ packages:
     resolution: {integrity: sha512-l0OE8wL34P4nJH/H2ffoaniAokM2qSmrtXHmlpvYr5AVVX8msAyW0l8NVJFDxlSK4u3Uh/f41cQheDVdnYijwQ==}
     hasBin: true
 
-  rosepack@0.4.0:
-    resolution: {integrity: sha512-xSpCrUnzZxcrpbP3c3AA3pdKVjQI+4cYX21xzT4hh7azo9Pv2KCn9CVZMnKtgg+8z8n8ma3x3aYCrg/j2j9q0g==}
+  rosepack@0.5.1:
+    resolution: {integrity: sha512-IJHd6PiJGRjiR8MqWjSceEjR+nVfuUUTdWw9dy2FyReXbhz+Hw3oz+wDYNFBBs+IEsi5KzISO4Y5Ttiqf3glKw==}
     engines: {node: '>=22'}
     hasBin: true
     peerDependencies:
@@ -6306,7 +6306,7 @@ snapshots:
 
   assertion-error@2.0.1: {}
 
-  axiom@0.52.2(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@types/node@26.1.1)(@vitest/browser-preview@4.1.10(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(vitest@4.1.10))(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(typescript@7.0.2)(zod@4.4.3):
+  axiom@0.52.2(@opentelemetry/api@1.9.1)(@opentelemetry/core@2.10.0(@opentelemetry/api@1.9.1))(@types/node@26.1.1)(@vitest/browser-preview@4.1.10)(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(typescript@7.0.2)(zod@4.4.3):
     dependencies:
       '@next/env': 15.5.20
       '@opentelemetry/api': 1.9.1
@@ -7154,7 +7154,7 @@ snapshots:
     dependencies:
       glob: 10.5.0
 
-  rosepack@0.4.0(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(oceanic.js@1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)):
+  rosepack@0.5.1(@voidzero-dev/vite-plus-core@0.2.4(@types/node@26.1.1)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.1)(typescript@7.0.2)(yaml@2.9.0))(oceanic.js@1.14.0(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)):
     dependencies:
       gunshi: 0.37.0
       obug: 2.1.4

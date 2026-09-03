@@ -1,4 +1,4 @@
-import type { File as DiscordFile, MediaGalleryItem } from 'oceanic.js'
+import type { File as DiscordFile } from 'oceanic.js'
 import { z } from 'zod'
 import type { ResolvedInstagramMedia } from './vendor/types.ts'
 
@@ -99,7 +99,11 @@ export type InstagramMedia = z.infer<typeof InstagramMediaSchema>
 export type InstagramImageVersions = z.infer<typeof InstagramImageVersionsSchema>
 
 export interface InstagramComponentAssets {
-  mediaItems: Array<MediaGalleryItem>
+  mediaItems: Array<InstagramComponentMediaItem>
+}
+
+export interface InstagramComponentMediaItem {
+  url: string
 }
 
 export interface PreparedInstagramMediaAssets extends InstagramComponentAssets {

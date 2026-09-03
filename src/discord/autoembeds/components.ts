@@ -1,5 +1,3 @@
-import { ComponentTypes, type TextDisplayComponent, type UnfurledMediaItem } from 'oceanic.js'
-
 export function discordTimestamp(timestamp?: string | null): string | undefined {
   if (!timestamp) {
     return undefined
@@ -20,15 +18,4 @@ export function trimComponentText(content: string, maxCharacters: number): strin
   }
 
   return `${characters.slice(0, Math.max(0, maxCharacters - 3)).join('')}...`
-}
-
-export function textDisplay(content: string): TextDisplayComponent {
-  return {
-    content,
-    type: ComponentTypes.TEXT_DISPLAY
-  }
-}
-
-export function unfurledMedia(url: string): UnfurledMediaItem {
-  return { url }
 }

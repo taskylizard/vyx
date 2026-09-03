@@ -1,9 +1,10 @@
 export {
   findAutoembedLinks,
   handleAutoembeds,
-  instagramComponents,
+  instagramMessage,
+  instagramMediaMessage,
   isAutoembedMessage,
-  twitterComponents
+  twitterMessage
 } from './autoembeds/index.ts'
 export type {
   AutoembedLink,

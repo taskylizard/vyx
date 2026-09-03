@@ -1,21 +1,18 @@
 import { Buffer } from 'node:buffer'
+import { ButtonStyles, type CreateMessageOptions } from 'oceanic.js'
 import {
-  ButtonStyles,
-  ComponentTypes,
-  MessageFlags,
-  type ContainerComponent,
-  type MediaGalleryItem,
-  type MessageComponent
-} from 'oceanic.js'
+  Button,
+  ComponentMessage,
+  Container,
+  MediaGallery,
+  MediaGalleryItem,
+  Section,
+  TextDisplay,
+  Thumbnail
+} from 'rosepack'
 import { replyMessageReference, suppressAllMentions } from '../message-options.ts'
 import { safeCreateMessage } from '../safe-actions.ts'
-import {
-  discordTimestamp,
-  escapeMarkdown,
-  textDisplay,
-  trimComponentText,
-  unfurledMedia
-} from './components.ts'
+import { discordTimestamp, escapeMarkdown, trimComponentText } from './components.ts'
 import {
   BROWSER_USER_AGENT,
   MAX_DISCORD_ATTACHMENTS,
@@ -43,19 +40,18 @@ export async function sendTwitterAutoembed(
   const status = await fetchTwitterStatus(statusID, context.env.FAUNA_URL)
   const assets = await prepareTwitterAssets(context, status)
   await safeCreateMessage(context.client, message.channelID, {
+    ...twitterMessage(realURL, status, assets),
     allowedMentions: suppressAllMentions,
-    components: twitterComponents(realURL, status, assets),
     files: assets.files,
-    flags: MessageFlags.IS_COMPONENTS_V2,
     messageReference: replyMessageReference(message)
   })
 }
 
-export function twitterComponents(
+export function twitterMessage(
   realURL: string,
   status: TwitterStatus,
   assets: TwitterComponentAssets
-): Array<MessageComponent> {
+): CreateMessageOptions {
   const timestamp = discordTimestamp(status.created_at) ?? 'unknown time'
   const account = status.account
   const displayName = account?.display_name ?? account?.username ?? 'Twitter'
@@ -73,45 +69,37 @@ export function twitterComponents(
     header += `\n${content}`
   }
 
-  const containerComponents: ContainerComponent['components'] = []
-  if (assets.avatarReference) {
-    containerComponents.push({
-      accessory: {
-        media: unfurledMedia(assets.avatarReference),
-        type: ComponentTypes.THUMBNAIL
-      },
-      components: [textDisplay(trimComponentText(header, 3500))],
-      type: ComponentTypes.SECTION
-    })
-  } else {
-    containerComponents.push(textDisplay(trimComponentText(header, 3500)))
-  }
+  const headerText = trimComponentText(header, 3500)
 
-  if (assets.mediaItems.length > 0) {
-    containerComponents.push({
-      items: assets.mediaItems,
-      type: ComponentTypes.MEDIA_GALLERY
-    })
-  }
-
-  containerComponents.push({
-    accessory: {
-      label: 'View Post',
-      style: ButtonStyles.LINK,
-      type: ComponentTypes.BUTTON,
-      url: realURL
-    },
-    components: [textDisplay(`-# Twitter - ${timestamp}`)],
-    type: ComponentTypes.SECTION
+  return ComponentMessage({
+    children: [
+      <Container accentColor={TWITTER_COMPONENT_COLOR}>
+        {assets.avatarReference ? (
+          <Section accessory={<Thumbnail url={assets.avatarReference} />}>
+            <TextDisplay>{headerText}</TextDisplay>
+          </Section>
+        ) : (
+          <TextDisplay>{headerText}</TextDisplay>
+        )}
+        {assets.mediaItems.length > 0 ? (
+          <MediaGallery>
+            {assets.mediaItems.map((item) => (
+              <MediaGalleryItem url={item.url} description={item.description} />
+            ))}
+          </MediaGallery>
+        ) : null}
+        <Section
+          accessory={
+            <Button style={ButtonStyles.LINK} url={realURL}>
+              View Post
+            </Button>
+          }
+        >
+          <TextDisplay>{`-# Twitter - ${timestamp}`}</TextDisplay>
+        </Section>
+      </Container>
+    ]
   })
-
-  return [
-    {
-      accentColor: TWITTER_COMPONENT_COLOR,
-      components: containerComponents,
-      type: ComponentTypes.CONTAINER
-    }
-  ]
 }
 
 async function prepareTwitterAssets(
@@ -136,7 +124,7 @@ async function prepareTwitterAssets(
     )
   ])
 
-  const mediaItems = media.flatMap((asset, index): Array<MediaGalleryItem> => {
+  const mediaItems = media.flatMap((asset, index) => {
     if (asset === undefined) {
       return []
     }
@@ -145,7 +133,7 @@ async function prepareTwitterAssets(
     return [
       {
         description: description ? trimComponentText(description, 1024) : undefined,
-        media: unfurledMedia(asset.reference)
+        url: asset.reference
       }
     ]
   })
